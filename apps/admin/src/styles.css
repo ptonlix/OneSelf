@@ -1,0 +1,152 @@
+:root {
+  color: #1c1915;
+  background: #f3efe6;
+  font-family: "Iowan Old Style", Palatino, "Palatino Linotype", "Songti SC", serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.shell {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 3rem;
+}
+
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+}
+
+nav a,
+button.link {
+  color: #0f6b4c;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+h1 {
+  font-size: 1.8rem;
+  line-height: 1.2;
+  margin: 0 0 0.75rem;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+}
+
+.card {
+  background: #fffdf8;
+  border: 1px solid #ddd4c4;
+  border-radius: 12px;
+  padding: 1.25rem;
+}
+
+form,
+.stack {
+  display: grid;
+  gap: 0.85rem;
+}
+
+label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+fieldset {
+  margin: 0;
+  border: 1px solid #ddd4c4;
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+input[type="text"],
+input[type="password"] {
+  border: 1px solid #b7ad9d;
+  border-radius: 6px;
+  padding: 0.45rem 0.55rem;
+  background: white;
+}
+
+button.primary,
+button.secondary {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+}
+
+button.primary {
+  background: #0f6b4c;
+  color: #fffdf8;
+  border: 1px solid #0f6b4c;
+}
+
+button.secondary {
+  background: transparent;
+  color: #1c1915;
+  border: 1px solid #1c1915;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  background: #fff4d6;
+  border: 1px solid #a15c07;
+  border-radius: 8px;
+}
+
+.alert {
+  margin: 0;
+  color: #8d1d18;
+}
+
+.muted {
+  color: #5c564c;
+}
+
+.key {
+  display: block;
+  padding: 0.8rem;
+  background: #1c1915;
+  color: #fffdf8;
+  border-radius: 8px;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "SFMono-Regular", monospace;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
