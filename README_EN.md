@@ -6,7 +6,7 @@
 
 <p><strong>One self. One context. Every AI.</strong></p>
 
-<p>An open-source, self-hosted personal context store: Markdown is the source of truth, and one set of PCP operations serves your scripts, other people's agents, and your public homepage.</p>
+<p>Open-source personal context management: build one context about you, let every AI understand you, and keep privacy and efficiency in balance.</p>
 
 <p>
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript strict" />
@@ -31,29 +31,34 @@
 
 ## 💡 What is OneSelf
 
-Personal data is scattered across résumés, notes, scanned documents, and chats with different agents. Every new agent needs the same background pasted in again, and nothing says what may be public and what is only for that one agent.
+Every time you connect a new AI, you explain your background all over again, and the more you share, the harder it gets to tell what may be public and what belongs to only one AI.
 
-OneSelf is a **self-hosted, single-owner personal data store** that keeps three concerns apart:
+OneSelf is open-source, self-hosted **personal context management**. Your résumé, experience, notes, photos, and scanned documents come together as one context about you: text becomes pages, and images and PDFs are attached to those pages as originals. Any AI agent reads, writes back to, and maintains it through one set of PCP operations, available over both HTTP and MCP. You approve which agent sees which sources and whether it may edit or publish, and you can take that access back at any time. Your public homepage is just another outlet of the same context: it shows only what you mark public, and a redesign goes live only when you say so.
 
-- **Storage**: every page is a Markdown file stored in object storage under its content hash. PostgreSQL holds only a predefined index; no kind of data gets its own business table.
-- **Agent access**: every data and site operation lives in PCP (Personal Context Protocol). HTTP (OpenAPI) and MCP share one operation table. Your own agents use API keys; other people's agents use the OAuth 2.1 device flow. Permissions are granted per source (folder) at three levels: read, write, change visibility.
-- **Publishing**: the public site is a static landing page whose browser script reads the public PCP anonymously at runtime. The built-in original page already shows your public data; a customized version is uploaded by an agent and goes live only after you approve it.
+- **Efficiency**: one context shared by every AI. Agents onboard themselves from the discovery document and skills, and they help you organize and write back, so you never have to introduce yourself again.
+- **Privacy**: private by default, granted per source, every grant approved by you and revocable at any time, and the whole service runs on your own machine.
 
-> In short: your data lives in one place, and you approve who reads it, what they see, and when your homepage changes.
+> In short: One self. One context. Every AI. You decide which context goes to which AI, how much of it, and when to take it back.
 
 ## ✨ Features
 
-**OneSelf is built for agents: reading and writing data, filing originals, and redesigning the homepage all happen through PCP. People only approve: which agent gets which permissions, and which homepage version goes live.**
+**OneSelf is agent-first personal context management: agents read, organize, and maintain; you set the boundaries: who gets what, how much, and for how long.**
 
-- **Agents onboard themselves**: reading `/.well-known/pcp` gives an agent the operation list, OpenAPI, MCP, OAuth endpoints, and the two skills ([data](skills/data.md), [original page](skills/original-page.md)), so nobody has to paste background in again.
-- **One operation table for HTTP and MCP**: the 40 data and site operations registered in [`packages/operations`](packages/operations/src/registry.ts) generate the `/pcp/v1` routes, `/openapi.json`, and `POST /mcp` (official MCP SDK, in-process Streamable HTTP). API key management is HTTP-only and never exposed to MCP.
-- **Humans approve, secrets stay put**: other people's agents use the OAuth 2.1 device flow (`oidc-provider`); you pick sources and permissions at `/admin/device`. Access tokens last 15 minutes; refresh tokens rotate on use and are stored only as hashes. API keys start with `osk_` and are shown once on the approval page. Agents cannot create keys or approve a site launch.
-- **Markdown is the source, new data needs no migration**: résumés, experience, notes, and document summaries are all pages with frontmatter, and new `type`s need no migration. `## Facts`, `## Timeline`, tags, and `[[source/slug]]` links are written back into the Markdown and indexed for `search`, `query`, and `recall`.
-- **Private by default**: `visibility` defaults to `private`. Without read access, private, deleted, and missing pages all return the same `not_found`. Making a page public needs the separate "change visibility" permission.
-- **Originals stay under your control**: images and PDFs (up to 20 MiB each) go to object storage and are attached through the page's `files` frontmatter; `/media/{id}` is anonymously readable only when the owning page is public.
-- **Agents redesign, you publish**: an agent downloads the original-page source zip, uploads its build as an immutable release, previews it at `/_preview/{id}/`, and requests activation. The site pointer moves only after you open the approval link and accept. Rolling back uses the same flow.
-- **History and recovery**: each page keeps its 50 most recent versions for revert; soft-deleted pages and sources can be restored within 30 days.
-- **One process, self-hosted**: API, MCP, OAuth, admin UI, and the public site run in one Node.js process. Docker Compose adds PostgreSQL 18 and RustFS, with one public ingress chosen from cloudflared, Caddy, or Tailscale.
+**🗂️ Manage**
+
+- **One context for everything about you**: experience, notes, and document summaries become pages, and photos and PDFs are uploaded as originals and attached to them; new kinds of data need no schema change, and facts, timelines, tags, and links between pages are indexed for keyword, filtered, and fact search.
+- **Every change is traceable and reversible**: incremental edits must carry the current version, so nobody silently overwrites changes they haven't seen; each page keeps its last 50 versions, and deleted pages and sources can be restored for 30 days.
+
+**🔐 Privacy**
+
+- **Private by default, public only by your choice**: permissions per source at three levels (read, write, change visibility); without access, a private page looks exactly like a missing one. Your public homepage shows only what you mark public, and agents can redesign it, but a new version goes live only after you approve.
+- **You approve every grant, and can revoke any of them**: whether an agent connects with an API key or the OAuth device flow, you confirm it on your approval page, and keys are shown once; revoke any single key or grant and the next request fails. Agents can't issue themselves keys or approve on your behalf.
+- **Your context stays on your machine**: one Node.js process with PostgreSQL and RustFS, deployed with Docker Compose; agents only use the API and never touch the database, object storage, or secrets.
+
+**⚡ Efficiency**
+
+- **Agent-first, any AI can onboard itself**: an agent reads `/.well-known/pcp` and two skills to learn how to use it; one operation table serves both HTTP (OpenAPI) and MCP, so any AI that speaks either can connect, with identical results.
+- **AI keeps it current, no more repeating yourself**: agents can read originals you upload and turn them into pages, remember or forget a fact, add a timeline entry, tags, and links, so the next AI always reads the latest you.
 
 ## 🚀 Quick start
 
@@ -68,7 +73,7 @@ cp .env.example .env
 Edit `.env` and set at least:
 
 - `PUBLIC_ORIGIN`: the single public origin, e.g. `https://your-domain`
-- `OWNER_PASSWORD`: the owner's initial password (must be changed on first login)
+- `OWNER_PASSWORD`: the initial password for your account (must be changed on first login)
 - `POSTGRES_PASSWORD`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`
 - the variables your ingress needs (`TUNNEL_TOKEN` by default)
 
@@ -81,7 +86,7 @@ docker compose up -d --build
 > [!IMPORTANT]
 > The app does **not** run database migrations on startup. Migrations live in [`packages/db/migrations`](packages/db/migrations), and `pnpm db:migrate` applies them with drizzle-kit using `DATABASE_URL` from `.env`. Production Compose does not publish the PostgreSQL port to the host, so plan a migration run before first start.
 
-Then open `PUBLIC_ORIGIN` for the public homepage, sign in and change your password at `PUBLIC_ORIGIN/admin`, and give `PUBLIC_ORIGIN/.well-known/pcp` to your agent.
+Then open `PUBLIC_ORIGIN` for the public homepage, sign in and change your password at `PUBLIC_ORIGIN/admin`, and give `PUBLIC_ORIGIN/.well-known/pcp` to any AI agent you want to connect.
 
 ### 💻 Option 2: Local development
 
@@ -123,7 +128,7 @@ node --env-file=.env --experimental-strip-types apps/server/src/index.ts
 Open <http://127.0.0.1:3000> for the original page and <http://127.0.0.1:3000/admin> to sign in.
 
 > [!TIP]
-> On direct start the app checks `DATABASE_URL`, `OBJECT_STORAGE_*`, `apps/admin/dist`, and `packages/original-pages/dist`, and refuses to start if any is missing. It also refuses to start when there is no owner yet and `OWNER_PASSWORD` is not set.
+> On direct start the app checks `DATABASE_URL`, `OBJECT_STORAGE_*`, `apps/admin/dist`, and `packages/original-pages/dist`, and refuses to start if any is missing. It also refuses to start when no account exists yet and `OWNER_PASSWORD` is not set.
 
 ## 🔧 Configuration
 
@@ -132,7 +137,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | Variable                                                          | Description                                                                                                                                          |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PUBLIC_ORIGIN`                                                   | The single public origin, used for discovery, OAuth issuer, approval links, and media URLs; adds `Secure` to the cookie when HTTPS                   |
-| `OWNER_LOGIN` / `OWNER_PASSWORD`                                  | Creates the single owner on first start (Argon2id hash only) and forces a password change                                                            |
+| `OWNER_LOGIN` / `OWNER_PASSWORD`                                  | Creates your account (the single account owner) on first start, stores only an Argon2id hash, and forces a password change                           |
 | `OWNER_RESET_PASSWORD`                                            | Set temporarily if you forget the password; on restart it replaces the hash and forces a change again. Remove it afterwards. There is no email reset |
 | `DATABASE_URL`                                                    | PostgreSQL connection string; built from `POSTGRES_PASSWORD` in Compose                                                                              |
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
@@ -144,40 +149,39 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 ## 🧱 Architecture
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="OneSelf architecture: browsers open the site served by pointer and read the public PCP anonymously; your own agents use API keys and other agents use device-flow tokens to call the same PCP operation table; one Node.js process stores Markdown, originals, and site bundles in RustFS and the index, grants, and site pointer in PostgreSQL" width="100%" />
+  <img src="docs/images/architecture.png" alt="OneSelf architecture: browsers open the site served by pointer and read the public PCP anonymously; any AI agent uses an API key or device-flow token you approved to call the same PCP operation table; one Node.js process stores pages, originals, and site bundles in RustFS and the index, grants, and site pointer in PostgreSQL" width="100%" />
 </p>
 
 - **One process**: PCP, MCP, OAuth, the admin static files, and the published site are all served by one Hono app. No microservices, no Redis, no queue.
-- **Rules stay out of routes**: HTTP and MCP only authenticate, parse, and respond. Shared use cases live in `apps/server/src/app`, business rules in pure-TypeScript `packages/domain`; object storage, clock, and Markdown parsing come in through `ports` / `adapters`, and dependency-cruiser enforces the direction.
-- **Source vs. projection**: Markdown, originals, and site files live in object storage; page bodies, tags, links, facts, and timelines in PostgreSQL are projections. A write stores the hashed object first, then updates projections and appends a version in one transaction.
+- **Rules stay out of routes**: HTTP and MCP only authenticate, parse, and respond. Shared use cases live in `apps/server/src/app`, business rules in pure-TypeScript `packages/domain`; object storage, clock, and page parsing come in through `ports` / `adapters`, and dependency-cruiser enforces the direction.
+- **Source vs. projection**: page sources, originals, and site files live in object storage; page bodies, tags, links, facts, and timelines in PostgreSQL are projections. A write stores the hashed object first, then updates projections and appends a version in one transaction.
 - **The site never queries pages**: the handler that serves site files only follows the site pointer; data on the page comes from separate browser requests to the public PCP.
 
-| Role               | Can                                                                                                                         | Cannot                                  |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| Owner              | Sign in to the admin UI, approve device codes, create and revoke API keys, approve site launches, delete or restore sources | Reset the password by email             |
-| Own agent / script | Read and write allowed sources with an approved API key; request a site launch with `site:write`                            | Create or manage keys, approve a launch |
-| Third-party agent  | Get a short-lived token via the device flow and call the same operations within the granted sources                         | Manage keys, approve a launch           |
-| Visitor            | Open the live public site and read public data and public originals                                                         | Read any `private` page                 |
+| Role                | Can                                                                                                                                                     | Cannot                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| You (account owner) | Sign in to the admin UI, approve API keys and device-flow grants, revoke keys and grants, approve homepage launches, delete or restore sources          | Reset the password by email                       |
+| AI agent            | Call the same operations within the approved sources and permissions using an API key or device-flow token; request a homepage launch with `site:write` | Create or manage keys, approve grants or launches |
+| Visitor             | Open the live public site and read public content and public originals                                                                                  | Read any `private` page                           |
 
 For the Mermaid system overview, code boundaries, tables, and key flows, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#系统总览图) (Chinese, with an English diagram).
 
 ## 🤖 Agent entry points
 
-| Path                                 | Who                    | Purpose                                                                         |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
-| `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills        |
-| `/skills/data.md`                    | Agents                 | How to write data: frontmatter, visibility, the two fences, files, links        |
-| `/skills/original-page.md`           | Site agents            | What the original page shows; how to customize, upload, preview, request launch |
-| `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                   |
-| `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                       |
-| `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations     |
-| `/pcp/v1/public/*`                   | Anyone                 | Only `visibility: public`, non-deleted pages                                    |
-| `/media/{id}`                        | Depends on owning page | Original bytes; anonymous when the owning page is public                        |
-| `/oauth/device/auth`, `/oauth/token` | Third-party agents     | Request a device code; obtain and refresh access tokens                         |
-| `/admin`                             | Owner                  | Sign in, change password, approve device codes, API keys, and site launches     |
-| `/_preview/{releaseId}/`             | Anyone                 | Preview an unreleased build without moving the live pointer                     |
+| Path                                 | Who                    | Purpose                                                                              |
+| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------ |
+| `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills             |
+| `/skills/data.md`                    | Agents                 | How to write context: page fields, visibility, facts and timelines, originals, links |
+| `/skills/original-page.md`           | Site agents            | What the original page shows; how to customize, upload, preview, request launch      |
+| `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                        |
+| `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                            |
+| `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations          |
+| `/pcp/v1/public/*`                   | Anyone                 | Only `visibility: public`, non-deleted pages                                         |
+| `/media/{id}`                        | Depends on owning page | Original bytes; anonymous when the owning page is public                             |
+| `/oauth/device/auth`, `/oauth/token` | Agents                 | Request a device code; obtain and refresh access tokens                              |
+| `/admin`                             | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches          |
+| `/_preview/{releaseId}/`             | Anyone                 | Preview an unreleased build without moving the live pointer                          |
 
-Authentication: API keys use `Authorization: ApiKey <key>` or `X-Api-Key`; OAuth access tokens use `Authorization: Bearer <token>`. Errors are always `{ "error", "message" }`. Paths are defined in [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts).
+Agents connect with either an API key (`Authorization: ApiKey <key>` or `X-Api-Key`) or an access token from the OAuth 2.1 device flow (`Authorization: Bearer <token>`). You approve both, and the same permissions give the same results. Errors are always `{ "error", "message" }`. Paths are defined in [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts).
 
 <details>
 <summary><strong>PCP operations</strong></summary>
@@ -194,9 +198,12 @@ Authentication: API keys use `Authorization: ApiKey <key>` or `X-Api-Key`; OAuth
 
 </details>
 
-## 📝 Writing data
+## 🧩 How context is organized
 
-A page is identified by `(source, slug)`. `type` and `title` go in frontmatter; any other keys are free-form. Statements that need a validity date or confidence go under `## Facts`, and dated events under `## Timeline`:
+A context is made of **pages** and **originals**, grouped by source, e.g. `profile`, `career`, `health`:
+
+- **Pages**: identified by `(source, slug)`; fields such as `type`, `title`, and `visibility` go in the frontmatter at the top, and any other keys are free-form. Statements that need a validity date or confidence go under `## Facts`, and dated events under `## Timeline`.
+- **Originals**: photos, scans, and documents (JPEG, PNG, WebP, GIF, PDF, up to 20 MiB each) are uploaded with `file_upload` and referenced from a page's `files`; an original is anonymously readable only when its page is public.
 
 ```markdown
 ---
@@ -225,7 +232,7 @@ Builds personal tools and developer products.
 - 2024-06-01 | Joined a company | Backend work
 ```
 
-Only these two fences are recognized, and a parse failure rolls back the whole write. Full rules: [skills/data.md](skills/data.md).
+Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/data.md](skills/data.md).
 
 ## 📁 Project structure
 
@@ -237,7 +244,7 @@ OneSelf/
 ├── packages/
 │   ├── domain/            # Pure business rules: pages, originals, search, access, site pointer
 │   ├── operations/        # Operation registry: names, paths, http-only. Zero dependencies
-│   ├── ports/             # Interfaces for object storage, clock, Markdown parsing
+│   ├── ports/             # Interfaces for object storage, clock, page parsing
 │   ├── adapters/          # S3 and PostgreSQL implementations plus in-memory test fakes
 │   ├── db/                # Drizzle schema and SQL migrations
 │   ├── public-client/     # Anonymous public PCP client, also used by custom sites
@@ -289,7 +296,7 @@ Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/admin`, `/skills`, `/media`,
 
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
-- [Skill: writing data](skills/data.md)
+- [Skill: how to write context](skills/data.md)
 - [Skill: original page](skills/original-page.md)
 - [OpenSpec change: oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
 - On a running instance: `/.well-known/pcp`, `/openapi.json`, `/skills/data.md`, `/skills/original-page.md`
