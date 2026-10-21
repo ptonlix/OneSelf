@@ -1,3 +1,4 @@
+export type { Clock } from "@oneself/ports";
 import type { Clock } from "@oneself/ports";
 
 /** Test and process clock. Retention math stays in `@oneself/domain`. */
@@ -18,5 +19,12 @@ export class ManualClock implements Clock {
 
   iso(): string {
     return this.now().toISOString();
+  }
+}
+
+/** Wall clock for the process entry. Tests keep using {@link ManualClock}. */
+export class SystemClock extends ManualClock {
+  override now(): Date {
+    return new Date();
   }
 }

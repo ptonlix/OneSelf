@@ -26,13 +26,13 @@
 ## 4. 第二波并行车道
 
 - [x] 4.1 `packages/adapters`：实现 RustFS 所用的 S3 端口、Postgres 端口，以及测试用的内存对象存储。单元测试使用内存假实现，不连接生产端点。
-- [ ] 4.2 `apps/server` 写入路径：同一事务完成对象指针、投影和最多 50 条版本；`put_pages` 任一页失败则全部不写；fence 失败整次回滚。每小时清理超过 30 天的软删除和超过 7 天且无引用的对象，不删除 release。集成测试覆盖 stale hash、模糊替换、跨页原件和这次清理。
-- [ ] 4.3 `apps/server` 读取与检索：实现授权搜索、匿名公开搜索、`query`、`recall`、目录、`whoami`、`resolve_slugs` 和结构读接口。`search` 查 `pages` 的 type、标题、正文和 frontmatter，不查 `chunks`。主人可以软删除和恢复 source；API Key 不能。测试断言私有页不改变公开命中和计数，匿名 `query` 返回 `unauthorized`，无权限、已删除和不存在都是 `not_found`，删除目录后其他页的链接原文不变。
-- [ ] 4.4 `apps/server` 站点：按指针提供 `original` 或 release。预览匿名可开且不移动指针。只有主人批准才移动指针。公开资料变化后不用重新激活；已打进 zip 的副本不回收。测试覆盖保留路径整包拒绝、没有删除 release 的路由，以及 Agent 调用批准路由得到 `forbidden`。
-- [ ] 4.5 `apps/server` 身份：实现主人引导、改密门、API Key 一次展示、设备码、刷新令牌轮换和重用即作废。测试断言启动不生成 API Key，且 OAuth 不能管理密钥。
-- [ ] 4.6 `apps/server` 协议与入口：从注册表生成 OpenAPI 和 `POST /mcp`，路径与 protocol 规格一致，不启用 CORS。发现文档只使用 `PUBLIC_ORIGIN`。限流只信任当前入口这一跳。Cloudflare 规则不缓存 `/pcp`、`/oauth`、`/admin`、`/skills`、`/media`、`/_preview`。测试断言 MCP 工具列表没有密钥操作，伪造的 `X-Forwarded-For` 不改变限额桶。
+- [x] 4.2 `apps/server` 写入路径：同一事务完成对象指针、投影和最多 50 条版本；`put_pages` 任一页失败则全部不写；fence 失败整次回滚。每小时清理超过 30 天的软删除和超过 7 天且无引用的对象，不删除 release。集成测试覆盖 stale hash、模糊替换、跨页原件和这次清理。
+- [x] 4.3 `apps/server` 读取与检索：实现授权搜索、匿名公开搜索、`query`、`recall`、目录、`whoami`、`resolve_slugs` 和结构读接口。`search` 查 `pages` 的 type、标题、正文和 frontmatter，不查 `chunks`。主人可以软删除和恢复 source；API Key 不能。测试断言私有页不改变公开命中和计数，匿名 `query` 返回 `unauthorized`，无权限、已删除和不存在都是 `not_found`，删除目录后其他页的链接原文不变。
+- [x] 4.4 `apps/server` 站点：按指针提供 `original` 或 release。预览匿名可开且不移动指针。只有主人批准才移动指针。公开资料变化后不用重新激活；已打进 zip 的副本不回收。测试覆盖保留路径整包拒绝、没有删除 release 的路由，以及 Agent 调用批准路由得到 `forbidden`。
+- [x] 4.5 `apps/server` 身份：实现主人引导、改密门、API Key 一次展示、设备码、刷新令牌轮换和重用即作废。测试断言启动不生成 API Key，且 OAuth 不能管理密钥。
+- [x] 4.6 `apps/server` 协议与入口：从注册表生成 OpenAPI 和 `POST /mcp`，路径与 protocol 规格一致，不启用 CORS。发现文档只使用 `PUBLIC_ORIGIN`。限流只信任当前入口这一跳。Cloudflare 规则不缓存 `/pcp`、`/oauth`、`/admin`、`/skills`、`/media`、`/_preview`。测试断言 MCP 工具列表没有密钥操作，伪造的 `X-Forwarded-For` 不改变限额桶。
 
 ## 5. 主代理合并并验收
 
-- [ ] 5.1 合并 adapters 后合并 server，再次更新锁文件。运行全部单元测试、HTTP 与 MCP 契约测试和 dependency-cruiser，三者都通过。
-- [ ] 5.2 用 `compose.dev.yaml` 启动 PostgreSQL 和回环上的 RustFS `9000`，跑一条闭环：改密、写入公开页、原始页面读到它、上传 release、批准前线上路径不变、批准后改变、再把该页改成 private 后公开读消失。开发和生产配置都没有本地目录存储。这条测试通过才算本变更完成。
+- [x] 5.1 合并 adapters 后合并 server，再次更新锁文件。运行全部单元测试、HTTP 与 MCP 契约测试和 dependency-cruiser，三者都通过。
+- [x] 5.2 用 `compose.dev.yaml` 启动 PostgreSQL 和回环上的 RustFS `9000`，跑一条闭环：改密、写入公开页、原始页面读到它、上传 release、批准前线上路径不变、批准后改变、再把该页改成 private 后公开读消失。开发和生产配置都没有本地目录存储。这条测试通过才算本变更完成。

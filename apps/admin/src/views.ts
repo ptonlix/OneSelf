@@ -28,7 +28,7 @@ function yesNo(value: boolean): string {
   return value ? "是" : "否";
 }
 
-export function ReadGrantNotice(): ReactElement {
+function ReadGrantNotice(): ReactElement {
   return h("p", { className: "notice" }, READ_GRANT_NOTICE);
 }
 

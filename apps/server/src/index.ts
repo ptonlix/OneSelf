@@ -10,7 +10,7 @@ import { openPostgres, openS3ObjectStore } from "@oneself/adapters";
 import { memoryObjectStore } from "@oneself/adapters/testing";
 import { Hono } from "hono";
 
-import { ManualClock } from "./app/clock.js";
+import { ManualClock, SystemClock } from "./app/clock.js";
 import {
   openRuntime,
   StartupRefused,
@@ -117,7 +117,7 @@ if (isDirectRun()) {
 }
 
 async function listen(): Promise<void> {
-  const clock = new ManualClock();
+  const clock = new SystemClock();
   const endpoint = env("OBJECT_STORAGE_ENDPOINT");
   const objectStore =
     endpoint === undefined

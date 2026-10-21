@@ -1,6 +1,6 @@
 import { fail, ok, type DomainResult } from "./result.js";
 
-export type FrontmatterScalar = string | number | boolean | null;
+type FrontmatterScalar = string | number | boolean | null;
 
 export type FrontmatterValue = FrontmatterScalar | readonly FrontmatterScalar[];
 

@@ -1,0 +1,9 @@
+# Host ports for the closed loop when 5432 and 9000 are already taken.
+# compose.dev.yaml remains the default: loopback 5432 and 9000.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:5433:5432"
+  rustfs:
+    ports: !override
+      - "127.0.0.1:9002:9000"

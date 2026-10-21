@@ -67,10 +67,6 @@ export interface DeviceApprovalBody {
 
 export type SiteDecision = "approve" | "reject";
 
-export interface SiteDecisionBody {
-  decision: SiteDecision;
-}
-
 export type GrantFlag = "read" | "write" | "visibility";
 
 export interface SourceDraft {
