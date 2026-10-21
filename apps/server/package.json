@@ -1,5 +1,15 @@
 {
   "name": "@oneself/server",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@oneself/adapters": "workspace:*",
+    "@oneself/domain": "workspace:*",
+    "@oneself/operations": "workspace:*",
+    "@oneself/ports": "workspace:*",
+    "hash-wasm": "4.12.0",
+    "hono": "4.10.7",
+    "zod": "4.1.12"
+  }
 }
