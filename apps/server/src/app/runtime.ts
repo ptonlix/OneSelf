@@ -50,9 +50,23 @@ import {
   type SourceGrant,
   type TimelineEntry,
 } from "@oneself/domain";
+import type { PostgresHandle, PostgresStore } from "@oneself/adapters";
 import type { MarkdownParser, ObjectStore } from "@oneself/ports";
 
 import { ManualClock } from "./clock.js";
+import {
+  apiKeyInsert,
+  apiKeyRequestInsert,
+  loadProjection,
+  oauthGrantInsert,
+  saveDomain,
+  type ApiKeyRecord,
+  type ApiKeyRequestRecord,
+  type LoadedProjection,
+  type OauthGrantRecord,
+  type OwnerRecord,
+  type SiteFileRecord,
+} from "./postgres-state.js";
 import {
   hashesEqual,
   randomId,
@@ -101,6 +115,11 @@ export type ServerOptions = {
   readonly skillsDir: string;
   readonly originalPagesDir: string;
   readonly log?: (line: string) => void;
+  readonly postgres?: PostgresHandle;
+};
+
+type RuntimeOptions = ServerOptions & {
+  readonly loaded?: LoadedProjection;
 };
 
 export type Actor = {
@@ -112,52 +131,6 @@ export type Actor = {
 export type OauthHttpResult = {
   readonly status: number;
   readonly body: Record<string, unknown>;
-};
-
-type OwnerRecord = {
-  login: string;
-  passwordHash: string;
-  mustChangePassword: boolean;
-};
-
-type ApiKeyRecord = {
-  id: string;
-  keyHash: string;
-  label: string;
-  unrestrictedData: boolean;
-  siteWrite: boolean;
-  sources: SourceGrant[];
-  createdAt: string;
-  lastUsedAt: string | null;
-  revokedAt: string | null;
-};
-
-type ApiKeyRequestRecord = {
-  id: string;
-  label: string;
-  unrestrictedData: boolean;
-  siteWrite: boolean;
-  sources: SourceGrant[];
-  status: "pending" | "confirmed" | "expired";
-  expiresAt: string;
-  createdAt: string;
-  apiKeyId: string | null;
-};
-
-type AccessTokenRecord = {
-  hash: string;
-  expiresAt: string;
-};
-
-type OauthGrantRecord = {
-  id: string;
-  siteWrite: boolean;
-  sources: SourceGrant[];
-  refreshTokenHash: string | null;
-  rotatedRefreshHashes: string[];
-  revokedAt: string | null;
-  createdAt: string;
-  accessTokens: AccessTokenRecord[];
 };
 
 type DeviceRecord = {
@@ -176,12 +149,6 @@ type AuthCodeRecord = {
   sources: SourceGrant[];
   expiresAt: string;
   consumed: boolean;
-};
-
-type SiteFileRecord = {
-  releaseId: string;
-  path: string;
-  objectKey: string;
 };
 
 type RateScope = "search" | "upload" | "login";
@@ -214,15 +181,24 @@ export class Runtime {
   #skills: ReadonlyMap<string, Uint8Array>;
   #originalRoot: string;
   #log: (line: string) => void;
+  #postgres: PostgresHandle | null;
+  #store: PostgresStore | null;
 
-  constructor(options: ServerOptions) {
+  constructor(options: RuntimeOptions) {
     this.origin = (options.publicOrigin ?? "http://127.0.0.1:3000").replace(/\/$/, "");
     this.ingress = options.ingress ?? "none";
     this.oauthAuthorizationCode = options.oauthAuthorizationCode ?? false;
     this.clock = options.clock ?? new ManualClock();
     this.objectStore = options.objectStore;
     this.parser = createMarkdownParser();
-    this.state = emptyDomainState();
+    this.state = options.loaded?.state ?? emptyDomainState();
+    this.#owner = options.loaded?.owner ?? null;
+    this.#apiKeys = options.loaded?.apiKeys ?? [];
+    this.#apiKeyRequests = options.loaded?.apiKeyRequests ?? [];
+    this.#grants = options.loaded?.grants ?? [];
+    this.#siteFiles = options.loaded?.siteFiles ?? [];
+    this.#postgres = options.postgres ?? null;
+    this.#store = options.postgres?.store ?? null;
     this.#originalRoot = options.originalPagesDir;
     this.#log =
       options.log ??
@@ -249,17 +225,33 @@ export class Runtime {
       ) {
         throw new StartupRefused();
       }
-      this.#owner = {
+      const owner: OwnerRecord = {
         login,
         passwordHash: await hashPassword(password),
         mustChangePassword: true,
       };
+      await this.#store?.insertOwner({
+        id: 1,
+        login: owner.login,
+        password_hash: owner.passwordHash,
+        must_change_password: true,
+      });
+      this.#owner = owner;
     }
     if (reset !== undefined && reset.length > 0) {
-      this.#owner.passwordHash = await hashPassword(reset);
+      const passwordHash = await hashPassword(reset);
+      await this.#store?.updateOwner({
+        password_hash: passwordHash,
+        must_change_password: true,
+      });
+      this.#owner.passwordHash = passwordHash;
       this.#owner.mustChangePassword = true;
       this.#log("owner password hash replaced");
     }
+  }
+
+  close(): Promise<void> {
+    return this.#postgres?.close() ?? Promise.resolve();
   }
 
   exclusive<T>(fn: () => Promise<T>): Promise<T> {
@@ -349,7 +341,12 @@ export class Runtime {
         return fail("invalid", "password is required");
       }
       const owner = this.#requireOwner();
-      owner.passwordHash = await hashPassword(password);
+      const passwordHash = await hashPassword(password);
+      await this.#store?.updateOwner({
+        password_hash: passwordHash,
+        must_change_password: false,
+      });
+      owner.passwordHash = passwordHash;
       owner.mustChangePassword = false;
       return ok({ must_change_password: false as const });
     });
@@ -367,7 +364,7 @@ export class Runtime {
   maintain(): Promise<void> {
     return this.exclusive(async () => {
       const now = this.clock.iso();
-      this.state = runHourlyMaintenance(this.state, now);
+      await this.#publish(runHourlyMaintenance(this.state, now));
       const referenced = referencedObjectKeys(this.state);
       const heads = await this.objectStore.list("");
       for (const head of heads) {
@@ -665,7 +662,7 @@ export class Runtime {
         pageSlug: null,
         createdAt: this.clock.iso(),
       });
-      this.state = next;
+      await this.#publish(next);
       return ok({ id, url: `${this.origin}/media/${id}` });
     });
   }
@@ -1309,7 +1306,15 @@ export class Runtime {
       }
       const next = cloneState(this.state);
       next.site.releases.push({ id, createdAt: this.clock.iso() });
-      this.state = next;
+      await this.#publish(next, (store) =>
+        store.insertSiteFiles(
+          stored.map((file) => ({
+            release_id: file.releaseId,
+            path: file.path,
+            object_key: file.objectKey,
+          })),
+        ),
+      );
       this.#siteFiles.push(...stored);
       return ok({ id });
     });
@@ -1349,7 +1354,7 @@ export class Runtime {
       }
       const next = cloneState(this.state);
       next.site.activations.push(requested.value.activation);
-      this.state = next;
+      await this.#publish(next);
       return ok({
         id,
         status: "pending",
@@ -1449,7 +1454,7 @@ export class Runtime {
           const current = next.site.activations[index];
           if (current !== undefined) {
             next.site.activations[index] = decided.value.activation;
-            this.state = next;
+            await this.#publish(next);
           }
         }
         return fail(decided.error, decided.message);
@@ -1461,7 +1466,7 @@ export class Runtime {
       if (current !== undefined) {
         next.site.activations[index] = decided.value.activation;
       }
-      this.state = next;
+      await this.#publish(next);
       return ok({
         status: decided.value.activation.status,
         release_id: decided.value.pointer.releaseId,
@@ -1484,17 +1489,19 @@ export class Runtime {
         return fail("invalid", "invalid timestamp");
       }
       const id = randomId("akr_");
-      this.#apiKeyRequests.push({
+      const request: ApiKeyRequestRecord = {
         id,
         label: input.label,
         unrestrictedData: input.unrestrictedData,
         siteWrite: input.siteWrite,
-        sources: input.unrestrictedData ? [] : input.sources,
+        sources: input.unrestrictedData ? [] : input.sources.map((source) => ({ ...source })),
         status: "pending",
         expiresAt,
         createdAt: now,
         apiKeyId: null,
-      });
+      };
+      await this.#store?.insertApiKeyRequest(apiKeyRequestInsert(request));
+      this.#apiKeyRequests.push(request);
       return ok({
         id,
         status: "pending",
@@ -1538,7 +1545,9 @@ export class Runtime {
       if (key.revokedAt !== null) {
         return fail("conflict", "api key is already revoked");
       }
-      key.revokedAt = this.clock.iso();
+      const revokedAt = this.clock.iso();
+      await this.#store?.updateApiKey(id, { revoked_at: new Date(revokedAt) });
+      key.revokedAt = revokedAt;
       return ok({ id });
     });
   }
@@ -1553,7 +1562,7 @@ export class Runtime {
       if (request === undefined) {
         return fail("not_found", "api key request not found");
       }
-      this.#expireKeyRequest(request);
+      await this.#expireKeyRequest(request);
       return ok({
         id: request.id,
         label: request.label,
@@ -1576,7 +1585,7 @@ export class Runtime {
       if (request === undefined) {
         return fail("not_found", "api key request not found");
       }
-      this.#expireKeyRequest(request);
+      await this.#expireKeyRequest(request);
       if (request.status === "expired") {
         return fail("conflict", "api key request has expired");
       }
@@ -1585,7 +1594,7 @@ export class Runtime {
       }
       const key = randomToken("osk_");
       const apiKeyId = randomId("key_");
-      this.#apiKeys.push({
+      const record: ApiKeyRecord = {
         id: apiKeyId,
         keyHash: sha256Hex(key),
         label: request.label,
@@ -1595,7 +1604,15 @@ export class Runtime {
         createdAt: this.clock.iso(),
         lastUsedAt: null,
         revokedAt: null,
+      };
+      await this.#writeAuth(async (store) => {
+        await store.insertApiKey(apiKeyInsert(record));
+        await store.updateApiKeyRequest(request.id, {
+          status: "confirmed",
+          api_key_id: apiKeyId,
+        });
       });
+      this.#apiKeys.push(record);
       request.status = "confirmed";
       request.apiKeyId = apiKeyId;
       return ok({ key });
@@ -1657,6 +1674,7 @@ export class Runtime {
         createdAt: this.clock.iso(),
         accessTokens: [],
       };
+      await this.#store?.insertOauthGrant(oauthGrantInsert(grant));
       this.#grants.push(grant);
       device.status = "approved";
       device.grantId = grant.id;
@@ -1753,7 +1771,10 @@ export class Runtime {
     return ok({ source: written.value.source, slug: written.value.slug, hash: written.value.hash });
   }
 
-  async #publish(next: DomainState): Promise<void> {
+  async #publish(
+    next: DomainState,
+    after?: (store: PostgresStore) => Promise<void>,
+  ): Promise<void> {
     const known = new Set(this.state.objects.map((object) => object.key));
     for (const object of next.objects) {
       if (known.has(object.key)) {
@@ -1761,7 +1782,27 @@ export class Runtime {
       }
       await this.objectStore.put(object.key, new TextEncoder().encode(object.bytes));
     }
-    this.state = next;
+    const store = this.#store;
+    if (store === null) {
+      this.state = next;
+      return;
+    }
+    // Bytes are stored before the projection transaction. A rollback leaves no row pointing at a new key.
+    const previous = this.state;
+    this.state = await store.transaction(async (tx) => {
+      const saved = await saveDomain(tx, previous, next);
+      if (after !== undefined) {
+        await after(tx);
+      }
+      return saved;
+    });
+  }
+
+  async #writeAuth(run: (store: PostgresStore) => Promise<void>): Promise<void> {
+    if (this.#store === null) {
+      return;
+    }
+    await this.#store.transaction(run);
   }
 
   #rewrite(
@@ -1817,7 +1858,7 @@ export class Runtime {
     return this.state.pages.find((page) => page.source === source && page.slug === slug);
   }
 
-  #authenticate(request: Request): Actor {
+  async #authenticate(request: Request): Promise<Actor> {
     const authorization = request.headers.get("authorization");
     if (authorization !== null) {
       const match = /^(ApiKey|Bearer)\s+(\S+)$/i.exec(authorization.trim());
@@ -1845,13 +1886,15 @@ export class Runtime {
     return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
   }
 
-  #actorFromApiKey(token: string): Actor {
+  async #actorFromApiKey(token: string): Promise<Actor> {
     const hash = sha256Hex(token);
     const key = this.#apiKeys.find((item) => hashesEqual(item.keyHash, hash));
     if (key === undefined || key.revokedAt !== null) {
       return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
     }
-    key.lastUsedAt = this.clock.iso();
+    const lastUsedAt = this.clock.iso();
+    await this.#store?.updateApiKey(key.id, { last_used_at: new Date(lastUsedAt) });
+    key.lastUsedAt = lastUsedAt;
     return {
       credential: {
         kind: "api_key",
@@ -1911,11 +1954,12 @@ export class Runtime {
     return this.#owner;
   }
 
-  #expireKeyRequest(request: ApiKeyRequestRecord): void {
+  async #expireKeyRequest(request: ApiKeyRequestRecord): Promise<void> {
     if (
       request.status === "pending" &&
       Date.parse(request.expiresAt) < this.clock.now().getTime()
     ) {
+      await this.#store?.updateApiKeyRequest(request.id, { status: "expired" });
       request.status = "expired";
     }
   }
@@ -1992,7 +2036,7 @@ export class Runtime {
     return { credential: "anonymous", admin: false, site_write: false, sources: [] };
   }
 
-  #oauthToken(params: URLSearchParams): OauthHttpResult {
+  async #oauthToken(params: URLSearchParams): Promise<OauthHttpResult> {
     const grantType = params.get("grant_type");
     if (grantType === "password" || grantType === "implicit") {
       return oauthError(400, "unsupported_grant_type", "grant type is not supported");
@@ -2030,11 +2074,15 @@ export class Runtime {
     if (grant === undefined || grant.revokedAt !== null) {
       return oauthError(400, "invalid_grant", "grant is not available");
     }
+    const issued = await this.#issueTokens(grant);
+    if (issued.status !== 200) {
+      return issued;
+    }
     device.consumed = true;
-    return this.#issueTokens(grant);
+    return issued;
   }
 
-  #authorizationCodeToken(params: URLSearchParams): OauthHttpResult {
+  async #authorizationCodeToken(params: URLSearchParams): Promise<OauthHttpResult> {
     const code = params.get("code") ?? "";
     const verifier = params.get("code_verifier") ?? "";
     const record = this.#authCodes.find((item) => hashesEqual(item.codeHash, sha256Hex(code)));
@@ -2049,29 +2097,39 @@ export class Runtime {
     if (verifier.length === 0 || !hashesEqual(digest, record.challenge)) {
       return oauthError(400, "invalid_grant", "pkce verification failed");
     }
-    record.consumed = true;
     const grant: OauthGrantRecord = {
       id: randomId("gr_"),
       siteWrite: record.siteWrite,
-      sources: record.sources,
+      sources: record.sources.map((source) => ({ ...source })),
       refreshTokenHash: null,
       rotatedRefreshHashes: [],
       revokedAt: null,
       createdAt: this.clock.iso(),
       accessTokens: [],
     };
+    await this.#store?.insertOauthGrant(oauthGrantInsert(grant));
+    const issued = await this.#issueTokens(grant);
+    if (issued.status !== 200) {
+      return issued;
+    }
+    record.consumed = true;
     this.#grants.push(grant);
-    return this.#issueTokens(grant);
+    return issued;
   }
 
-  #refresh(token: string): OauthHttpResult {
+  async #refresh(token: string): Promise<OauthHttpResult> {
     if (token.length === 0) {
       return oauthError(400, "invalid_grant", "refresh token is invalid");
     }
     const hash = sha256Hex(token);
     for (const grant of this.#grants) {
       if (grant.rotatedRefreshHashes.some((item) => hashesEqual(item, hash))) {
-        grant.revokedAt = this.clock.iso();
+        const revokedAt = this.clock.iso();
+        await this.#store?.updateOauthGrant(grant.id, {
+          revoked_at: new Date(revokedAt),
+          refresh_token_hash: null,
+        });
+        grant.revokedAt = revokedAt;
         grant.refreshTokenHash = null;
         grant.accessTokens = [];
         return oauthError(400, "invalid_grant", "refresh token was reused");
@@ -2087,15 +2145,17 @@ export class Runtime {
     return this.#issueTokens(grant);
   }
 
-  #issueTokens(grant: OauthGrantRecord): OauthHttpResult {
+  async #issueTokens(grant: OauthGrantRecord): Promise<OauthHttpResult> {
     const access = randomToken();
     const refresh = randomToken();
     const expiresAt = addMilliseconds(this.clock.iso(), ACCESS_TTL_MS);
     if (expiresAt === null) {
       return oauthError(400, "invalid_grant", "invalid timestamp");
     }
+    const refreshHash = sha256Hex(refresh);
+    await this.#store?.updateOauthGrant(grant.id, { refresh_token_hash: refreshHash });
     grant.accessTokens.push({ hash: sha256Hex(access), expiresAt });
-    grant.refreshTokenHash = sha256Hex(refresh);
+    grant.refreshTokenHash = refreshHash;
     return {
       status: 200,
       body: {
@@ -2278,7 +2338,25 @@ export async function openRuntime(
   options: Omit<ServerOptions, "objectStore"> & { objectStore?: ObjectStore },
   objectStore: ObjectStore,
 ): Promise<Runtime> {
-  const runtime = new Runtime({ ...options, objectStore });
-  await runtime.bootstrap(options.ownerLogin, options.ownerPassword, options.ownerResetPassword);
-  return runtime;
+  let runtime: Runtime | undefined;
+  try {
+    const loaded =
+      options.postgres === undefined
+        ? undefined
+        : await loadProjection(options.postgres.store, objectStore);
+    runtime = new Runtime({
+      ...options,
+      objectStore,
+      ...(loaded === undefined ? {} : { loaded }),
+    });
+    await runtime.bootstrap(options.ownerLogin, options.ownerPassword, options.ownerResetPassword);
+    return runtime;
+  } catch (error) {
+    if (runtime !== undefined) {
+      await runtime.close();
+    } else {
+      await options.postgres?.close();
+    }
+    throw error;
+  }
 }

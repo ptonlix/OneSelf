@@ -6,7 +6,7 @@ import {
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { openS3ObjectStore } from "@oneself/adapters";
+import { openPostgres, openS3ObjectStore } from "@oneself/adapters";
 import { memoryObjectStore } from "@oneself/adapters/testing";
 import { Hono } from "hono";
 
@@ -62,6 +62,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
         ? {}
         : { oauthAuthorizationCode: options.oauthAuthorizationCode }),
       ...(options.log === undefined ? {} : { log: options.log }),
+      ...(options.postgres === undefined ? {} : { postgres: options.postgres }),
     },
     objectStore,
   );
@@ -85,7 +86,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
     maintain: () => runtime.maintain(),
     close: () => {
       clearInterval(timer);
-      return Promise.resolve();
+      return runtime.close();
     },
   };
 }
@@ -128,6 +129,8 @@ async function listen(): Promise<void> {
           accessKeyId: env("OBJECT_STORAGE_ACCESS_KEY") ?? env("RUSTFS_ACCESS_KEY") ?? "",
           secretAccessKey: env("OBJECT_STORAGE_SECRET_KEY") ?? env("RUSTFS_SECRET_KEY") ?? "",
         });
+  const databaseUrl = env("DATABASE_URL");
+  const postgres = databaseUrl === undefined ? undefined : openPostgres(databaseUrl);
   const publicOrigin = env("PUBLIC_ORIGIN");
   const ownerLogin = env("OWNER_LOGIN");
   const ownerPassword = env("OWNER_PASSWORD");
@@ -137,6 +140,7 @@ async function listen(): Promise<void> {
     oauthAuthorizationCode: env("OAUTH_TEST_AUTHORIZATION_CODE") === "1",
     clock,
     objectStore,
+    ...(postgres === undefined ? {} : { postgres }),
     ...(publicOrigin === undefined ? {} : { publicOrigin }),
     ...(ownerLogin === undefined ? {} : { ownerLogin }),
     ...(ownerPassword === undefined ? {} : { ownerPassword }),
@@ -146,11 +150,17 @@ async function listen(): Promise<void> {
   const httpServer = createHttpServer((request, response) => {
     void forward(server, request, response);
   });
-  await new Promise<void>((resolve) => {
-    httpServer.listen(port, "127.0.0.1", () => {
-      resolve();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once("error", reject);
+      httpServer.listen(port, "127.0.0.1", () => {
+        resolve();
+      });
     });
-  });
+  } catch (error) {
+    await server.close();
+    throw error;
+  }
   console.info(`oneself listening on ${String(port)}`);
 }
 
