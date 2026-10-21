@@ -9,7 +9,7 @@ export default defineConfig({
       "tests/acceptance/**/*.test.ts",
       "tests/smoke/**/*.test.ts",
     ],
-    exclude: ["tests/smoke/closed-loop.test.ts"],
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/smoke/closed-loop.test.ts"],
     passWithNoTests: true,
     fileParallelism: false,
   },

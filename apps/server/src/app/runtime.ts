@@ -67,18 +67,10 @@ import {
   type OwnerRecord,
   type SiteFileRecord,
 } from "./postgres-state.js";
-import {
-  hashesEqual,
-  randomId,
-  randomToken,
-  sha256Base64Url,
-  sha256Bytes,
-  sha256Hex,
-  userCode,
-} from "./ids.js";
+import { hashesEqual, randomId, randomToken, sha256Bytes, sha256Hex } from "./ids.js";
 import { createMarkdownParser } from "./markdown-port.js";
 import { hashPassword, verifyPassword } from "./password.js";
-import { parseLimit, parseOffset, searchPages, visiblePages } from "./search.js";
+import { buildSnippet, parseLimit, parseOffset, searchPages, visiblePages } from "./search.js";
 import {
   addLink,
   addTag,
@@ -89,6 +81,7 @@ import {
   removeTag,
 } from "./structure.js";
 import { readZip, writeStoredZip } from "./zip.js";
+import { createOauthEngine, type OauthEngine, type PersistedGrant } from "../oauth/engine.js";
 
 const FILE_LIMIT = 20 * 1024 * 1024;
 const MEDIA_TYPES = new Set([
@@ -98,7 +91,6 @@ const MEDIA_TYPES = new Set([
   "image/gif",
   "application/pdf",
 ]);
-const ACCESS_TTL_MS = 15 * 60 * 1000;
 const RATE_WINDOW_MS = 60_000;
 
 export type IngressMode = "none" | "cloudflared" | "caddy" | "tailscale";
@@ -114,8 +106,10 @@ export type ServerOptions = {
   readonly oauthAuthorizationCode?: boolean;
   readonly skillsDir: string;
   readonly originalPagesDir: string;
+  readonly adminDistDir?: string;
   readonly log?: (line: string) => void;
   readonly postgres?: PostgresHandle;
+  readonly seedGrants?: readonly OauthGrantRecord[];
 };
 
 type RuntimeOptions = ServerOptions & {
@@ -133,25 +127,7 @@ export type OauthHttpResult = {
   readonly body: Record<string, unknown>;
 };
 
-type DeviceRecord = {
-  userCode: string;
-  deviceCodeHash: string;
-  status: "pending" | "approved" | "expired";
-  expiresAt: string;
-  grantId: string | null;
-  consumed: boolean;
-};
-
-type AuthCodeRecord = {
-  codeHash: string;
-  challenge: string;
-  siteWrite: boolean;
-  sources: SourceGrant[];
-  expiresAt: string;
-  consumed: boolean;
-};
-
-type RateScope = "search" | "upload" | "login";
+type RateScope = "search" | "upload" | "login" | "device";
 
 export class StartupRefused extends Error {
   constructor() {
@@ -173,9 +149,10 @@ export class Runtime {
   #apiKeys: ApiKeyRecord[] = [];
   #apiKeyRequests: ApiKeyRequestRecord[] = [];
   #grants: OauthGrantRecord[] = [];
-  #devices: DeviceRecord[] = [];
-  #authCodes: AuthCodeRecord[] = [];
+  #engine: OauthEngine | null = null;
   #siteFiles: SiteFileRecord[] = [];
+  #originalDist: string;
+  #adminDist: string;
   #rates = new Map<string, number[]>();
   #tail: Promise<unknown> = Promise.resolve();
   #skills: ReadonlyMap<string, Uint8Array>;
@@ -195,11 +172,13 @@ export class Runtime {
     this.#owner = options.loaded?.owner ?? null;
     this.#apiKeys = options.loaded?.apiKeys ?? [];
     this.#apiKeyRequests = options.loaded?.apiKeyRequests ?? [];
-    this.#grants = options.loaded?.grants ?? [];
+    this.#grants = options.loaded?.grants ?? [...(options.seedGrants ?? [])];
     this.#siteFiles = options.loaded?.siteFiles ?? [];
     this.#postgres = options.postgres ?? null;
     this.#store = options.postgres?.store ?? null;
     this.#originalRoot = options.originalPagesDir;
+    this.#originalDist = path.join(options.originalPagesDir, "dist");
+    this.#adminDist = options.adminDistDir ?? "";
     this.#log =
       options.log ??
       ((line) => {
@@ -251,7 +230,10 @@ export class Runtime {
   }
 
   close(): Promise<void> {
-    return this.#postgres?.close() ?? Promise.resolve();
+    return Promise.all([
+      this.#engine?.close() ?? Promise.resolve(),
+      this.#postgres?.close() ?? Promise.resolve(),
+    ]).then(() => undefined);
   }
 
   exclusive<T>(fn: () => Promise<T>): Promise<T> {
@@ -264,7 +246,7 @@ export class Runtime {
   }
 
   allow(scope: RateScope, address: string): Promise<boolean> {
-    const limit = scope === "login" ? 10 : 30;
+    const limit = scope === "login" || scope === "device" ? 10 : 30;
     return this.exclusive(() => {
       const now = this.clock.now().getTime();
       const key = `${scope}:${address}`;
@@ -281,16 +263,19 @@ export class Runtime {
 
   clientAddress(request: Request): string {
     if (this.ingress === "cloudflared") {
-      const connecting = request.headers.get("cf-connecting-ip")?.trim();
-      if (connecting !== undefined && connecting.length > 0) {
-        return connecting;
-      }
+      return headerValue(request, "cf-connecting-ip") ?? "direct";
     }
-    if (this.ingress === "caddy" || this.ingress === "tailscale") {
-      const forwarded = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-      if (forwarded !== undefined && forwarded.length > 0) {
-        return forwarded;
-      }
+    if (this.ingress === "caddy") {
+      return headerValue(request, "x-real-ip") ?? "direct";
+    }
+    if (this.ingress === "tailscale") {
+      const forwarded = request.headers.get("x-forwarded-for");
+      const hop = forwarded
+        ?.split(",")
+        .map((part) => part.trim())
+        .filter((part) => part.length > 0)
+        .at(-1);
+      return hop ?? "direct";
     }
     return "direct";
   }
@@ -364,6 +349,7 @@ export class Runtime {
   maintain(): Promise<void> {
     return this.exclusive(async () => {
       const now = this.clock.iso();
+      this.#engine?.sweep(Math.max(Date.now(), this.clock.now().getTime()));
       await this.#publish(runHourlyMaintenance(this.state, now));
       const referenced = referencedObjectKeys(this.state);
       const heads = await this.objectStore.list("");
@@ -766,6 +752,43 @@ export class Runtime {
       }
       if (body.source !== undefined && typeof body.source !== "string") {
         return fail("invalid", "source is invalid");
+      }
+      if (this.#store !== null) {
+        const sourceIds = searchableSources(actor.credential, publicOnly);
+        const rows = await this.#store.searchPages({
+          text: body.q,
+          limit,
+          offset,
+          deleted_at: "null",
+          exclude_hidden: true,
+          active_sources_only: true,
+          ...(publicOnly ? { visibility: "public" } : {}),
+          ...(typeof body.source === "string" ? { source: body.source } : {}),
+          ...(sourceIds === undefined ? {} : { source_ids: sourceIds }),
+        });
+        const hits = [];
+        for (const row of rows) {
+          const snippet = buildSnippet(
+            {
+              type: row.type,
+              title: row.title,
+              body: row.body,
+              frontmatter: row.frontmatter,
+            },
+            body.q,
+          );
+          if (snippet === null) {
+            continue;
+          }
+          hits.push({
+            source: row.source,
+            slug: row.slug,
+            type: row.type,
+            title: row.title,
+            snippet,
+          });
+        }
+        return ok(hits);
       }
       const hits = searchPages(
         this.state,
@@ -1326,6 +1349,11 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
+      if (!canSiteWrite(actor.credential)) {
+        return actor.credential.kind === "anonymous"
+          ? fail("unauthorized", "authentication required")
+          : fail("forbidden", "site write is required");
+      }
       const previewed = previewSite(this.state.site.pointer, this.state.site.releases, releaseId);
       if (!previewed.ok) {
         return previewed;
@@ -1619,29 +1647,69 @@ export class Runtime {
     });
   }
 
-  startDevice(): Promise<Record<string, unknown>> {
+  startOauth(): Promise<void> {
     return this.exclusive(async () => {
-      const now = this.clock.iso();
-      const expiresAt = addMilliseconds(now, SITE_ACTIVATION_TTL_MS) ?? now;
-      const device = randomToken();
-      const code = userCode();
-      this.#devices.push({
-        userCode: code,
-        deviceCodeHash: sha256Hex(device),
-        status: "pending",
-        expiresAt,
-        grantId: null,
-        consumed: false,
+      if (this.#engine !== null) {
+        return;
+      }
+      this.#engine = await createOauthEngine({
+        origin: this.origin,
+        authorizationCode: this.oauthAuthorizationCode,
+        grants: this.#grants.map(persistedGrant),
+        now: () => this.clock.iso(),
+        insertGrant: async (grant) => {
+          const record = grantRecord(grant);
+          await this.#store?.insertOauthGrant(oauthGrantInsert(record));
+          this.#grants.push(record);
+        },
+        updateGrant: async (id, patch) => {
+          const grant = this.#grants.find((item) => item.id === id);
+          if (grant === undefined) {
+            return;
+          }
+          if (patch.refreshTokenHash !== undefined) {
+            grant.refreshTokenHash = patch.refreshTokenHash;
+          }
+          if (patch.rotatedRefreshHashes !== undefined) {
+            grant.rotatedRefreshHashes = [...patch.rotatedRefreshHashes];
+          }
+          if (patch.refreshTokenPayload !== undefined) {
+            grant.refreshTokenPayload = patch.refreshTokenPayload;
+          }
+          if (patch.revokedAt !== undefined) {
+            grant.revokedAt = patch.revokedAt;
+          }
+          await this.#store?.updateOauthGrant(id, {
+            refresh_token_hash: grant.refreshTokenHash,
+            rotated_refresh_hashes: grant.rotatedRefreshHashes,
+            refresh_token_payload: grant.refreshTokenPayload,
+            revoked_at: grant.revokedAt === null ? null : new Date(grant.revokedAt),
+          });
+        },
       });
-      return {
-        device_code: device,
-        user_code: code,
-        verification_uri: `${this.origin}/admin/device`,
-        verification_uri_complete: `${this.origin}/admin/device?user_code=${encodeURIComponent(code)}`,
-        expires_in: 900,
-        interval: 5,
-      };
     });
+  }
+
+  oauthRequest(request: Request, path: "/device/auth" | "/token"): Promise<Response> {
+    return this.exclusive(async () => {
+      const engine = this.#requireEngine();
+      engine.sweep(Math.max(Date.now(), this.clock.now().getTime()));
+      return engine.handle(request, path);
+    });
+  }
+
+  oauthGrants(): readonly OauthGrantRecord[] {
+    return this.#grants.map((grant) => ({
+      ...grant,
+      sources: grant.sources.map((source) => ({ ...source })),
+      rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
+      refreshTokenPayload:
+        grant.refreshTokenPayload === null ? null : { ...grant.refreshTokenPayload },
+    }));
+  }
+
+  dropOauthRefreshAdapter(token: string): void {
+    this.#requireEngine().dropRefreshAdapter(token);
   }
 
   approveDevice(
@@ -1653,31 +1721,19 @@ export class Runtime {
       if (!allowed.ok) {
         return allowed;
       }
-      const device = this.#devices.find((item) => item.userCode === input.userCode);
-      if (device === undefined) {
+      const approved = await this.#requireEngine().approveDevice(input.userCode, {
+        siteWrite: input.siteWrite,
+        sources: input.sources,
+      });
+      if (approved === "not_found") {
         return fail("not_found", "device code not found");
       }
-      if (Date.parse(device.expiresAt) < this.clock.now().getTime()) {
-        device.status = "expired";
+      if (approved === "expired") {
         return fail("conflict", "device code has expired");
       }
-      if (device.status !== "pending") {
+      if (approved === "used") {
         return fail("conflict", "device code is not pending");
       }
-      const grant: OauthGrantRecord = {
-        id: randomId("gr_"),
-        siteWrite: input.siteWrite,
-        sources: input.sources.map((source) => ({ ...source })),
-        refreshTokenHash: null,
-        rotatedRefreshHashes: [],
-        revokedAt: null,
-        createdAt: this.clock.iso(),
-        accessTokens: [],
-      };
-      await this.#store?.insertOauthGrant(oauthGrantInsert(grant));
-      this.#grants.push(grant);
-      device.status = "approved";
-      device.grantId = grant.id;
       return ok({});
     });
   }
@@ -1697,33 +1753,62 @@ export class Runtime {
       if (input.method !== "S256" || input.challenge.length === 0) {
         return fail("invalid", "pkce challenge is invalid");
       }
-      const code = randomToken();
-      const expiresAt = addMilliseconds(this.clock.iso(), ACCESS_TTL_MS);
-      if (expiresAt === null) {
-        return fail("invalid", "invalid timestamp");
-      }
-      this.#authCodes.push({
-        codeHash: sha256Hex(code),
-        challenge: input.challenge,
-        siteWrite: input.siteWrite,
-        sources: input.sources,
-        expiresAt,
-        consumed: false,
-      });
-      return ok({ code });
+      const issued = await this.#requireEngine().issueAuthCode(input);
+      return ok(issued);
     });
   }
 
   oauthToken(params: URLSearchParams): Promise<OauthHttpResult> {
-    return this.exclusive(async () => this.#oauthToken(params));
+    return this.exclusive(async () => {
+      const request = new Request(`${this.origin}/oauth/token`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: params,
+      });
+      const response = await this.#requireEngine().handle(request, "/token");
+      return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+    });
+  }
+
+  revokeOauthGrant(actor: Actor, id: string): Promise<DomainResult<{ id: string }>> {
+    return this.exclusive(async () => {
+      const allowed = this.#ownerActor(actor);
+      if (!allowed.ok) {
+        return allowed;
+      }
+      const revoked = await this.#requireEngine().revoke(id);
+      if (!revoked) {
+        return fail("not_found", "grant not found");
+      }
+      return ok({ id });
+    });
   }
 
   currentPointer(): Promise<string> {
     return this.exclusive(async () => this.state.site.pointer.releaseId);
   }
 
+  readAdmin(relative: string): Uint8Array | null {
+    if (this.#adminDist.length === 0) {
+      return null;
+    }
+    const absolute = safeJoin(this.#adminDist, relative);
+    if (absolute === null) {
+      return null;
+    }
+    try {
+      const info = statSync(absolute);
+      if (!info.isFile()) {
+        return null;
+      }
+      return readFileSync(absolute);
+    } catch {
+      return null;
+    }
+  }
+
   readOriginal(relative: string): Uint8Array | null {
-    const absolute = safeJoin(this.#originalRoot, relative);
+    const absolute = safeJoin(this.#originalDist, relative);
     if (absolute === null) {
       return null;
     }
@@ -1868,7 +1953,7 @@ export class Runtime {
         return this.#actorFromApiKey(token);
       }
       if (scheme === "bearer" && token !== undefined) {
-        return this.#actorFromAccessToken(token);
+        return await this.#actorFromAccessToken(token);
       }
     }
     const headerKey = request.headers.get("x-api-key");
@@ -1907,27 +1992,27 @@ export class Runtime {
     };
   }
 
-  #actorFromAccessToken(token: string): Actor {
-    const hash = sha256Hex(token);
-    const now = this.clock.now().getTime();
-    for (const grant of this.#grants) {
-      if (grant.revokedAt !== null) {
-        continue;
-      }
-      const access = grant.accessTokens.find((item) => hashesEqual(item.hash, hash));
-      if (access === undefined) {
-        continue;
-      }
-      if (Date.parse(access.expiresAt) < now) {
-        return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
-      }
-      return {
-        credential: { kind: "oauth", siteWrite: grant.siteWrite, sources: grant.sources },
-        mustChangePassword: false,
-        sessionId: null,
-      };
+  async #actorFromAccessToken(token: string): Promise<Actor> {
+    const engine = this.#engine;
+    if (engine === null) {
+      return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
     }
-    return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
+    const grant = await engine.grantForAccessToken(token);
+    if (grant === null) {
+      return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
+    }
+    return {
+      credential: { kind: "oauth", siteWrite: grant.siteWrite, sources: grant.sources },
+      mustChangePassword: false,
+      sessionId: null,
+    };
+  }
+
+  #requireEngine(): OauthEngine {
+    if (this.#engine === null) {
+      throw new StartupRefused();
+    }
+    return this.#engine;
   }
 
   #ownerActor(actor: Actor): DomainResult<true> {
@@ -2035,137 +2120,57 @@ export class Runtime {
     }
     return { credential: "anonymous", admin: false, site_write: false, sources: [] };
   }
+}
 
-  async #oauthToken(params: URLSearchParams): Promise<OauthHttpResult> {
-    const grantType = params.get("grant_type");
-    if (grantType === "password" || grantType === "implicit") {
-      return oauthError(400, "unsupported_grant_type", "grant type is not supported");
-    }
-    if (grantType === "authorization_code") {
-      if (!this.oauthAuthorizationCode) {
-        return oauthError(400, "unsupported_grant_type", "authorization code is not enabled");
-      }
-      return this.#authorizationCodeToken(params);
-    }
-    if (grantType === "refresh_token") {
-      return this.#refresh(params.get("refresh_token") ?? "");
-    }
-    if (grantType !== "urn:ietf:params:oauth:grant-type:device_code") {
-      return oauthError(400, "unsupported_grant_type", "grant type is not supported");
-    }
-    const deviceCode = params.get("device_code") ?? "";
-    const device = this.#devices.find((item) =>
-      hashesEqual(item.deviceCodeHash, sha256Hex(deviceCode)),
-    );
-    if (device === undefined) {
-      return oauthError(400, "invalid_grant", "device code is invalid");
-    }
-    if (Date.parse(device.expiresAt) < this.clock.now().getTime()) {
-      device.status = "expired";
-      return oauthError(400, "expired_token", "device code has expired");
-    }
-    if (device.status === "pending") {
-      return oauthError(400, "authorization_pending", "authorization pending");
-    }
-    if (device.consumed || device.grantId === null) {
-      return oauthError(400, "invalid_grant", "device code is no longer valid");
-    }
-    const grant = this.#grants.find((item) => item.id === device.grantId);
-    if (grant === undefined || grant.revokedAt !== null) {
-      return oauthError(400, "invalid_grant", "grant is not available");
-    }
-    const issued = await this.#issueTokens(grant);
-    if (issued.status !== 200) {
-      return issued;
-    }
-    device.consumed = true;
-    return issued;
+function headerValue(request: Request, name: string): string | undefined {
+  const value = request.headers.get(name)?.trim();
+  if (value === undefined || value.length === 0) {
+    return undefined;
   }
+  return value;
+}
 
-  async #authorizationCodeToken(params: URLSearchParams): Promise<OauthHttpResult> {
-    const code = params.get("code") ?? "";
-    const verifier = params.get("code_verifier") ?? "";
-    const record = this.#authCodes.find((item) => hashesEqual(item.codeHash, sha256Hex(code)));
-    if (
-      record === undefined ||
-      record.consumed ||
-      Date.parse(record.expiresAt) < this.clock.now().getTime()
-    ) {
-      return oauthError(400, "invalid_grant", "authorization code is invalid");
-    }
-    const digest = sha256Base64Url(verifier);
-    if (verifier.length === 0 || !hashesEqual(digest, record.challenge)) {
-      return oauthError(400, "invalid_grant", "pkce verification failed");
-    }
-    const grant: OauthGrantRecord = {
-      id: randomId("gr_"),
-      siteWrite: record.siteWrite,
-      sources: record.sources.map((source) => ({ ...source })),
-      refreshTokenHash: null,
-      rotatedRefreshHashes: [],
-      revokedAt: null,
-      createdAt: this.clock.iso(),
-      accessTokens: [],
-    };
-    await this.#store?.insertOauthGrant(oauthGrantInsert(grant));
-    const issued = await this.#issueTokens(grant);
-    if (issued.status !== 200) {
-      return issued;
-    }
-    record.consumed = true;
-    this.#grants.push(grant);
-    return issued;
+function searchableSources(
+  credential: Credential,
+  publicOnly: boolean,
+): readonly string[] | undefined {
+  if (publicOnly || credential.kind === "owner") {
+    return undefined;
   }
+  if (credential.kind === "anonymous") {
+    return [];
+  }
+  if (credential.kind === "api_key" && credential.unrestrictedData) {
+    return undefined;
+  }
+  return credential.sources.filter((source) => source.read).map((source) => source.id);
+}
 
-  async #refresh(token: string): Promise<OauthHttpResult> {
-    if (token.length === 0) {
-      return oauthError(400, "invalid_grant", "refresh token is invalid");
-    }
-    const hash = sha256Hex(token);
-    for (const grant of this.#grants) {
-      if (grant.rotatedRefreshHashes.some((item) => hashesEqual(item, hash))) {
-        const revokedAt = this.clock.iso();
-        await this.#store?.updateOauthGrant(grant.id, {
-          revoked_at: new Date(revokedAt),
-          refresh_token_hash: null,
-        });
-        grant.revokedAt = revokedAt;
-        grant.refreshTokenHash = null;
-        grant.accessTokens = [];
-        return oauthError(400, "invalid_grant", "refresh token was reused");
-      }
-    }
-    const grant = this.#grants.find(
-      (item) => item.refreshTokenHash !== null && hashesEqual(item.refreshTokenHash, hash),
-    );
-    if (grant === undefined || grant.revokedAt !== null) {
-      return oauthError(400, "invalid_grant", "refresh token is invalid");
-    }
-    grant.rotatedRefreshHashes.push(hash);
-    return this.#issueTokens(grant);
-  }
+function persistedGrant(grant: OauthGrantRecord): PersistedGrant {
+  return {
+    id: grant.id,
+    siteWrite: grant.siteWrite,
+    sources: grant.sources.map((source) => ({ ...source })),
+    refreshTokenHash: grant.refreshTokenHash,
+    rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
+    refreshTokenPayload: grant.refreshTokenPayload,
+    revokedAt: grant.revokedAt,
+    createdAt: grant.createdAt,
+  };
+}
 
-  async #issueTokens(grant: OauthGrantRecord): Promise<OauthHttpResult> {
-    const access = randomToken();
-    const refresh = randomToken();
-    const expiresAt = addMilliseconds(this.clock.iso(), ACCESS_TTL_MS);
-    if (expiresAt === null) {
-      return oauthError(400, "invalid_grant", "invalid timestamp");
-    }
-    const refreshHash = sha256Hex(refresh);
-    await this.#store?.updateOauthGrant(grant.id, { refresh_token_hash: refreshHash });
-    grant.accessTokens.push({ hash: sha256Hex(access), expiresAt });
-    grant.refreshTokenHash = refreshHash;
-    return {
-      status: 200,
-      body: {
-        access_token: access,
-        token_type: "Bearer",
-        expires_in: 900,
-        refresh_token: refresh,
-      },
-    };
-  }
+function grantRecord(grant: PersistedGrant): OauthGrantRecord {
+  return {
+    id: grant.id,
+    siteWrite: grant.siteWrite,
+    sources: grant.sources.map((source) => ({ ...source })),
+    refreshTokenHash: grant.refreshTokenHash,
+    rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
+    refreshTokenPayload: grant.refreshTokenPayload,
+    revokedAt: grant.revokedAt,
+    createdAt: grant.createdAt,
+    accessTokens: [],
+  };
 }
 
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -2240,10 +2245,6 @@ function sourceFlagsRead(credential: Credential, source: string): boolean {
     return true;
   }
   return credential.sources.some((item) => item.id === source && item.read);
-}
-
-function oauthError(status: number, error: string, message: string): OauthHttpResult {
-  return { status, body: { error, message } };
 }
 
 function readCookie(header: string | null, name: string): string | null {
@@ -2350,6 +2351,7 @@ export async function openRuntime(
       ...(loaded === undefined ? {} : { loaded }),
     });
     await runtime.bootstrap(options.ownerLogin, options.ownerPassword, options.ownerResetPassword);
+    await runtime.startOauth();
     return runtime;
   } catch (error) {
     if (runtime !== undefined) {

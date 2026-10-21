@@ -106,7 +106,15 @@ export function visiblePages(
   return pages;
 }
 
-function matchSnippet(page: PageRecord, q: string): string | null {
+export function buildSnippet(
+  page: {
+    readonly type: string;
+    readonly title: string;
+    readonly body: string;
+    readonly frontmatter: unknown;
+  },
+  q: string,
+): string | null {
   if (q.length === 0) {
     return null;
   }
@@ -119,7 +127,8 @@ function matchSnippet(page: PageRecord, q: string): string | null {
   if (page.body.includes(q)) {
     return clip(page.body, q);
   }
-  for (const value of Object.values(page.frontmatter)) {
+  const frontmatter = isFrontmatter(page.frontmatter) ? page.frontmatter : {};
+  for (const value of Object.values(frontmatter)) {
     if (typeof value === "string" && value.includes(q)) {
       return clip(value, q);
     }
@@ -132,6 +141,14 @@ function matchSnippet(page: PageRecord, q: string): string | null {
     }
   }
   return null;
+}
+
+function isFrontmatter(value: unknown): value is PageRecord["frontmatter"] {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function matchSnippet(page: PageRecord, q: string): string | null {
+  return buildSnippet(page, q);
 }
 
 function clip(text: string, q: string): string {

@@ -32,7 +32,9 @@ it("shows an API key once and does not let OAuth manage keys", async () => {
   expect(pending.key).toBeUndefined();
   expect(String(pending.approval_url).startsWith(`${ORIGIN}/admin/api-keys/`)).toBe(true);
   const viewed = await readJson(
-    await server.request(`/admin/api-keys/${String(pending.id)}`, { headers: { cookie } }),
+    await server.request(`/admin/api-keys/${String(pending.id)}`, {
+      headers: { cookie, accept: "application/json" },
+    }),
   );
   expect(viewed.key).toBeUndefined();
   expect(viewed.label).toBe("once");

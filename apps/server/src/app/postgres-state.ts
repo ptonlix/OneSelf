@@ -20,8 +20,8 @@ import type { ObjectStore } from "@oneself/ports";
 /**
  * Rows behind the in-memory projection.
  * Markdown bytes stay in the object store; page rows only point at them.
- * Sessions, device codes, authorization codes, access tokens, and rotated
- * refresh hashes are absent from PostgresStore, so Runtime keeps those in memory.
+ * Sessions, device codes, authorization codes, and access tokens stay in this
+ * process. Rotated refresh hashes are loaded from oauth_grants so reuse survives restart.
  */
 export type OwnerRecord = {
   login: string;
@@ -64,6 +64,7 @@ export type OauthGrantRecord = {
   sources: SourceGrant[];
   refreshTokenHash: string | null;
   rotatedRefreshHashes: string[];
+  refreshTokenPayload: Record<string, unknown> | null;
   revokedAt: string | null;
   createdAt: string;
   accessTokens: AccessTokenRecord[];
@@ -248,7 +249,8 @@ export async function loadProjection(
       siteWrite: grant.site_write,
       sources: copyGrants(grant.sources),
       refreshTokenHash: grant.refresh_token_hash,
-      rotatedRefreshHashes: [],
+      rotatedRefreshHashes: stringList(grant.rotated_refresh_hashes),
+      refreshTokenPayload: recordOrNull(grant.refresh_token_payload),
       revokedAt: grant.revoked_at === null ? null : iso(grant.revoked_at),
       createdAt: iso(grant.created_at),
       accessTokens: [],
@@ -510,6 +512,8 @@ export function oauthGrantInsert(record: OauthGrantRecord): OauthGrantInsert {
     site_write: record.siteWrite,
     sources: copyGrants(record.sources),
     refresh_token_hash: record.refreshTokenHash,
+    rotated_refresh_hashes: record.rotatedRefreshHashes,
+    refresh_token_payload: record.refreshTokenPayload,
     revoked_at: dateOrNull(record.revokedAt),
     created_at: new Date(record.createdAt),
   };
@@ -585,6 +589,20 @@ function iso(value: Date): string {
 
 function dateOrNull(value: string | null): Date | null {
   return value === null ? null : new Date(value);
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === "string");
+}
+
+function recordOrNull(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+  return { ...value };
 }
 
 function asVisibility(value: string): PageRecord["visibility"] {

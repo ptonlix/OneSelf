@@ -387,10 +387,16 @@ const schemaMd = {
       { name: "site_write", sqlType: "boolean", notNull: true, primaryKey: false },
       { name: "sources", sqlType: "jsonb", notNull: true, primaryKey: false },
       text("refresh_token_hash", false),
+      { name: "rotated_refresh_hashes", sqlType: "jsonb", notNull: true, primaryKey: false },
+      { name: "refresh_token_payload", sqlType: "jsonb", notNull: false, primaryKey: false },
       timestamptz("revoked_at", false),
       timestamptz("created_at", true),
     ],
-    checks: ["oauth_grants_sources_array", "oauth_grants_refresh_token_hash_format"],
+    checks: [
+      "oauth_grants_sources_array",
+      "oauth_grants_refresh_token_hash_format",
+      "oauth_grants_rotated_refresh_hashes_array",
+    ],
     foreignKeys: [],
     indexes: [],
     unique: [],
@@ -496,17 +502,34 @@ it("matches the schema.md tables and does not split business tables by material 
 
 it("appends one initial migration whose columns match schema.md", () => {
   const sqlFiles = readdirSync(migrationsDirectory).filter((file) => file.endsWith(".sql"));
-  expect(sqlFiles).toEqual(["0000_initial.sql"]);
+  expect(sqlFiles).toEqual(["0000_initial.sql", "0001_oauth_refresh_reuse.sql"]);
 
   const journal = JSON.parse(
     readFileSync(join(migrationsDirectory, "meta/_journal.json"), "utf8"),
   ) as { dialect: string; entries: { tag: string }[] };
   expect(journal.dialect).toBe("postgresql");
-  expect(journal.entries.map((entry) => entry.tag)).toEqual(["0000_initial"]);
+  expect(journal.entries.map((entry) => entry.tag)).toEqual([
+    "0000_initial",
+    "0001_oauth_refresh_reuse",
+  ]);
 
   const sqlText = readFileSync(join(migrationsDirectory, "0000_initial.sql"), "utf8");
   const created = migrationTables(sqlText);
   expect([...created.keys()].sort()).toEqual(Object.keys(schemaMd).sort());
+  const reuse = readFileSync(join(migrationsDirectory, "0001_oauth_refresh_reuse.sql"), "utf8");
+  const altered = created.get("oauth_grants");
+  if (altered === undefined) {
+    throw new Error("oauth_grants missing from the initial migration");
+  }
+  const revokedAt = altered.findIndex((column) => column.name === "revoked_at");
+  altered.splice(
+    revokedAt < 0 ? altered.length : revokedAt,
+    0,
+    { name: "rotated_refresh_hashes", sqlType: "jsonb", notNull: true },
+    { name: "refresh_token_payload", sqlType: "jsonb", notNull: false },
+  );
+  expect(reuse).toContain('ADD COLUMN "rotated_refresh_hashes" jsonb');
+  expect(reuse).toContain('ADD COLUMN "refresh_token_payload" jsonb');
 
   for (const [name, spec] of Object.entries(schemaMd)) {
     expect(

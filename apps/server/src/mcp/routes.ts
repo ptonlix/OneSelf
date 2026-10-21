@@ -5,50 +5,16 @@ import type { Hono } from "hono";
 import { z } from "zod";
 
 import { isRecord } from "../app/json.js";
+import { operationSchemas, type OperationSchemaName } from "../app/schemas.js";
 import type { Runtime } from "../app/runtime.js";
 import { callTool } from "./call.js";
 
-const toolInput = z.looseObject({
-  source: z.string().optional(),
-  slug: z.string().optional(),
-  markdown: z.string().optional(),
-  hash: z.string().optional(),
-  edits: z.array(z.object({ search: z.string(), replace: z.string() })).optional(),
-  pages: z
-    .array(
-      z.object({
-        source: z.string(),
-        slug: z.string(),
-        markdown: z.string(),
-        hash: z.string().optional(),
-      }),
-    )
-    .optional(),
-  slugs: z.array(z.object({ source: z.string(), slug: z.string() })).optional(),
-  q: z.string().optional(),
-  limit: z.number().optional(),
-  cursor: z.string().optional(),
-  type: z.string().optional(),
-  tag: z.string().optional(),
-  prefix: z.string().optional(),
-  updated_after: z.string().optional(),
-  updated_before: z.string().optional(),
-  from: z.object({ source: z.string(), slug: z.string() }).optional(),
-  to: z.object({ source: z.string(), slug: z.string() }).optional(),
-  date: z.string().optional(),
-  title: z.string().optional(),
-  detail: z.string().nullable().optional(),
-  entity: z.string().optional(),
-  statement: z.string().optional(),
-  confidence: z.number().nullable().optional(),
-  valid_until: z.string().nullable().optional(),
-  id: z.string().optional(),
-  release_id: z.string().optional(),
-  name: z.string().optional(),
-  data_base64: z.string().optional(),
-  media_type: z.string().optional(),
-  archive_base64: z.string().optional(),
-});
+function schemaFor(name: string): z.ZodType {
+  if (Object.hasOwn(operationSchemas, name)) {
+    return operationSchemas[name as OperationSchemaName];
+  }
+  return z.object({});
+}
 
 export function mountMcp(app: Hono, runtime: Runtime): void {
   app.post("/mcp", async (c) => {
@@ -60,7 +26,7 @@ export function mountMcp(app: Hono, runtime: Runtime): void {
         tool.name,
         {
           description: tool.name,
-          inputSchema: toolInput,
+          inputSchema: schemaFor(tool.name),
         },
         async (args) => {
           const fields: Record<string, unknown> = {};

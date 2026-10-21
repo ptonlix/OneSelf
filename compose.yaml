@@ -10,18 +10,23 @@ name: oneself
 services:
   app:
     image: ${ONESELF_IMAGE:-oneself:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
     env_file:
       - path: .env
         required: false
     environment:
       NODE_ENV: production
+      HOST: 0.0.0.0
       DATABASE_URL: postgres://oneself:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/oneself
       OBJECT_STORAGE_ENDPOINT: http://rustfs:9000
       OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
       OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-oneself}
-      OBJECT_STORAGE_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
-      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      OBJECT_STORAGE_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      OBJECT_STORAGE_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
       PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}
+      OWNER_LOGIN: ${OWNER_LOGIN:?set OWNER_LOGIN}
     depends_on:
       postgres:
         condition: service_healthy

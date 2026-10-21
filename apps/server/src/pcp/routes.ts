@@ -10,6 +10,7 @@ import {
   sendError,
   sendJson,
 } from "../app/json.js";
+import { parseOperation } from "../app/schemas.js";
 import type { Actor, Runtime } from "../app/runtime.js";
 import { discoveryDocument, oauthMetadata, openApiDocument } from "./discovery.js";
 
@@ -33,9 +34,11 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
     if (!(await runtime.allow("search", runtime.clientAddress(c.req.raw)))) {
       return rateLimited();
     }
-    return publicResult(c, runtime, async (actor) =>
-      runtime.search(actor, await jsonRecord(c), true),
-    );
+    const body = parseOperation("search", await jsonRecord(c));
+    if (body === null) {
+      return sendError("invalid", "search body is invalid");
+    }
+    return publicResult(c, runtime, (actor) => runtime.search(actor, body, true));
   });
 
   app.get("/skills/data.md", () => skillFile(runtime, "data"));
@@ -248,9 +251,13 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
   });
 
   app.post("/pcp/v1/search", (c) =>
-    authed(c, runtime, async (actor) =>
-      resultOf(await runtime.search(actor, await jsonRecord(c), false)),
-    ),
+    authed(c, runtime, async (actor) => {
+      const body = parseOperation("search", await jsonRecord(c));
+      if (body === null) {
+        return sendError("invalid", "search body is invalid");
+      }
+      return resultOf(await runtime.search(actor, body, false));
+    }),
   );
   app.post("/pcp/v1/query", (c) =>
     authed(c, runtime, async (actor) => resultOf(await runtime.query(actor, await jsonRecord(c)))),

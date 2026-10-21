@@ -370,6 +370,8 @@ export const oauth_grants = pgTable(
     site_write: boolean("site_write").notNull(),
     sources: sourceGrants("sources").notNull(),
     refresh_token_hash: text("refresh_token_hash"),
+    rotated_refresh_hashes: jsonb("rotated_refresh_hashes").notNull().default([]),
+    refresh_token_payload: jsonb("refresh_token_payload"),
     revoked_at: timestamptz("revoked_at"),
     created_at: timestamptz("created_at").notNull(),
   },
@@ -378,6 +380,10 @@ export const oauth_grants = pgTable(
     check(
       "oauth_grants_refresh_token_hash_format",
       sql`${table.refresh_token_hash} is null or ${table.refresh_token_hash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "oauth_grants_rotated_refresh_hashes_array",
+      sql`jsonb_typeof(${table.rotated_refresh_hashes}) = 'array'`,
     ),
   ],
 );

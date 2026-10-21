@@ -18,7 +18,9 @@ it("rejects reserved site paths, has no release delete route, and forbids agent 
   const home = await server.request("/");
   expect(home.status).toBe(200);
   expect(home.headers.get("cache-control")).toBe("no-store");
-  expect(await home.text()).toContain("OneSelf");
+  const homeText = await home.text();
+  expect(homeText).toContain("OneSelf");
+  expect(homeText).not.toContain("/src/main.ts");
   expect((await server.request("/missing-path")).status).toBe(404);
 
   const rejected = await uploadArchive(
@@ -49,8 +51,15 @@ it("rejects reserved site paths, has no release delete route, and forbids agent 
       })
     ).status,
   ).toBe(404);
+  const anonymousPreview = await server.request(`/pcp/v1/site/releases/${releaseId}/preview`, {
+    method: "POST",
+  });
+  await expectError(anonymousPreview, 401, "unauthorized");
   const preview = await readJson(
-    await server.request(`/pcp/v1/site/releases/${releaseId}/preview`, { method: "POST" }),
+    await server.request(`/pcp/v1/site/releases/${releaseId}/preview`, {
+      method: "POST",
+      headers: { cookie },
+    }),
   );
   expect(preview.url).toBe(`/_preview/${releaseId}/`);
   expect(await (await server.request(String(preview.url))).text()).toContain("RELEASE-MARKER");

@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { chunkBody, type PageChunk } from "./chunks.js";
 import { parseFences, type Fact, type TimelineEntry } from "./fences.js";
 import {
@@ -58,6 +60,14 @@ export function projectMarkdown(markdown: string): DomainResult<PageProjection> 
   });
 }
 
+const frontmatterSchema = z.looseObject({
+  type: z.string().regex(/^[a-z][a-z0-9-]{0,62}$/),
+  title: z.string().min(1),
+  visibility: z.enum(["public", "private"]).optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  files: z.array(z.string().min(1)).optional(),
+});
+
 function readFields(frontmatter: Frontmatter): DomainResult<{
   type: string;
   title: string;
@@ -65,6 +75,9 @@ function readFields(frontmatter: Frontmatter): DomainResult<{
   tags: string[];
   fileIds: string[];
 }> {
+  if (!frontmatterSchema.safeParse(frontmatter).success) {
+    return fail("invalid", "frontmatter is invalid");
+  }
   const type = frontmatter["type"];
   if (typeof type !== "string" || !isTypeName(type)) {
     return fail("invalid", "type is required");

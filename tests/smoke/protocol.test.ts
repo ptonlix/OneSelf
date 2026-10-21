@@ -177,6 +177,67 @@ it("trusts only CF-Connecting-IP when the ingress is cloudflared", async () => {
   await server.close();
 });
 
+it("trusts only the overwritten X-Real-IP when the ingress is caddy", async () => {
+  const server = await boot({ ingress: "caddy" });
+  for (let index = 0; index < 30; index += 1) {
+    const response = await server.request("/pcp/v1/public/search", {
+      method: "POST",
+      headers: jsonHeaders({
+        "x-real-ip": "203.0.113.20",
+        "x-forwarded-for": `198.51.100.${String(index)}`,
+      }),
+      body: JSON.stringify({ q: "token" }),
+    });
+    expect(response.status).toBe(200);
+  }
+  const spoofed = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({
+      "x-real-ip": "203.0.113.20",
+      "x-forwarded-for": "203.0.113.99",
+    }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  await expectRateLimited(spoofed);
+  const fresh = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({
+      "x-real-ip": "203.0.113.21",
+      "x-forwarded-for": "203.0.113.20",
+    }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  expect(fresh.status).toBe(200);
+  await server.close();
+});
+
+it("trusts the last ingress hop when the ingress is tailscale", async () => {
+  const server = await boot({ ingress: "tailscale" });
+  for (let index = 0; index < 30; index += 1) {
+    const response = await server.request("/pcp/v1/public/search", {
+      method: "POST",
+      headers: jsonHeaders({
+        "x-forwarded-for": `198.51.100.${String(index)}, 100.64.0.8`,
+      }),
+      body: JSON.stringify({ q: "token" }),
+    });
+    expect(response.status).toBe(200);
+  }
+  const spoofed = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({ "x-forwarded-for": "203.0.113.99, 100.64.0.8" }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  await expectRateLimited(spoofed);
+  const fresh = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({ "x-forwarded-for": "100.64.0.8, 100.64.0.9" }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  expect(fresh.status).toBe(200);
+  await server.close();
+});
+
 function forwarded(connecting: string, forwardedFor: string): Headers {
   return jsonHeaders({
     "cf-connecting-ip": connecting,

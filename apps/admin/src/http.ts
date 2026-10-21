@@ -47,7 +47,7 @@ export type HttpTransport = (request: HttpRequest) => Promise<HttpResponse>;
 
 export function browserTransport(fetchImpl: typeof fetch = globalThis.fetch): HttpTransport {
   return async (request) => {
-    const headers = new Headers();
+    const headers = new Headers({ accept: "application/json" });
     const init: RequestInit = {
       method: request.method,
       credentials: "include",

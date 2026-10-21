@@ -8,16 +8,8 @@ import { writeStoredZip } from "../../apps/server/src/app/zip.js";
 import { createServer, type ServerHandle } from "../../apps/server/src/index.js";
 
 const ORIGIN = "http://127.0.0.1:3000";
-const DATABASE_URL = "postgres://oneself:oneself@127.0.0.1:5433/oneself";
-const composeArgs = [
-  "compose",
-  "-p",
-  "oneself-smoke",
-  "-f",
-  "compose.dev.yaml",
-  "-f",
-  "tests/smoke/compose.ports.yaml",
-];
+const DATABASE_URL = "postgres://oneself:oneself@127.0.0.1:5432/oneself";
+const composeArgs = ["compose", "-p", "oneself-smoke", "-f", "compose.dev.yaml"];
 
 let server: ServerHandle | undefined;
 
@@ -56,7 +48,7 @@ beforeAll(async () => {
     ownerPassword: "initial-password",
     postgres: openPostgres(DATABASE_URL),
     objectStore: openS3ObjectStore({
-      endpoint: "http://127.0.0.1:9002",
+      endpoint: "http://127.0.0.1:9000",
       region: "us-east-1",
       bucket: "oneself",
       accessKeyId: "oneself",
@@ -71,6 +63,9 @@ afterAll(async () => {
 });
 
 it("publishes a page through the original site, then hides it", async () => {
+  if (server === undefined) {
+    throw new Error("server was not started");
+  }
   const cookie = await login();
   await changePassword(cookie);
   const source = "loop";
@@ -142,8 +137,15 @@ function jsonHeaders(extra: Record<string, string> = {}): Headers {
   return new Headers({ origin: ORIGIN, "content-type": "application/json", ...extra });
 }
 
+function started(): ServerHandle {
+  if (server === undefined) {
+    throw new Error("server was not started");
+  }
+  return server;
+}
+
 async function login(): Promise<string> {
-  const response = await server.request("/admin/login", {
+  const response = await started().request("/admin/login", {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify({ login: "owner", password: "initial-password" }),
@@ -153,7 +155,7 @@ async function login(): Promise<string> {
 }
 
 async function changePassword(cookie: string): Promise<void> {
-  const response = await server.request("/admin/password", {
+  const response = await started().request("/admin/password", {
     method: "POST",
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({ password: "new-password" }),

@@ -46,7 +46,7 @@ export async function login(server: ServerHandle, password = "initial-password")
   return cookie.split(";")[0] ?? "";
 }
 
-export async function changePassword(server: ServerHandle, cookie: string): Promise<void> {
+async function changePassword(server: ServerHandle, cookie: string): Promise<void> {
   const response = await server.request("/admin/password", {
     method: "POST",
     headers: jsonHeaders({ cookie }),

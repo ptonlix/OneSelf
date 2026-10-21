@@ -124,12 +124,69 @@ function rewriteFences(
   facts: readonly Fact[],
   timeline: readonly TimelineEntry[],
 ): DomainResult<string> {
+  for (const fact of facts) {
+    if (!fenceText(fact.statement)) {
+      return fail("invalid", "fact statement cannot contain a delimiter");
+    }
+  }
+  for (const entry of timeline) {
+    if (!fenceText(entry.title)) {
+      return fail("invalid", "timeline title cannot contain a delimiter");
+    }
+  }
   const prose = stripFences(body).replace(/\s*$/, "");
   const sections = [renderFacts(facts), renderTimeline(timeline)].filter(
     (section) => section !== "",
   );
   const nextBody = sections.length === 0 ? `${prose}\n` : `${prose}\n\n${sections.join("\n\n")}\n`;
-  return ok(joinMarkdown(serializeFrontmatter(frontmatter), nextBody));
+  const markdown = joinMarkdown(serializeFrontmatter(frontmatter), nextBody);
+  const roundTrip = projectMarkdown(markdown);
+  if (!roundTrip.ok) {
+    return fail("invalid", "fence did not round-trip");
+  }
+  if (
+    !sameFacts(roundTrip.value.facts, facts) ||
+    !sameTimeline(roundTrip.value.timeline, timeline)
+  ) {
+    return fail("invalid", "fence did not round-trip");
+  }
+  return ok(markdown);
+}
+
+function fenceText(value: string): boolean {
+  return !value.includes("|") && !value.includes("\n") && !value.includes("\r");
+}
+
+function sameFacts(parsed: readonly Fact[], input: readonly Fact[]): boolean {
+  if (parsed.length !== input.length) {
+    return false;
+  }
+  return parsed.every((fact, index) => {
+    const expected = input[index];
+    return (
+      expected !== undefined &&
+      fact.id === expected.id &&
+      fact.entity === expected.entity &&
+      fact.statement === expected.statement &&
+      fact.confidence === expected.confidence &&
+      fact.validUntil === expected.validUntil
+    );
+  });
+}
+
+function sameTimeline(parsed: readonly TimelineEntry[], input: readonly TimelineEntry[]): boolean {
+  if (parsed.length !== input.length) {
+    return false;
+  }
+  return parsed.every((entry, index) => {
+    const expected = input[index];
+    return (
+      expected !== undefined &&
+      entry.occurredOn === expected.occurredOn &&
+      entry.title === expected.title &&
+      entry.detail === expected.detail
+    );
+  });
 }
 
 function renderFacts(facts: readonly Fact[]): string {

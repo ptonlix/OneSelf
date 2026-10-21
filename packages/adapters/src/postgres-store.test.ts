@@ -1,36 +1,42 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { PGlite } from "@electric-sql/pglite";
-import { drizzle } from "drizzle-orm/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import postgres from "postgres";
 
-import { createPostgresStore, type PostgresStore } from "./postgres-store.js";
+import { openPostgres, type PostgresHandle, type PostgresStore } from "./postgres-store.js";
+
+const databaseUrl = process.env.DATABASE_URL;
+const postgresUrl =
+  databaseUrl !== undefined &&
+  (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://"))
+    ? databaseUrl
+    : undefined;
+// Default pnpm test must not dial DATABASE_URL. Opt in with ONSELF_POSTGRES_TESTS=1.
+const runPostgresTests = process.env.ONESELF_POSTGRES_TESTS === "1" && postgresUrl !== undefined;
 
 const HASH = "ab".repeat(32);
 const OTHER_HASH = "cd".repeat(32);
 const RELEASE = `rel_${"ef".repeat(16)}`;
 
-describe("postgres store", () => {
-  let client: PGlite;
+describe.skipIf(!runPostgresTests)("postgres store", () => {
+  let handle: PostgresHandle | undefined;
   let store: PostgresStore;
 
   beforeAll(async () => {
-    client = new PGlite();
-    const migration = readFileSync(
-      new URL("../../db/migrations/0000_initial.sql", import.meta.url),
-      "utf8",
-    );
-    for (const statement of migration.split("--> statement-breakpoint")) {
-      const sqlText = statement.trim();
-      if (sqlText !== "") {
-        await client.exec(sqlText);
-      }
+    if (!runPostgresTests || postgresUrl === undefined) {
+      return;
     }
-    store = createPostgresStore(drizzle(client));
+    await applyMigrations(postgresUrl);
+    handle = openPostgres(postgresUrl);
+    store = handle.store;
   }, 60_000);
 
   afterAll(async () => {
-    await client.close();
+    if (handle !== undefined) {
+      await handle.close();
+    }
   });
 
   it("writes and reads table rows without applying page rules", async () => {
@@ -253,4 +259,33 @@ function pageRow(source: string, slug: string, hash: string, updatedAt: Date, vi
 
 function objectKey(source: string, slug: string, hash: string): string {
   return `pages/${source}/${slug}/${hash}.md`;
+}
+
+async function applyMigrations(databaseUrl: string): Promise<void> {
+  const sql = postgres(databaseUrl);
+  const directory = fileURLToPath(new URL("../../db/migrations/", import.meta.url));
+  const files = readdirSync(directory)
+    .filter((file) => file.endsWith(".sql"))
+    .sort();
+  try {
+    for (const file of files) {
+      const text = readFileSync(join(directory, file), "utf8");
+      for (const statement of text.split("--> statement-breakpoint")) {
+        const sqlText = statement.trim();
+        if (sqlText === "") {
+          continue;
+        }
+        try {
+          await sql.unsafe(sqlText);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+          if (!/already exists/i.test(message)) {
+            throw error;
+          }
+        }
+      }
+    }
+  } finally {
+    await sql.end();
+  }
 }

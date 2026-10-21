@@ -2,6 +2,8 @@ import { inflateRawSync } from "node:zlib";
 
 import { MAX_SITE_ARCHIVE_BYTES } from "@oneself/domain";
 
+const INFLATE_TOO_LARGE = Symbol("inflate-too-large");
+
 export type ZipEntry = {
   readonly path: string;
   readonly directory: boolean;
@@ -65,6 +67,9 @@ export function readZip(bytes: Uint8Array): ZipReadResult {
     const data = directory
       ? new Uint8Array()
       : readLocal(bytes, localOffset, method, compressedSize, flags);
+    if (data === INFLATE_TOO_LARGE) {
+      return { ok: false, message: "archive exceeds the site upload limit" };
+    }
     if (data === null) {
       return { ok: false, message: "archive entry could not be read" };
     }
@@ -141,7 +146,7 @@ function readLocal(
   method: number,
   compressedSize: number,
   flags: number,
-): Uint8Array | null {
+): Uint8Array | null | typeof INFLATE_TOO_LARGE {
   if ((flags & 0x1) !== 0) {
     return null;
   }
@@ -166,10 +171,23 @@ function readLocal(
     return null;
   }
   try {
-    return inflateRawSync(compressed);
-  } catch {
+    return inflateRawSync(compressed, { maxOutputLength: MAX_SITE_ARCHIVE_BYTES });
+  } catch (error) {
+    if (isInflateTooLarge(error)) {
+      return INFLATE_TOO_LARGE;
+    }
     return null;
   }
+}
+
+function isInflateTooLarge(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  if ("code" in error && error.code === "ERR_BUFFER_TOO_LARGE") {
+    return true;
+  }
+  return error.message.includes("maxOutputLength");
 }
 
 function findEocd(bytes: Uint8Array): number | null {

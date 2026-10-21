@@ -1,15 +1,16 @@
 import type { Hono } from "hono";
 
-import { isRecord, parseGrants, sendError, sendJson } from "../app/json.js";
+import { isRecord, parseGrants, rateLimited, sendError, sendJson } from "../app/json.js";
 import type { Runtime } from "../app/runtime.js";
 
 export function mountOauth(app: Hono, runtime: Runtime): void {
-  app.post("/oauth/device/auth", async () => sendJson(await runtime.startDevice()));
-  app.post("/oauth/token", async (c) => {
-    const params = await tokenParams(c.req.raw);
-    const result = await runtime.oauthToken(params);
-    return sendJson(result.body, result.status);
+  app.post("/oauth/device/auth", async (c) => {
+    if (!(await runtime.allow("device", runtime.clientAddress(c.req.raw)))) {
+      return rateLimited();
+    }
+    return runtime.oauthRequest(c.req.raw, "/device/auth");
   });
+  app.post("/oauth/token", async (c) => runtime.oauthRequest(c.req.raw, "/token"));
   if (runtime.oauthAuthorizationCode) {
     app.post("/oauth/authorize", async (c) => {
       const actor = await runtime.authenticate(c.req.raw);
@@ -37,24 +38,6 @@ export function mountOauth(app: Hono, runtime: Runtime): void {
       return sendJson({ code: issued.value.code });
     });
   }
-}
-
-async function tokenParams(request: Request): Promise<URLSearchParams> {
-  const type = request.headers.get("content-type") ?? "";
-  if (type.includes("application/json")) {
-    const text = await request.text();
-    const body = text.trim() === "" ? {} : (JSON.parse(text) as unknown);
-    const params = new URLSearchParams();
-    if (isRecord(body)) {
-      for (const [key, value] of Object.entries(body)) {
-        if (typeof value === "string") {
-          params.set(key, value);
-        }
-      }
-    }
-    return params;
-  }
-  return new URLSearchParams(await request.text());
 }
 
 async function readBody(request: Request): Promise<unknown> {

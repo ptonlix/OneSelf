@@ -1,7 +1,9 @@
 import type { Hono } from "hono";
 
 import { isRecord, parseGrants, rateLimited, readJson, sendError, sendJson } from "../app/json.js";
+import { parseOperation } from "../app/schemas.js";
 import type { Runtime } from "../app/runtime.js";
+import { adminPage, wantsJson } from "./static.js";
 
 export function mountOwner(app: Hono, runtime: Runtime): void {
   app.post("/admin/login", async (c) => {
@@ -11,8 +13,8 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     if (!(await runtime.allow("login", runtime.clientAddress(c.req.raw)))) {
       return rateLimited();
     }
-    const body = await readBody(c.req.raw);
-    if (!isRecord(body) || typeof body.login !== "string" || typeof body.password !== "string") {
+    const body = parseOperation("login", await readBody(c.req.raw));
+    if (body === null) {
       return sendError("invalid", "login is invalid");
     }
     const result = await runtime.login(body.login, body.password);
@@ -33,8 +35,8 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
       return sendError("forbidden", "origin is not allowed");
     }
     const actor = await runtime.authenticate(c.req.raw);
-    const body = await readBody(c.req.raw);
-    if (!isRecord(body) || typeof body.password !== "string") {
+    const body = parseOperation("password", await readBody(c.req.raw));
+    if (body === null) {
       return sendError("invalid", "password is required");
     }
     const result = await runtime.changePassword(actor, body.password);
@@ -57,6 +59,9 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
   });
 
   app.get("/admin/api-keys/:id", async (c) => {
+    if (!wantsJson(c.req.raw)) {
+      return adminPage(runtime, c);
+    }
     const actor = await runtime.authenticate(c.req.raw);
     const result = await runtime.getApiKeyRequest(actor, c.req.param("id"));
     if (!result.ok) {
@@ -78,6 +83,9 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
   });
 
   app.get("/admin/site-activations/:id", async (c) => {
+    if (!wantsJson(c.req.raw)) {
+      return adminPage(runtime, c);
+    }
     const actor = await runtime.authenticate(c.req.raw);
     const result = await runtime.getActivation(actor, c.req.param("id"));
     if (!result.ok) {
@@ -111,22 +119,35 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     if (!isRecord(body) || "unrestricted_data" in body) {
       return sendError("invalid", "device approval is invalid");
     }
-    if (typeof body.user_code !== "string" || typeof body.site_write !== "boolean") {
+    const approved = parseOperation("device_approval", body);
+    if (approved === null) {
       return sendError("invalid", "device approval is invalid");
     }
-    const sources = parseGrants(body.sources);
+    const sources = parseGrants(approved.sources);
     if (sources === null) {
       return sendError("invalid", "sources are invalid");
     }
     const result = await runtime.approveDevice(actor, {
-      userCode: body.user_code,
-      siteWrite: body.site_write,
+      userCode: approved.user_code,
+      siteWrite: approved.site_write,
       sources,
     });
     if (!result.ok) {
       return sendError(result.error, result.message);
     }
     return sendJson({});
+  });
+
+  app.post("/admin/oauth-grants/:id/revoke", async (c) => {
+    if (!originAllowed(c.req.raw, runtime.origin)) {
+      return sendError("forbidden", "origin is not allowed");
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const result = await runtime.revokeOauthGrant(actor, c.req.param("id"));
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    return sendJson(result.value);
   });
 }
 

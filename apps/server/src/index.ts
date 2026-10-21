@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import {
   createServer as createHttpServer,
   type IncomingMessage,
@@ -21,17 +22,19 @@ import {
 import { mountMcp } from "./mcp/routes.js";
 import { mountOauth } from "./oauth/routes.js";
 import { mountOwner } from "./owner/routes.js";
+import { mountAdminPages } from "./owner/static.js";
 import { mountPcp } from "./pcp/routes.js";
 import { mountSiteFiles } from "./site-files/routes.js";
 
 export type { IngressMode };
 
 export type CreateServerOptions = Partial<
-  Omit<ServerOptions, "objectStore" | "skillsDir" | "originalPagesDir">
+  Omit<ServerOptions, "objectStore" | "skillsDir" | "originalPagesDir" | "adminDistDir">
 > & {
   readonly objectStore?: ServerOptions["objectStore"];
   readonly skillsDir?: string;
   readonly originalPagesDir?: string;
+  readonly adminDistDir?: string;
 };
 
 export type ServerHandle = {
@@ -51,6 +54,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
       clock,
       skillsDir: options.skillsDir ?? path.join(root, "skills"),
       originalPagesDir: options.originalPagesDir ?? path.join(root, "packages", "original-pages"),
+      adminDistDir: options.adminDistDir ?? path.join(root, "apps", "admin", "dist"),
       ...(options.publicOrigin === undefined ? {} : { publicOrigin: options.publicOrigin }),
       ...(options.ownerLogin === undefined ? {} : { ownerLogin: options.ownerLogin }),
       ...(options.ownerPassword === undefined ? {} : { ownerPassword: options.ownerPassword }),
@@ -63,6 +67,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
         : { oauthAuthorizationCode: options.oauthAuthorizationCode }),
       ...(options.log === undefined ? {} : { log: options.log }),
       ...(options.postgres === undefined ? {} : { postgres: options.postgres }),
+      ...(options.seedGrants === undefined ? {} : { seedGrants: options.seedGrants }),
     },
     objectStore,
   );
@@ -71,6 +76,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
   mountMcp(app, runtime);
   mountOauth(app, runtime);
   mountOwner(app, runtime);
+  mountAdminPages(app, runtime);
   mountSiteFiles(app, runtime);
   const timer = setInterval(
     () => {
@@ -116,21 +122,67 @@ if (isDirectRun()) {
   });
 }
 
+export function resolveListenHost(value: string | undefined): string {
+  if (value === undefined || value.length === 0) {
+    return "127.0.0.1";
+  }
+  return value;
+}
+
+export function assertDirectStart(
+  env: NodeJS.ProcessEnv,
+  paths: {
+    originalDist: string;
+    adminDist: string;
+  },
+): void {
+  const required = [
+    "DATABASE_URL",
+    "OBJECT_STORAGE_ENDPOINT",
+    "OBJECT_STORAGE_ACCESS_KEY",
+    "OBJECT_STORAGE_SECRET_KEY",
+  ] as const;
+  for (const name of required) {
+    const value = env[name];
+    if (value === undefined || value.length === 0) {
+      throw new Error(`${name} is required`);
+    }
+  }
+  if (!existsSync(path.join(paths.originalDist, "index.html"))) {
+    throw new Error("original page dist is missing");
+  }
+  if (!existsSync(path.join(paths.adminDist, "index.html"))) {
+    throw new Error("admin dist is missing");
+  }
+}
+
 async function listen(): Promise<void> {
+  const root = repoRoot();
+  const originalPagesDir = path.join(root, "packages", "original-pages");
+  const adminDistDir = path.join(root, "apps", "admin", "dist");
+  assertDirectStart(process.env, {
+    originalDist: path.join(originalPagesDir, "dist"),
+    adminDist: adminDistDir,
+  });
   const clock = new SystemClock();
   const endpoint = env("OBJECT_STORAGE_ENDPOINT");
-  const objectStore =
-    endpoint === undefined
-      ? memoryObjectStore(clock)
-      : openS3ObjectStore({
-          endpoint,
-          region: env("OBJECT_STORAGE_REGION") ?? "us-east-1",
-          bucket: env("OBJECT_STORAGE_BUCKET") ?? "oneself",
-          accessKeyId: env("OBJECT_STORAGE_ACCESS_KEY") ?? env("RUSTFS_ACCESS_KEY") ?? "",
-          secretAccessKey: env("OBJECT_STORAGE_SECRET_KEY") ?? env("RUSTFS_SECRET_KEY") ?? "",
-        });
+  const accessKeyId = env("OBJECT_STORAGE_ACCESS_KEY");
+  const secretAccessKey = env("OBJECT_STORAGE_SECRET_KEY");
+  if (endpoint === undefined || accessKeyId === undefined || secretAccessKey === undefined) {
+    throw new Error("object storage is not configured");
+  }
+  const objectStore = openS3ObjectStore({
+    endpoint,
+    region: env("OBJECT_STORAGE_REGION") ?? "us-east-1",
+    bucket: env("OBJECT_STORAGE_BUCKET") ?? "oneself",
+    accessKeyId,
+    secretAccessKey,
+  });
   const databaseUrl = env("DATABASE_URL");
-  const postgres = databaseUrl === undefined ? undefined : openPostgres(databaseUrl);
+  if (databaseUrl === undefined) {
+    throw new Error("DATABASE_URL is required");
+  }
+  const postgres = openPostgres(databaseUrl);
   const publicOrigin = env("PUBLIC_ORIGIN");
   const ownerLogin = env("OWNER_LOGIN");
   const ownerPassword = env("OWNER_PASSWORD");
@@ -140,7 +192,9 @@ async function listen(): Promise<void> {
     oauthAuthorizationCode: env("OAUTH_TEST_AUTHORIZATION_CODE") === "1",
     clock,
     objectStore,
-    ...(postgres === undefined ? {} : { postgres }),
+    originalPagesDir,
+    adminDistDir,
+    postgres,
     ...(publicOrigin === undefined ? {} : { publicOrigin }),
     ...(ownerLogin === undefined ? {} : { ownerLogin }),
     ...(ownerPassword === undefined ? {} : { ownerPassword }),
@@ -153,7 +207,8 @@ async function listen(): Promise<void> {
   try {
     await new Promise<void>((resolve, reject) => {
       httpServer.once("error", reject);
-      httpServer.listen(port, "127.0.0.1", () => {
+      const host = resolveListenHost(env("HOST"));
+      httpServer.listen(port, host, () => {
         resolve();
       });
     });

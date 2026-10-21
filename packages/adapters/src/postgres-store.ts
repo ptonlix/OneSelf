@@ -17,20 +17,7 @@ import {
   tags,
   timeline_entries,
 } from "@oneself/db";
-import {
-  and,
-  asc,
-  eq,
-  gte,
-  ilike,
-  inArray,
-  isNotNull,
-  isNull,
-  lte,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNotNull, isNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { type PgColumn, type PgDatabase, type PgQueryResultHKT } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
@@ -88,6 +75,10 @@ export type PageSearch = PageListFilter & {
   readonly text: string;
   readonly limit: number;
   readonly offset?: number;
+  /** When set, only these sources can match. An empty list matches nothing. */
+  readonly source_ids?: readonly string[];
+  readonly active_sources_only?: boolean;
+  readonly exclude_hidden?: boolean;
 };
 
 export type FileListFilter = {
@@ -136,6 +127,8 @@ export type ApiKeyRequestPatch = {
 
 export type OauthGrantPatch = {
   readonly refresh_token_hash?: string | null;
+  readonly rotated_refresh_hashes?: unknown;
+  readonly refresh_token_payload?: unknown;
   readonly revoked_at?: Date | null;
 };
 
@@ -240,7 +233,7 @@ export function openPostgres(databaseUrl: string): PostgresHandle {
   };
 }
 
-export function createPostgresStore<TResult extends PgQueryResultHKT>(
+function createPostgresStore<TResult extends PgQueryResultHKT>(
   db: PgDatabase<TResult>,
 ): PostgresStore {
   const pageKey = (source: string, slug: string) =>
@@ -298,10 +291,24 @@ export function createPostgresStore<TResult extends PgQueryResultHKT>(
         .orderBy(asc(pages.source), asc(pages.slug));
     },
     searchPages(query) {
+      if (query.source_ids !== undefined && query.source_ids.length === 0) {
+        return Promise.resolve([]);
+      }
       const clauses = pageFilterClauses(query);
       const text = textClause(query.text);
       if (text !== undefined) {
         clauses.push(text);
+      }
+      if (query.source_ids !== undefined) {
+        clauses.push(inArray(pages.source, [...query.source_ids]));
+      }
+      if (query.exclude_hidden === true) {
+        clauses.push(eq(pages.hidden_by_source, false));
+      }
+      if (query.active_sources_only === true) {
+        clauses.push(
+          sql`${pages.source} in (select ${sources.id} from ${sources} where ${sources.deleted_at} is null)`,
+        );
       }
       const filtered = db
         .select()
@@ -640,16 +647,36 @@ function pageFilterClauses(filter: PageListFilter | undefined): SQL[] {
   return clauses;
 }
 
+export function pageSearchTextClause(text: string): SQL | undefined {
+  return textClause(text);
+}
+
 function textClause(text: string): SQL | undefined {
   if (text === "") {
     return undefined;
   }
   const pattern = `%${escapeLike(text)}%`;
+  const like = (expression: SQL) => sql`${expression} LIKE ${pattern} ESCAPE '\\'`;
   return or(
-    ilike(pages.type, pattern),
-    ilike(pages.title, pattern),
-    ilike(pages.body, pattern),
-    sql`${pages.frontmatter}::text ILIKE ${pattern}`,
+    like(sql`${pages.type}`),
+    like(sql`${pages.title}`),
+    like(sql`${pages.body}`),
+    sql`exists (
+      select 1
+      from jsonb_each(${pages.frontmatter}) as entry(key, value)
+      where (
+        jsonb_typeof(entry.value) = 'string'
+        and (entry.value #>> '{}') like ${pattern} escape '\\'
+      ) or (
+        jsonb_typeof(entry.value) = 'array'
+        and exists (
+          select 1
+          from jsonb_array_elements(entry.value) as item(value)
+          where jsonb_typeof(item.value) = 'string'
+            and (item.value #>> '{}') like ${pattern} escape '\\'
+        )
+      )
+    )`,
   );
 }
 

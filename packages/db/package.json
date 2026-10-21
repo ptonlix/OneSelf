@@ -6,7 +6,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "db:generate": "drizzle-kit generate --config src/drizzle.config.ts"
+    "db:generate": "drizzle-kit generate --config src/drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config src/drizzle.config.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4"
