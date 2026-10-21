@@ -25,7 +25,7 @@
 
 ## 4. 第二波并行车道
 
-- [ ] 4.1 `packages/adapters`：实现 RustFS 所用的 S3 端口、Postgres 端口，以及测试用的内存对象存储。单元测试使用内存假实现，不连接生产端点。
+- [x] 4.1 `packages/adapters`：实现 RustFS 所用的 S3 端口、Postgres 端口，以及测试用的内存对象存储。单元测试使用内存假实现，不连接生产端点。
 - [ ] 4.2 `apps/server` 写入路径：同一事务完成对象指针、投影和最多 50 条版本；`put_pages` 任一页失败则全部不写；fence 失败整次回滚。每小时清理超过 30 天的软删除和超过 7 天且无引用的对象，不删除 release。集成测试覆盖 stale hash、模糊替换、跨页原件和这次清理。
 - [ ] 4.3 `apps/server` 读取与检索：实现授权搜索、匿名公开搜索、`query`、`recall`、目录、`whoami`、`resolve_slugs` 和结构读接口。`search` 查 `pages` 的 type、标题、正文和 frontmatter，不查 `chunks`。主人可以软删除和恢复 source；API Key 不能。测试断言私有页不改变公开命中和计数，匿名 `query` 返回 `unauthorized`，无权限、已删除和不存在都是 `not_found`，删除目录后其他页的链接原文不变。
 - [ ] 4.4 `apps/server` 站点：按指针提供 `original` 或 release。预览匿名可开且不移动指针。只有主人批准才移动指针。公开资料变化后不用重新激活；已打进 zip 的副本不回收。测试覆盖保留路径整包拒绝、没有删除 release 的路由，以及 Agent 调用批准路由得到 `forbidden`。
