@@ -1,0 +1,148 @@
+# 生产。应用、PostgreSQL、RustFS 不映射宿主机端口。
+# 三个入口都是 profile。默认 COMPOSE_PROFILES=cloudflared，见 .env.example。
+# 换成 caddy 或 tailscale 时只改这个值。不要同时开两个入口。
+# Cloudflare 不缓存 /pcp、/oauth、/admin、/skills、/media、/_preview。
+# 已开始的响应若超过 Cloudflare 代理读超时仍未结束，会被断开。
+# 页面、登录、设备码和普通 MCP 调用应在该时限内结束。
+# 没有隧道令牌或 auth key 时，入口容器可以失败，应用和数据库仍然留在。
+name: oneself
+
+services:
+  app:
+    image: ${ONESELF_IMAGE:-oneself:local}
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://oneself:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/oneself
+      OBJECT_STORAGE_ENDPOINT: http://rustfs:9000
+      OBJECT_STORAGE_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-oneself}
+      OBJECT_STORAGE_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      OBJECT_STORAGE_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rustfs-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: oneself
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: oneself
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oneself -d oneself"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  rustfs-volume:
+    image: rustfs/rustfs:1.0.1
+    user: "0:0"
+    entrypoint: ["chown", "10001:10001", "/data"]
+    volumes:
+      - rustfs_data:/data
+    restart: "no"
+
+  rustfs:
+    image: rustfs/rustfs:1.0.1
+    user: "10001:10001"
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+    volumes:
+      - rustfs_data:/data
+    depends_on:
+      rustfs-volume:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  rustfs-init:
+    image: amazon/aws-cli:2.27.49
+    environment:
+      AWS_ACCESS_KEY_ID: ${RUSTFS_ACCESS_KEY:?set RUSTFS_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${RUSTFS_SECRET_KEY:?set RUSTFS_SECRET_KEY}
+      AWS_DEFAULT_REGION: ${OBJECT_STORAGE_REGION:-us-east-1}
+      AWS_EC2_METADATA_DISABLED: "true"
+      OBJECT_STORAGE_BUCKET: ${OBJECT_STORAGE_BUCKET:-oneself}
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        'aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$OBJECT_STORAGE_BUCKET" || aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$OBJECT_STORAGE_BUCKET"',
+      ]
+    restart: "no"
+
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2025.8.1}
+    profiles: ["cloudflared"]
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2.11.7-alpine}
+    profiles: ["caddy"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  tailscale:
+    image: ${TAILSCALE_IMAGE:-tailscale/tailscale:v1.86.2}
+    profiles: ["tailscale"]
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTHKEY:-}
+      TS_USERSPACE: "true"
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /tmp/serve.json
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        cat > /tmp/serve.json <<'EOF'
+        {"TCP":{"443":{"HTTPS":true}},"Web":{"$${TS_CERT_DOMAIN}:443":{"Handlers":{"/":{"Proxy":"http://app:3000"}}}}}
+        EOF
+        exec /usr/local/bin/containerboot
+    volumes:
+      - tailscale_state:/var/lib/tailscale
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  rustfs_data:
+  caddy_data:
+  caddy_config:
+  tailscale_state:

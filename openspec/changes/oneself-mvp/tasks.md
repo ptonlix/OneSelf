@@ -4,9 +4,9 @@
 
 ## 1. 主代理准备空工作区
 
-- [ ] 1.1 在主工作树创建 pnpm 工作区、TypeScript strict、Vitest 和 dependency-cruiser 配置，包目录先留空的 `package.json`。运行 `pnpm install`，确认它成功且没有 `package-lock.json`。
-- [ ] 1.2 添加 `compose.yaml` 和 `compose.dev.yaml`。生产不映射应用、PostgreSQL 或 RustFS 的宿主机端口。开发只把 PostgreSQL 和 RustFS `9000` 绑到回环，不发布 `9001`，应用用 pnpm 跑在宿主机。`cloudflared`、`caddy`、`tailscale` 是互斥 profile，默认 `COMPOSE_PROFILES=cloudflared`。用 `docker compose config` 确认这两种端口结果。
-- [ ] 1.3 添加 `.env.example`，包含 `PUBLIC_ORIGIN`、主人初始口令和入口令牌的占位，不含真实密钥。确认示例文件可被提交，而 `.env` 仍被 gitignore。
+- [x] 1.1 在主工作树创建 pnpm 工作区、TypeScript strict、Vitest 和 dependency-cruiser 配置，包目录先留空的 `package.json`。运行 `pnpm install`，确认它成功且没有 `package-lock.json`。
+- [x] 1.2 添加 `compose.yaml` 和 `compose.dev.yaml`。生产不映射应用、PostgreSQL 或 RustFS 的宿主机端口。开发只把 PostgreSQL 和 RustFS `9000` 绑到回环，不发布 `9001`，应用用 pnpm 跑在宿主机。`cloudflared`、`caddy`、`tailscale` 是互斥 profile，默认 `COMPOSE_PROFILES=cloudflared`。用 `docker compose config` 确认这两种端口结果。
+- [x] 1.3 添加 `.env.example`，包含 `PUBLIC_ORIGIN`、主人初始口令和入口令牌的占位，不含真实密钥。确认示例文件可被提交，而 `.env` 仍被 gitignore。
 
 ## 2. 第一波并行车道
 
