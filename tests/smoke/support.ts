@@ -86,9 +86,106 @@ export async function putPage(
   });
 }
 
+export const PNG_BYTES = new Uint8Array([137, 80, 78, 71]);
+
+export type SourceGrantInput = {
+  id: string;
+  read: boolean;
+  write: boolean;
+  visibility: boolean;
+};
+
+export async function expectError(
+  response: Response,
+  status: number,
+  error: string,
+): Promise<void> {
+  expect(response.status).toBe(status);
+  const body = await readJson(response);
+  expect(body.error).toBe(error);
+  expect(typeof body.message).toBe("string");
+  expect(body.message).not.toBe("");
+  expect(Object.keys(body).sort()).toEqual(["error", "message"]);
+}
+
+export async function issueApiKey(
+  server: ServerHandle,
+  cookie: string,
+  input: {
+    label: string;
+    unrestricted_data?: boolean;
+    site_write?: boolean;
+    sources?: SourceGrantInput[];
+  },
+): Promise<{ id: string; key: string }> {
+  const pending = await readJson(
+    await server.request("/pcp/v1/api-keys", {
+      method: "POST",
+      headers: jsonHeaders({ cookie }),
+      body: JSON.stringify({
+        label: input.label,
+        unrestricted_data: input.unrestricted_data ?? false,
+        site_write: input.site_write ?? false,
+        sources: input.sources ?? [],
+      }),
+    }),
+  );
+  const revealed = await readJson(
+    await server.request(`/admin/api-keys/${String(pending.id)}/approve`, {
+      method: "POST",
+      headers: jsonHeaders({ cookie }),
+      body: "{}",
+    }),
+  );
+  const listed = await readJson(await server.request("/pcp/v1/api-keys", { headers: { cookie } }));
+  const found = listedKeys(listed).find((item) => item.label === input.label);
+  if (found === undefined || !String(revealed.key).startsWith("osk_")) {
+    throw new Error("api key was not issued");
+  }
+  return { id: found.id, key: String(revealed.key) };
+}
+
+export async function issueAccessToken(
+  server: ServerHandle,
+  cookie: string,
+  input: { site_write?: boolean; sources?: SourceGrantInput[] } = {},
+): Promise<string> {
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const approved = await server.request("/admin/device", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: JSON.stringify({
+      user_code: device.user_code,
+      site_write: input.site_write ?? false,
+      sources: input.sources ?? [],
+    }),
+  });
+  expect(approved.status, await approved.clone().text()).toBe(200);
+  const token = await readJson(
+    await server.request("/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: String(device.device_code),
+      }),
+    }),
+  );
+  if (typeof token.access_token !== "string" || token.access_token.length === 0) {
+    throw new Error("access token was not issued");
+  }
+  return token.access_token;
+}
+
 export async function uploadPng(server: ServerHandle, cookie: string): Promise<{ id: string }> {
   const body = new FormData();
-  body.set("file", new File([new Uint8Array([137, 80, 78, 71])], "a.png", { type: "image/png" }));
+  body.set("file", new File([PNG_BYTES], "a.png", { type: "image/png" }));
   const response = await server.request("/pcp/v1/files", {
     method: "POST",
     headers: { cookie },
@@ -96,6 +193,23 @@ export async function uploadPng(server: ServerHandle, cookie: string): Promise<{
   });
   expect(response.status, await response.clone().text()).toBe(200);
   return (await response.json()) as { id: string };
+}
+
+function listedKeys(body: Record<string, unknown>): { id: string; label: string }[] {
+  if (!Array.isArray(body.api_keys)) {
+    return [];
+  }
+  const keys: { id: string; label: string }[] = [];
+  for (const item of body.api_keys) {
+    if (typeof item !== "object" || item === null) {
+      continue;
+    }
+    const row = item as { id?: unknown; label?: unknown };
+    if (typeof row.id === "string" && typeof row.label === "string") {
+      keys.push({ id: row.id, label: row.label });
+    }
+  }
+  return keys;
 }
 
 export async function uploadArchive(

@@ -1,6 +1,18 @@
 import { expect, it } from "vitest";
 
-import { boot, jsonHeaders, ORIGIN, owner, readJson } from "./support.js";
+import {
+  addSource,
+  boot,
+  expectError,
+  issueAccessToken,
+  issueApiKey,
+  jsonHeaders,
+  markdown,
+  ORIGIN,
+  owner,
+  putPage,
+  readJson,
+} from "./support.js";
 
 it("shows an API key once and does not let OAuth manage keys", async () => {
   const server = await boot();
@@ -107,5 +119,138 @@ it("shows an API key once and does not let OAuth manage keys", async () => {
     headers: { authorization: `Bearer ${bearer}` },
   });
   expect(who.status).toBe(401);
+  await server.close();
+});
+
+it("returns the owner whoami result", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  await addSource(server, cookie, "notes");
+  expect(await readJson(await server.request("/pcp/v1/whoami", { headers: { cookie } }))).toEqual({
+    credential: "owner",
+    admin: true,
+    site_write: true,
+    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+  });
+  await server.close();
+});
+
+it("revokes an API key on the next request", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  await addSource(server, cookie, "notes");
+  expect((await putPage(server, cookie, "notes", "hello", markdown("alpha"))).status).toBe(200);
+  const issued = await issueApiKey(server, cookie, {
+    label: "reader",
+    sources: [{ id: "notes", read: true, write: false, visibility: false }],
+  });
+  expect(
+    (
+      await server.request("/pcp/v1/pages/notes/hello", {
+        headers: { authorization: `ApiKey ${issued.key}` },
+      })
+    ).status,
+  ).toBe(200);
+  const revoked = await readJson(
+    await server.request(`/pcp/v1/api-keys/${issued.id}`, {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(revoked).toEqual({ id: issued.id });
+  const next = await server.request("/pcp/v1/pages/notes/hello", {
+    headers: { authorization: `ApiKey ${issued.key}` },
+  });
+  await expectError(next, 404, "not_found");
+  await expectError(
+    await server.request("/pcp/v1/whoami", {
+      headers: { authorization: `ApiKey ${issued.key}` },
+    }),
+    401,
+    "unauthorized",
+  );
+  await server.close();
+});
+
+it("ends the owner session on logout", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  expect((await server.request("/pcp/v1/whoami", { headers: { cookie } })).status).toBe(200);
+  const loggedOut = await server.request("/admin/logout", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+  });
+  expect(loggedOut.status).toBe(200);
+  const cleared = loggedOut.headers.get("set-cookie") ?? "";
+  expect(cleared.startsWith("oneself_session=")).toBe(true);
+  expect(cleared).toContain("Max-Age=0");
+  const next = await server.request("/pcp/v1/whoami", { headers: { cookie } });
+  await expectError(next, 401, "unauthorized");
+  await server.close();
+});
+
+it("returns the same private page to an API key and an OAuth grant with the same flags", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  await addSource(server, cookie, "notes");
+  expect((await putPage(server, cookie, "notes", "hello", markdown("secret"))).status).toBe(200);
+  const grants = [{ id: "notes", read: true, write: false, visibility: false }];
+  const issued = await issueApiKey(server, cookie, { label: "reader", sources: grants });
+  const accessToken = await issueAccessToken(server, cookie, {
+    site_write: false,
+    sources: grants,
+  });
+  const byKey = await readJson(
+    await server.request("/pcp/v1/pages/notes/hello", {
+      headers: { authorization: `ApiKey ${issued.key}` },
+    }),
+  );
+  const byOauth = await readJson(
+    await server.request("/pcp/v1/pages/notes/hello", {
+      headers: { authorization: `Bearer ${accessToken}` },
+    }),
+  );
+  expect(byKey).toEqual(byOauth);
+  expect(byKey.visibility).toBe("private");
+  expect(byKey.markdown).toContain("secret");
+  await server.close();
+});
+
+it("leaves another key and an OAuth grant working after one key is revoked", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  await addSource(server, cookie, "notes");
+  expect((await putPage(server, cookie, "notes", "hello", markdown("secret"))).status).toBe(200);
+  const grants = [{ id: "notes", read: true, write: false, visibility: false }];
+  const first = await issueApiKey(server, cookie, { label: "first", sources: grants });
+  const second = await issueApiKey(server, cookie, { label: "second", sources: grants });
+  const accessToken = await issueAccessToken(server, cookie, { sources: grants });
+  expect(
+    (
+      await server.request(`/pcp/v1/api-keys/${first.id}`, {
+        method: "DELETE",
+        headers: { cookie },
+      })
+    ).status,
+  ).toBe(200);
+  await expectError(
+    await server.request("/pcp/v1/whoami", {
+      headers: { authorization: `ApiKey ${first.key}` },
+    }),
+    401,
+    "unauthorized",
+  );
+  const byKey = await readJson(
+    await server.request("/pcp/v1/pages/notes/hello", {
+      headers: { authorization: `ApiKey ${second.key}` },
+    }),
+  );
+  const byOauth = await readJson(
+    await server.request("/pcp/v1/pages/notes/hello", {
+      headers: { authorization: `Bearer ${accessToken}` },
+    }),
+  );
+  expect(byKey.markdown).toContain("secret");
+  expect(byOauth.markdown).toContain("secret");
   await server.close();
 });
