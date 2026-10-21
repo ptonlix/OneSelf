@@ -1,0 +1,5 @@
+{
+  "name": "@oneself/server",
+  "private": true,
+  "type": "module"
+}

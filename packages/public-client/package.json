@@ -1,0 +1,5 @@
+{
+  "name": "@oneself/public-client",
+  "private": true,
+  "type": "module"
+}
