@@ -38,7 +38,7 @@ export function AdminApp(): ReactElement {
         setSession(
           identity.admin
             ? { status: "ready" }
-            : { status: "anonymous", message: "只有主人可以打开管理端" },
+            : { status: "anonymous", message: "只有所属人可以打开管理端" },
         );
       } catch (reason: unknown) {
         if (!cancelled) setSession(sessionFromProbeFailure(reason));

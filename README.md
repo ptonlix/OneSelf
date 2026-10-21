@@ -149,7 +149,7 @@ node --env-file=.env --experimental-strip-types apps/server/src/index.ts
 ## 🧱 架构
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="OneSelf 系统架构：浏览器打开按指针提供的站点并匿名读取公开 PCP；任意 AI Agent 用所属人批准的 API Key 或 OAuth 设备码令牌调用同一份 PCP 操作表；单个 Node.js 进程使用 RustFS 保存页面、原件和站点包，使用 PostgreSQL 保存索引、授权和站点指针" width="100%" />
+  <img src="docs/images/architecture.png" alt="OneSelf 架构：所属人在管理端批准授权、随时收回，并整理个人上下文；任意 AI Agent / 脚本用所属人批准的 API Key 或 OAuth 设备码接入 PCP（HTTP 与 MCP 同一套操作）；访客打开公开主页，只读取公开内容；个人上下文由页面和原件组成，按目录授权、默认私有、版本可回退，存放在自托管的 RustFS 与 PostgreSQL" width="100%" />
 </p>
 
 - **一个进程**：PCP、MCP、OAuth、管理端静态文件和已发布站点都由同一个 Hono 应用提供，不拆微服务，也没有 Redis 或队列。

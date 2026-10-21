@@ -2,7 +2,7 @@
 
 ## Purpose
 
-保存主人的 Markdown 原文，并用同一套页投影支持任意 `type`，不按资料种类建表。
+保存所属人的 Markdown 原文，并用同一套页投影支持任意 `type`，不按资料种类建表。
 
 ## ADDED Requirements
 

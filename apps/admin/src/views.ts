@@ -85,7 +85,7 @@ export function LoginView(props: {
       },
     },
     h("h1", null, "登录"),
-    h("p", { className: "muted" }, "使用主人登录名。改密完成前，其他管理操作不会打开。"),
+    h("p", { className: "muted" }, "使用所属人登录名。改密完成前，其他管理操作不会打开。"),
     message(props.message),
     h(
       "label",
@@ -136,7 +136,7 @@ export function PasswordView(props: {
     h(
       "p",
       { className: "muted" },
-      props.locked ? "必须先改密。在此之前只能留在这一页或登出。" : "新密码会替换当前主人密码。",
+      props.locked ? "必须先改密。在此之前只能留在这一页或登出。" : "新密码会替换当前所属人密码。",
     ),
     message(props.message),
     h(

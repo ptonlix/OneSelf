@@ -2,7 +2,7 @@
 
 ## Context
 
-仓库现在没有应用代码。行为已经写在 `docs/PRD.md` 和 `docs/ARCHITECTURE.md` v0.13。见 `proposal.md` 的 Why。实现必须能在一台机器上跑通「写入一页、公开页被原始落地页读到、主人批准后指针才移动」。
+仓库现在没有应用代码。行为已经写在 `docs/PRD.md` 和 `docs/ARCHITECTURE.md` v0.13。见 `proposal.md` 的 Why。实现必须能在一台机器上跑通「写入一页、公开页被原始落地页读到、所属人批准后指针才移动」。
 
 并行约束：后面会有多个 subagent，各自使用独立 git worktree。主代理把分支合并回 `main`，再跑最终验收。因此每个工作包只能拥有自己的目录；根清单、锁文件和 `compose.yaml` 只有主代理能改。
 
@@ -100,7 +100,7 @@ subagent 不推 `main`，不互相改 worktree。主代理按「domain、operati
 
 ## Migration Plan
 
-没有旧数据。首次启动创建主人并要求改密。回滚是停掉 compose 并丢弃开发卷；不提供生产数据迁移。
+没有旧数据。首次启动创建所属人并要求改密。回滚是停掉 compose 并丢弃开发卷；不提供生产数据迁移。
 
 入口切换只改 `COMPOSE_PROFILES` 和 `PUBLIC_ORIGIN`。换域名后，已保存旧发现地址的 Agent 必须重新读取 `/.well-known/pcp`。
 

@@ -24,7 +24,7 @@
 ## 2. 总体结构
 
 ```text
-主人浏览器 / 访客浏览器 / Agent
+所属人浏览器 / 访客浏览器 / Agent
     │
     ▼
 ┌──────────────────────────────────────────┐
@@ -40,18 +40,17 @@
      PostgreSQL        RustFS（S3 兼容）
 ```
 
-Agent 不连接数据库和对象存储，也不读取磁盘路径。它只调用 PCP 的 HTTP API 或同一进程里的 MCP。主人密码、OAuth 签名密钥、API Key 原文和对象存储密钥只存在于服务端环境变量或只存哈希的表里。
+Agent 不连接数据库和对象存储，也不读取磁盘路径。它只调用 PCP 的 HTTP API 或同一进程里的 MCP。所属人密码、OAuth 签名密钥、API Key 原文和对象存储密钥只存在于服务端环境变量或只存哈希的表里。
 
 ### 系统总览图
 
-访客只拿到当前指针指向的静态文件，再由浏览器匿名读取公开 PCP。自己的 Agent 使用 API Key。别人的 Agent 走 OAuth 2.1 设备码，人在管理端批准。浏览器和 Agent 都先到达唯一的 HTTPS 入口，再进入这一个进程。默认入口是 cloudflared。
+访客只拿到当前指针指向的静态文件，再由浏览器匿名读取公开 PCP。任意 AI Agent 二选一接入：使用所属人批准生成的 API Key，或走 OAuth 2.1 设备码、由所属人在管理端批准。浏览器和 Agent 都先到达唯一的 HTTPS 入口，再进入这一个进程。默认入口是 cloudflared。
 
 ```mermaid
 flowchart LR
-    Owner["主人<br/>管理端"]
+    Owner["所属人<br/>管理端"]
     Visitor["访客"]
-    OwnAgent["自己的 Agent / 脚本"]
-    OtherAgent["别人的 Agent"]
+    Agent["任意 AI Agent / 脚本"]
     Front["HTTPS 入口<br/>默认 cloudflared"]
 
     subgraph App["OneSelf（单进程）"]
@@ -65,8 +64,7 @@ flowchart LR
 
     Owner --> Front
     Visitor --> Front
-    OwnAgent --> Front
-    OtherAgent --> Front
+    Agent -->|API Key 或设备码令牌| Front
     Front --> Admin
     Front --> Sites
     Front --> API
@@ -85,10 +83,9 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Owner["Owner<br/>admin UI"]
+    Owner["Account owner<br/>admin UI"]
     Visitor["Visitor"]
-    OwnAgent["Own agent / script"]
-    OtherAgent["Third-party agent"]
+    Agent["Any AI agent / script"]
     Front["HTTPS front<br/>cloudflared by default"]
 
     subgraph App["OneSelf (one process)"]
@@ -102,8 +99,7 @@ flowchart LR
 
     Owner --> Front
     Visitor --> Front
-    OwnAgent --> Front
-    OtherAgent --> Front
+    Agent -->|API key or device-flow token| Front
     Front --> Admin
     Front --> Sites
     Front --> API
@@ -129,7 +125,7 @@ flowchart LR
 | 运行时 | Node.js 24 LTS | 与当前 Active LTS 对齐。不使用尚未成为 LTS 的更大版本做生产运行时 |
 | 包管理 | pnpm | 只用这一套。工作区用来放服务端、管理端、原始页面和公开客户端。不提交 npm 或 Yarn 的锁文件 |
 | 服务端 | Hono | 只提供 API、MCP 和静态文件。公开站点不是服务端模板，所以不用 Next.js。不使用 Express 或 Nest |
-| 管理端 | Vite + React | 主人用的界面。构建后由同一个 Node 进程提供。不把管理端做成服务端渲染应用 |
+| 管理端 | Vite + React | 所属人用的界面。构建后由同一个 Node 进程提供。不把管理端做成服务端渲染应用 |
 | 原始页面 | Vite + React | 随应用发布的一份完整落地页。不拆成首页和简历页，也不做客户端路由。不定制时指针指向它的构建结果。定制产物只要能按路径提供即可，不要求继续使用 React |
 | 公开数据客户端 | 工作区里的小 TypeScript 包 | 站点脚本用它请求匿名公开 PCP。不让每个页面各写一套请求 |
 | 领域代码 | 纯 TypeScript | 不依赖 Hono、React 或数据库驱动。规则可以用单元测试直接跑 |
@@ -138,8 +134,8 @@ flowchart LR
 | 数据访问 | Drizzle | 显式 SQL、JSON 和事务。表结构只来自 migration |
 | 检索 | Postgres 全文检索 + `frontmatter` 的 GIN | 第一版不引入 Elasticsearch，也不做向量检索。`search` 查 `pages` 的标题、正文和 frontmatter 字符串 |
 | 授权 | `node-oidc-provider` | 生产只启用设备码。授权码加 PKCE 只在测试配置启用。不自己写 OAuth |
-| 主人密码 | Argon2id | 只存哈希 |
-| API Key 与刷新令牌 | 只存 SHA-256 | 原文只在主人确认批准页时出现一次。Key 原文以 `osk_` 开头 |
+| 所属人密码 | Argon2id | 只存哈希 |
+| API Key 与刷新令牌 | 只存 SHA-256 | 原文只在所属人确认批准页时出现一次。Key 原文以 `osk_` 开头 |
 | 校验 | Zod | 接口入参和 frontmatter 的必填项共用解析。不因此为每种 `type` 建表 |
 | Markdown | 一个解析端口 | frontmatter 与正文拆开。只识别 PRD 6.2 的两种 fence |
 | 对象存储 | S3 兼容端口 | 原件、Markdown 和站点 zip 都走这个端口。开发和生产都用单盘 `rustfs/rustfs:1.0.1`。单元测试可以用内存假实现，那不是部署选项 |
@@ -166,7 +162,7 @@ flowchart LR
 
 三个容器都只把 HTTPS 转到应用的站内地址。不挂站点目录，也不保存上传的 zip。不把 API、MCP 或 OAuth 改写成 Workers，也不把数据库换成 D1。对象存储仍然可以换成 R2，那是另一件事。
 
-`PUBLIC_ORIGIN` 是唯一对外源，例如 `https://自己的域名` 或 `https://机器名.tailnet.ts.net`。发现文档、OAuth issuer、批准地址和媒体绝对地址只使用它，不从 `Host` 或转发头现推。它是 HTTPS 时，主人 Cookie 加 `Secure`。管理端写请求的 `Origin` 必须等于它。没有这个变量时，只接受本机开发源，不以公网入口启动。
+`PUBLIC_ORIGIN` 是唯一对外源，例如 `https://自己的域名` 或 `https://机器名.tailnet.ts.net`。发现文档、OAuth issuer、批准地址和媒体绝对地址只使用它，不从 `Host` 或转发头现推。它是 HTTPS 时，所属人 Cookie 加 `Secure`。管理端写请求的 `Origin` 必须等于它。没有这个变量时，只接受本机开发源，不以公网入口启动。
 
 限流使用的客户端地址只取这一跳入口送来的值。cloudflared 用 `CF-Connecting-IP`。Caddy 和 Tailscale 用它们自己写入的转发头。应用不信任其他来源的 `X-Forwarded-For`。
 
@@ -282,7 +278,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 | `site_files` | 该 release 里每个路径对应的对象键 |
 | `site_pointers` | 只有一行。`release_id` 为 `original` 或某份 release |
 | `site_activations` | 待批准的上线申请、目标 release 和过期时间 |
-| `owners` | 唯一主人。登录名、密码哈希、是否必须改密 |
+| `owners` | 唯一所属人。登录名、密码哈希、是否必须改密 |
 | `api_keys` | 已生效密钥的哈希、标签、权限、作废时间、最近使用时间 |
 | `api_key_requests` | 待批准的密钥请求、要求的权限和过期时间 |
 | `oauth_grants` | 授权范围、刷新令牌哈希、作废时间 |
@@ -294,7 +290,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 3. 在一个事务里替换 `pages` 投影、标签、链接、chunks，并追加 `page_versions`。第 4 步启用抽取后，facts 和 timeline 也在这个事务里替换；抽取失败则事务回滚。
 4. 事务失败留下的对象没有指针。每小时清理：软删除超过 30 天的页及其投影和版本；没有任何页、版本或文件引用、且写入超过 7 天的对象。
 
-`get_page` 读 `pages` 正文，不每次回源对象。重建命令扫描 `pages/` 前缀下仍被需要的对象，重写 `pages`、`chunks`、`links`、`tags`、`facts`、`timeline_entries`。授权、密钥、主人和站点指针不重建。
+`get_page` 读 `pages` 正文，不每次回源对象。重建命令扫描 `pages/` 前缀下仍被需要的对象，重写 `pages`、`chunks`、`links`、`tags`、`facts`、`timeline_entries`。授权、密钥、所属人和站点指针不重建。
 
 公开 PCP 在领域层排除 `visibility` 不是 `public` 的页，也不返回已软删除的页。调用方不能读该 source 时，页和文件都返回与不存在相同的 `not_found`。
 
@@ -343,7 +339,7 @@ GET  /skills/original-page.md
 | 方法 | 路径 | 操作 |
 | --- | --- | --- |
 | POST | `/pcp/v1/files` | `file_upload`。`multipart/form-data`，字段名 `file` |
-| GET | `/pcp/v1/files` | `file_list`。查询 `source` 与 `slug`；主人可以不带页，只看未挂接文件 |
+| GET | `/pcp/v1/files` | `file_list`。查询 `source` 与 `slug`；所属人可以不带页，只看未挂接文件 |
 | GET | `/pcp/v1/files/{id}` | `file_url`。JSON `{id, url, media_type, byte_size, sha256}`，`url` 为绝对的 `/media/{id}` |
 | GET | `/media/{id}` | 吐字节。不是注册表里的另一个操作 |
 
@@ -379,28 +375,28 @@ GET  /skills/original-page.md
 | --- | --- | --- |
 | GET | `/pcp/v1/sources` | `sources_list`。不含软删除目录 |
 | POST | `/pcp/v1/sources` | `sources_add`。JSON `{id}`。软删除期内的同名返回 `conflict` |
-| DELETE | `/pcp/v1/sources/{id}` | `sources_delete`。只有主人会话 |
-| POST | `/pcp/v1/sources/{id}/restore` | `sources_restore`。只有主人会话，30 天内 |
+| DELETE | `/pcp/v1/sources/{id}` | `sources_delete`。只有所属人会话 |
+| POST | `/pcp/v1/sources/{id}/restore` | `sources_restore`。只有所属人会话，30 天内 |
 | GET | `/pcp/v1/sources/{id}` | `sources_status`。软删除目录是 `not_found` |
 | GET | `/pcp/v1/whoami` | `whoami` |
 | GET | `/pcp/v1/skills` | `list_skills` |
 | GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `data` 或 `original-page` |
 
-`whoami` 返回 `{credential, admin, site_write, sources:[{id, read, write, visibility}]}`。只有主人会话的 `admin` 为 true。
+`whoami` 返回 `{credential, admin, site_write, sources:[{id, read, write, visibility}]}`。只有所属人会话的 `admin` 为 true。
 
 站点：
 
 | 方法 | 路径 | 操作 |
 | --- | --- | --- |
 | GET | `/pcp/v1/site` | `list_sites`。当前指针和 release 列表 |
-| GET | `/pcp/v1/site/source` | `get_site`。`application/zip`，文件名 `original-page-source.zip`。需要 `site:write` 或主人会话 |
+| GET | `/pcp/v1/site/source` | `get_site`。`application/zip`，文件名 `original-page-source.zip`。需要 `site:write` 或所属人会话 |
 | POST | `/pcp/v1/site/releases` | `put_site`。字段 `archive`，zip 根目录必须有 `index.html` |
 | POST | `/pcp/v1/site/releases/{id}/preview` | `preview_site`。返回 `{url}`，url 为 `/_preview/{id}/` |
-| POST | `/pcp/v1/site/activate` | `activate_site`。JSON `{release_id}`，`release_id` 为 `rel_...` 或 `original`。需要 `site:write` 或主人会话 |
+| POST | `/pcp/v1/site/activate` | `activate_site`。JSON `{release_id}`，`release_id` 为 `rel_...` 或 `original`。需要 `site:write` 或所属人会话 |
 
 `activate_site` 写入 `site_activations`，15 分钟有效，响应 `{id, status:"pending", approval_url, expires_at}`。它不修改 `site_pointers`。
 
-密钥管理，仅主人会话，且不进 MCP：
+密钥管理，仅所属人会话，且不进 MCP：
 
 | 方法 | 路径 | 操作 |
 | --- | --- | --- |
@@ -420,21 +416,21 @@ GET  /skills/original-page.md
 | POST | `/oauth/token` | 换访问令牌或刷新 |
 | POST | `/mcp` | Streamable HTTP。认证头与 PCP 相同 |
 | GET | `/openapi.json` | 由注册表生成 |
-| POST | `/admin/login` | 主人登录 |
+| POST | `/admin/login` | 所属人登录 |
 | POST | `/admin/password` | 修改密码。未改密前其他管理操作和 PCP 都拒绝 |
 | POST | `/admin/logout` | 结束会话 |
 | POST | `/admin/api-keys/{id}/approve` | 核对并生成密钥。原文只在这次 JSON 里 |
 | POST | `/admin/site-activations/{id}/approve` | JSON `{decision:"approve"\|"reject"}`。只有 `approve` 移动指针 |
 
-认证之后只经过 `authorize(credential, operation, source)`。主人会话拥有全部操作。API Key 和 OAuth 按批准的 source 三档和 `site:write` 判断。两者都不能令 `admin` 为 true。
+认证之后只经过 `authorize(credential, operation, source)`。所属人会话拥有全部操作。API Key 和 OAuth 按批准的 source 三档和 `site:write` 判断。两者都不能令 `admin` 为 true。
 
 无凭据调用写入、非公开检索、上线申请或管理路由返回 401 `unauthorized`。凭据有效但操作不在授权里返回 403 `forbidden`。资源读不到返回 404 `not_found`。哈希冲突返回 409 `conflict`。非法正文、围栏、slug 或 zip 返回 400 `invalid`。超过 20 MiB 或 200 个站点文件返回 413 `payload_too_large`。未改密返回 403 `password_change_required`。
 
 OAuth access token 15 分钟。refresh token 轮换，只存哈希。被轮换掉的 refresh token 再次使用时，把整条 `oauth_grants` 标成作废。撤销写在 `revoked_at`。
 
-主人 Cookie 名 `oneself_session`，`Path=/`、`HttpOnly`、`SameSite=Lax`，HTTPS 时加 `Secure`。管理端因此可以调用 `/pcp/v1`。站点脚本必须 `credentials: omit`。站点响应不 `Set-Cookie`。管理端的写请求还要核对 `Origin` 与本站一致。
+所属人 Cookie 名 `oneself_session`，`Path=/`、`HttpOnly`、`SameSite=Lax`，HTTPS 时加 `Secure`。管理端因此可以调用 `/pcp/v1`。站点脚本必须 `credentials: omit`。站点响应不 `Set-Cookie`。管理端的写请求还要核对 `Origin` 与本站一致。
 
-第一次启动时，若 `owners` 为空，用 `OWNER_LOGIN` 和 `OWNER_PASSWORD` 创建主人，密码只存 Argon2id 哈希，并标记必须改密。之后启动不读取这两个变量来登录，也不在账号已存在时用它们重置密码。若设置了 `OWNER_RESET_PASSWORD`，启动时替换哈希、重新要求改密，并打一条不含密码的日志。没有主人且没有初始密码变量时，应用拒绝启动。启动时不生成 API Key。
+第一次启动时，若 `owners` 为空，用 `OWNER_LOGIN` 和 `OWNER_PASSWORD` 创建所属人，密码只存 Argon2id 哈希，并标记必须改密。之后启动不读取这两个变量来登录，也不在账号已存在时用它们重置密码。若设置了 `OWNER_RESET_PASSWORD`，启动时替换哈希、重新要求改密，并打一条不含密码的日志。没有所属人且没有初始密码变量时，应用拒绝启动。启动时不生成 API Key。
 
 ---
 
@@ -457,7 +453,7 @@ Agent 构建 dist/ 并打成 zip
     │  activate_site
     ▼
 site_activations 增加一行，返回批准地址
-    │  主人会话 POST .../approve {decision:"approve"}
+    │  所属人会话 POST .../approve {decision:"approve"}
     ▼
 site_pointers 改指向这一行
     │
@@ -467,7 +463,7 @@ site_pointers 改指向这一行
 
 应用识别到请求路径属于线上站点时，只查指针和 `site_files`，或在指针为 `original` 时读镜像里的 dist。这个处理函数不能查询 `pages`。资料由浏览器里的公开客户端另一次请求取得。
 
-预览路径不使用线上路径，匿名可访问。主人同意前线上路径保持不变。回到旧版或 `original` 时重新走 `activate_site` 和批准。没有回滚路由。第一版不提供删除 release 的接口。
+预览路径不使用线上路径，匿名可访问。所属人同意前线上路径保持不变。回到旧版或 `original` 时重新走 `activate_site` 和批准。没有回滚路由。第一版不提供删除 release 的接口。
 
 缓存：公开 PCP、`/media`、Skill 和站点 `index.html` 使用 `Cache-Control: no-store`。带内容哈希的 CSS 和 JS 使用 `public, max-age=31536000, immutable`。同一进程同源提供页面和 API，不另开 CORS。站点文件不交给入口容器。入口只把 `PUBLIC_ORIGIN` 转到应用进程。
 
@@ -498,18 +494,18 @@ site_pointers 改指向这一行
 1. 请求 `/`。应用按唯一指针返回 `index.html` 和它引用的脚本。
 2. 脚本用公开客户端请求公开 PCP，`credentials` 为 `omit`。
 3. 服务端只返回 `visibility: public` 且未删除的页。
-4. 主人把一页改成 `private` 后，下一次公开请求和该页媒体地址都不再对匿名返回它。已经打进 zip 的副本收不回来。
+4. 所属人把一页改成 `private` 后，下一次公开请求和该页媒体地址都不再对匿名返回它。已经打进 zip 的副本收不回来。
 
-### 8.4 别人的 Agent 取得授权
+### 8.4 Agent 通过设备码取得授权
 
 1. Agent 读 `/.well-known/pcp` 和 Skill。
-2. 设备码页面只让主人批准 source 三档和可选的 `site:write`，不创建 API Key。
+2. 设备码页面只让所属人批准 source 三档和可选的 `site:write`，不创建 API Key。
 3. Agent 用 Bearer 令牌调用已批准的操作。申请上线只得到批准地址。
-4. 主人撤销这一条授权后，refresh 立即失败。其他 Key 和其他授权仍可用。
+4. 所属人撤销这一条授权后，refresh 立即失败。其他 Key 和其他授权仍可用。
 
-### 8.5 主人生成 API Key
+### 8.5 所属人生成 API Key
 
-1. 主人改密后，在管理端发起 `create_api_key`。
+1. 所属人改密后，在管理端发起 `create_api_key`。
 2. 打开返回的批准地址，核对权限并确认。
 3. 页面显示一次 `osk_` 原文。列表之后只能看到哈希对应的元数据。
 4. 作废立即生效。改权限必须作废后重新批准。
@@ -540,7 +536,7 @@ site_pointers 改指向这一行
 Skill 有两份：
 
 - 资料写法：frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。
-- 原始页面：这份落地页已经能展示哪些公开资料，如何从源码 zip 定制、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给主人。
+- 原始页面：这份落地页已经能展示哪些公开资料，如何从源码 zip 定制、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
 
 Skill 不写死后端框架。它只写操作名和公开客户端的用法。
 

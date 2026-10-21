@@ -2,7 +2,7 @@
 
 ## Purpose
 
-用一个主人账号、批准后才生效的 API Key，以及 OAuth 设备码，决定谁可以读写哪些目录。
+用一个所属人账号、批准后才生效的 API Key，以及 OAuth 设备码，决定谁可以读写哪些目录。
 
 ## ADDED Requirements
 

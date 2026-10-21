@@ -26,11 +26,11 @@
 - `POST /pcp/v1/public/search`
 - `GET /media/{id}`
 
-公开页面的请求使用 `credentials: omit`。不要携带 API Key、访问令牌或主人的 Cookie。站点响应不 `Set-Cookie`。
+公开页面的请求使用 `credentials: omit`。不要携带 API Key、访问令牌或所属人的 Cookie。站点响应不 `Set-Cookie`。
 
 ## 从原始源码 zip 构建
 
-定制需要 `site:write` 或主人会话。调用 `get_site`（`GET /pcp/v1/site/source`）下载镜像内的原始页面源码 zip，文件名是 `original-page-source.zip`。这不是已上传的 dist。
+定制需要 `site:write` 或所属人会话。调用 `get_site`（`GET /pcp/v1/site/source`）下载镜像内的原始页面源码 zip，文件名是 `original-page-source.zip`。这不是已上传的 dist。
 
 在这份源码上修改。会变的事实在运行时向公开 PCP 读取，不写进构建产物。构建结果是一棵静态文件树：根目录有 `index.html`，未知路径保持 404，不把任意路径回退到 `/`。
 
@@ -48,7 +48,7 @@
 
 `preview_site` 的预览地址是 `/_preview/{releaseId}/`。release id 是 `rel_` 加上 32 个十六进制字符。预览匿名可开，不移动指针。
 
-预览之后调用 `activate_site`（`POST /pcp/v1/site/activate`）。目标只能是 `rel_...` 或 `original`。响应当下不移动指针。批准地址必须交给主人。Agent 不能调用 `POST /admin/site-activations/{id}/approve`。同意前不得声称已更换。拒绝、过期或一直没有决定时，线上路径保持不变。回到旧 release 或 `original` 也要重新申请并等待主人同意。没有删除 release 的接口。
+预览之后调用 `activate_site`（`POST /pcp/v1/site/activate`）。目标只能是 `rel_...` 或 `original`。响应当下不移动指针。批准地址必须交给所属人。Agent 不能调用 `POST /admin/site-activations/{id}/approve`。同意前不得声称已更换。拒绝、过期或一直没有决定时，线上路径保持不变。回到旧 release 或 `original` 也要重新申请并等待所属人同意。没有删除 release 的接口。
 
 ## 下一轮
 

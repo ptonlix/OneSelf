@@ -19,7 +19,7 @@ const requiredSentences = [
   "保留路径",
   "credentials: omit",
   "不得写入密钥或私有页",
-  "批准地址必须交给主人",
+  "批准地址必须交给所属人",
   "同意前不得声称已更换",
   "下一轮必须从原始源码 zip 开始",
 ] as const;
@@ -62,7 +62,7 @@ describe("product skills", () => {
       "_preview",
       "credentials: omit",
       "不得写入密钥或私有页",
-      "批准地址必须交给主人",
+      "批准地址必须交给所属人",
       "同意前不得声称已更换",
       "下一轮必须从原始源码 zip 开始",
       "original-page-source.zip",

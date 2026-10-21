@@ -149,7 +149,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 ## 🧱 Architecture
 
 <p align="center">
-  <img src="docs/images/architecture.png" alt="OneSelf architecture: browsers open the site served by pointer and read the public PCP anonymously; any AI agent uses an API key or device-flow token you approved to call the same PCP operation table; one Node.js process stores pages, originals, and site bundles in RustFS and the index, grants, and site pointer in PostgreSQL" width="100%" />
+  <img src="docs/images/architecture.png" alt="OneSelf architecture: you, the account owner, approve and revoke access and curate your context in the admin UI; any AI agent or script connects to the PCP (HTTP and MCP, same operations) with an API key or OAuth device code you approved; visitors open the public homepage, which reads public content only; personal context is pages plus originals, with per-source grants, private by default and revertible versions, stored in self-hosted RustFS and PostgreSQL" width="100%" />
 </p>
 
 - **One process**: PCP, MCP, OAuth, the admin static files, and the published site are all served by one Hono app. No microservices, no Redis, no queue.

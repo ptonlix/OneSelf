@@ -6,7 +6,7 @@
 
 - [x] 1.1 在主工作树创建 pnpm 工作区、TypeScript strict、Vitest 和 dependency-cruiser 配置，包目录先留空的 `package.json`。运行 `pnpm install`，确认它成功且没有 `package-lock.json`。
 - [x] 1.2 添加 `compose.yaml` 和 `compose.dev.yaml`。生产不映射应用、PostgreSQL 或 RustFS 的宿主机端口。开发只把 PostgreSQL 和 RustFS `9000` 绑到回环，不发布 `9001`，应用用 pnpm 跑在宿主机。`cloudflared`、`caddy`、`tailscale` 是互斥 profile，默认 `COMPOSE_PROFILES=cloudflared`。用 `docker compose config` 确认这两种端口结果。
-- [x] 1.3 添加 `.env.example`，包含 `PUBLIC_ORIGIN`、主人初始口令和入口令牌的占位，不含真实密钥。确认示例文件可被提交，而 `.env` 仍被 gitignore。
+- [x] 1.3 添加 `.env.example`，包含 `PUBLIC_ORIGIN`、所属人初始口令和入口令牌的占位，不含真实密钥。确认示例文件可被提交，而 `.env` 仍被 gitignore。
 
 ## 2. 第一波并行车道
 
@@ -16,7 +16,7 @@
 - [x] 2.4 `packages/ports`：定义对象存储、时钟和 Markdown 解析端口。`pnpm exec tsc --noEmit` 在该包通过，且源码不引用厂商 SDK。
 - [x] 2.5 `apps/admin`：实现登录、改密、设备码批准、API Key 批准和站点批准页面，只调用 HTTP。批准页在确认前写明：读权限包含该 source 的全部未删除私有页。生产构建成功，页面源码不引用 `packages/domain` 或 `packages/db`。
 - [x] 2.6 `packages/public-client` 与 `packages/original-pages`：客户端请求公开 PCP 时使用 `credentials: omit`。原始页面在没有公开页时显示空状态，有公开页时按 site 规格展示，未知路径构建结果不启用 SPA 回退。相关测试通过。
-- [x] 2.7 `skills/data.md` 与 `skills/original-page.md`：写明 frontmatter、两种 fence、`files`、`[[source/slug]]`、原始页面能展示的公开字段、真实路径、保留路径、`credentials: omit`、不得写入密钥或私有页、批准地址必须交给主人、同意前不得声称已更换，以及下一轮必须从原始源码 zip 开始。测试断言这些句子存在，且正文不出现 Hono、Express 或 Next.js。
+- [x] 2.7 `skills/data.md` 与 `skills/original-page.md`：写明 frontmatter、两种 fence、`files`、`[[source/slug]]`、原始页面能展示的公开字段、真实路径、保留路径、`credentials: omit`、不得写入密钥或私有页、批准地址必须交给所属人、同意前不得声称已更换，以及下一轮必须从原始源码 zip 开始。测试断言这些句子存在，且正文不出现 Hono、Express 或 Next.js。
 
 ## 3. 主代理登记第一波
 
@@ -27,9 +27,9 @@
 
 - [x] 4.1 `packages/adapters`：实现 RustFS 所用的 S3 端口、Postgres 端口，以及测试用的内存对象存储。单元测试使用内存假实现，不连接生产端点。
 - [x] 4.2 `apps/server` 写入路径：同一事务完成对象指针、投影和最多 50 条版本；`put_pages` 任一页失败则全部不写；fence 失败整次回滚。每小时清理超过 30 天的软删除和超过 7 天且无引用的对象，不删除 release。集成测试覆盖 stale hash、模糊替换、跨页原件和这次清理。
-- [x] 4.3 `apps/server` 读取与检索：实现授权搜索、匿名公开搜索、`query`、`recall`、目录、`whoami`、`resolve_slugs` 和结构读接口。`search` 查 `pages` 的 type、标题、正文和 frontmatter，不查 `chunks`。主人可以软删除和恢复 source；API Key 不能。测试断言私有页不改变公开命中和计数，匿名 `query` 返回 `unauthorized`，无权限、已删除和不存在都是 `not_found`，删除目录后其他页的链接原文不变。
-- [x] 4.4 `apps/server` 站点：按指针提供 `original` 或 release。预览匿名可开且不移动指针。只有主人批准才移动指针。公开资料变化后不用重新激活；已打进 zip 的副本不回收。测试覆盖保留路径整包拒绝、没有删除 release 的路由，以及 Agent 调用批准路由得到 `forbidden`。
-- [x] 4.5 `apps/server` 身份：实现主人引导、改密门、API Key 一次展示、设备码、刷新令牌轮换和重用即作废。测试断言启动不生成 API Key，且 OAuth 不能管理密钥。
+- [x] 4.3 `apps/server` 读取与检索：实现授权搜索、匿名公开搜索、`query`、`recall`、目录、`whoami`、`resolve_slugs` 和结构读接口。`search` 查 `pages` 的 type、标题、正文和 frontmatter，不查 `chunks`。所属人可以软删除和恢复 source；API Key 不能。测试断言私有页不改变公开命中和计数，匿名 `query` 返回 `unauthorized`，无权限、已删除和不存在都是 `not_found`，删除目录后其他页的链接原文不变。
+- [x] 4.4 `apps/server` 站点：按指针提供 `original` 或 release。预览匿名可开且不移动指针。只有所属人批准才移动指针。公开资料变化后不用重新激活；已打进 zip 的副本不回收。测试覆盖保留路径整包拒绝、没有删除 release 的路由，以及 Agent 调用批准路由得到 `forbidden`。
+- [x] 4.5 `apps/server` 身份：实现所属人引导、改密门、API Key 一次展示、设备码、刷新令牌轮换和重用即作废。测试断言启动不生成 API Key，且 OAuth 不能管理密钥。
 - [x] 4.6 `apps/server` 协议与入口：从注册表生成 OpenAPI 和 `POST /mcp`，路径与 protocol 规格一致，不启用 CORS。发现文档只使用 `PUBLIC_ORIGIN`。限流只信任当前入口这一跳。Cloudflare 规则不缓存 `/pcp`、`/oauth`、`/admin`、`/skills`、`/media`、`/_preview`。测试断言 MCP 工具列表没有密钥操作，伪造的 `X-Forwarded-For` 不改变限额桶。
 
 ## 5. 主代理合并并验收
