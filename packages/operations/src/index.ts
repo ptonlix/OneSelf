@@ -1,0 +1,16 @@
+export {
+  errorBodyFields,
+  errorCodes,
+  generateTransports,
+  operations,
+  type ErrorCode,
+  type ErrorCodeDefinition,
+  type ErrorStatus,
+  type HttpMethod,
+  type HttpRoute,
+  type McpTool,
+  type Operation,
+  type OperationErrorBody,
+  type OperationName,
+  type TransportProjection,
+} from "./registry";
