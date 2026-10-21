@@ -1,4 +1,4 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreWorkspaces": ["apps/*", "packages/*"]
+  "ignoreWorkspaces": ["apps/server", "packages/adapters"]
 }

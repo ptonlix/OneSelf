@@ -5,7 +5,7 @@ module.exports = {
       name: "operations-has-no-outside-imports",
       severity: "error",
       comment: "The operation registry stays a zero-dependency package.",
-      from: { path: "^packages/operations/" },
+      from: { path: "^packages/operations/", pathNot: "\\.test\\.ts$" },
       to: { pathNot: "^packages/operations/" },
     },
     {
@@ -47,10 +47,11 @@ module.exports = {
       severity: "error",
       comment:
         "Ports declare storage, clock, and Markdown types. Implementations stay in adapters.",
-      from: { path: "^packages/ports/" },
+      from: { path: "^packages/ports/", pathNot: "\\.test\\.ts$" },
       to: {
         path: [
-          "^packages/|^apps/",
+          "^packages/(?!ports/)",
+          "^apps/",
           "(^|/)node_modules/(hono|react|react-dom|drizzle-orm|pg|@aws-sdk)(/|$)",
         ],
       },
