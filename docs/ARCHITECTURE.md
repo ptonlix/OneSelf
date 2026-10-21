@@ -245,7 +245,7 @@ OneSelf/
 
 单元测试与被测源码放在一起，文件名 `*.test.ts`。领域规则在 `packages/domain`，不启动 HTTP 或数据库。注册表、表结构、适配器、公开客户端和原始页面的测试留在各自的包里。服务器的进程内契约测试留在 `apps/server`，用内存端口，不连生产端点；HTTP 和 MCP 各有一条，断言同一资料操作的结果一致，并断言 MCP 没有密钥管理工具。管理端页面不要求单元测试。
 
-冒烟只放在 `tests/smoke/`，用 `vitest.smoke.config.ts` 单独跑。它打的是已经用 `compose.dev.yaml` 和宿主机进程启动的服务，只覆盖公开发现、鉴权门和一条从写入到公开页的短旅程。不把领域规则搬进冒烟。冒烟里的路径清单若存在，只给冒烟用，不是第二份路由表；路由仍以 `packages/operations` 为准。
+接口测试放在 `tests/smoke/`，按模块分文件：`owner`、`pages`、`retrieval`、`site`、`access`、`protocol`。它们不启动 compose，跟普通 `pnpm test` 一起跑。`closed-loop.test.ts` 才用 `vitest.smoke.config.ts` 单独跑，打的是已经用 `compose.dev.yaml` 起来的数据库和对象存储。不把领域规则搬进这些文件。冒烟里的路径清单若存在，只给冒烟用，不是第二份路由表；路由仍以 `packages/operations` 为准。
 
 `pnpm check` 按这个顺序跑：Prettier、ESLint、`tsc --noEmit`、Vitest、dependency-cruiser、Knip。ESLint 使用 `typescript-eslint` 的 `strictTypeChecked`，不使用 Next.js 的配置。TypeScript 在 `strict` 之外还打开 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`、`noImplicitOverride`、`noImplicitReturns`、`noUnusedLocals`、`noUnusedParameters`、`noFallthroughCasesInSwitch` 和 `verbatimModuleSyntax`。dependency-cruiser 锁住第 4 节的依赖方向：`operations` 不引用包外代码，`domain` 不引用服务器、React、数据库和对象存储 SDK，`adapters` 不引用 `domain`，管理端、原始页面和公开客户端不引用 `domain` 或 `db`。包还没有源码时，Knip 先不扫这些空包；出现入口文件后必须把该包从 `knip.json` 的 `ignoreWorkspaces` 去掉。
 
