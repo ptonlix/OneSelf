@@ -1,5 +1,14 @@
 {
   "name": "@oneself/original-pages",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@oneself/public-client": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
+  }
 }

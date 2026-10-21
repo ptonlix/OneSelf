@@ -1,5 +1,8 @@
 {
   "name": "@oneself/public-client",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
 }
