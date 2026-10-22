@@ -25,7 +25,7 @@ describe.skipIf(!runPostgresTests)("postgres store", () => {
   let store: PostgresStore;
 
   beforeAll(async () => {
-    if (!runPostgresTests || postgresUrl === undefined) {
+    if (!runPostgresTests) {
       return;
     }
     await applyMigrations(postgresUrl);
