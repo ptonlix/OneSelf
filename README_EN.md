@@ -167,19 +167,19 @@ For the Mermaid system overview, code boundaries, tables, and key flows, see [do
 
 ## 🤖 Agent entry points
 
-| Path                                 | Who                    | Purpose                                                                              |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------ |
-| `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills             |
-| `/skills/data.md`                    | Agents                 | How to write context: page fields, visibility, facts and timelines, originals, links |
-| `/skills/original-page.md`           | Site agents            | What the original page shows; how to customize, upload, preview, request launch      |
-| `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                        |
-| `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                            |
-| `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations          |
-| `/pcp/v1/public/*`                   | Anyone                 | Only `visibility: public`, non-deleted pages                                         |
-| `/media/{id}`                        | Depends on owning page | Original bytes; anonymous when the owning page is public                             |
-| `/oauth/device/auth`, `/oauth/token` | Agents                 | Request a device code; obtain and refresh access tokens                              |
-| `/admin`                             | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches          |
-| `/_preview/{releaseId}/`             | Anyone                 | Preview an unreleased build without moving the live pointer                          |
+| Path                                 | Who                    | Purpose                                                                         |
+| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
+| `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills        |
+| `/skills/context-management.md`      | Agents                 | How to manage personal context: pages, originals, reads, edits, deletes         |
+| `/skills/public-page.md`             | Site agents            | How to customize the public page: layout, real paths, preview, request launch  |
+| `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                   |
+| `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                       |
+| `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations     |
+| `/pcp/v1/public/*`                   | Anyone                 | Only `visibility: public`, non-deleted pages                                    |
+| `/media/{id}`                        | Depends on owning page | Original bytes; anonymous when the owning page is public                        |
+| `/oauth/device/auth`, `/oauth/token` | Agents                 | Request a device code; obtain and refresh access tokens                         |
+| `/admin`                             | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches     |
+| `/_preview/{releaseId}/`             | Anyone                 | Preview an unreleased build without moving the live pointer                     |
 
 Agents connect with either an API key (`Authorization: ApiKey <key>` or `X-Api-Key`) or an access token from the OAuth 2.1 device flow (`Authorization: Bearer <token>`). You approve both, and the same permissions give the same results. Errors are always `{ "error", "message" }`. Paths are defined in [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts).
 
@@ -232,7 +232,7 @@ Builds personal tools and developer products.
 - 2024-06-01 | Joined a company | Backend work
 ```
 
-Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/data.md](skills/data.md).
+Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/context-management.md](skills/context-management.md).
 
 ## 📁 Project structure
 
@@ -249,7 +249,7 @@ OneSelf/
 │   ├── db/                # Drizzle schema and SQL migrations
 │   ├── public-client/     # Anonymous public PCP client, also used by custom sites
 │   └── original-pages/    # Source of the built-in landing page
-├── skills/                # Product skills: data.md, original-page.md
+├── skills/                # Product skills: context-management.md, public-page.md
 ├── tests/                 # API smoke tests and skill acceptance tests
 ├── deploy/Caddyfile       # Caddy ingress, reverse proxy only
 ├── docs/                  # PRD and architecture
@@ -296,10 +296,10 @@ Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/admin`, `/skills`, `/media`,
 
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
-- [Skill: how to write context](skills/data.md)
-- [Skill: original page](skills/original-page.md)
+- [Skill: context management](skills/context-management.md)
+- [Skill: public page](skills/public-page.md)
 - [OpenSpec change: oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
-- On a running instance: `/.well-known/pcp`, `/openapi.json`, `/skills/data.md`, `/skills/original-page.md`
+- On a running instance: `/.well-known/pcp`, `/openapi.json`, `/skills/context-management.md`, `/skills/public-page.md`
 
 ## 🤝 Contributing
 

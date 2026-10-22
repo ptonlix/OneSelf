@@ -41,8 +41,8 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
     return publicResult(c, runtime, (actor) => runtime.search(actor, body, true));
   });
 
-  app.get("/skills/data.md", () => skillFile(runtime, "data"));
-  app.get("/skills/original-page.md", () => skillFile(runtime, "original-page"));
+  app.get("/skills/context-management.md", () => skillFile(runtime, "context-management"));
+  app.get("/skills/public-page.md", () => skillFile(runtime, "public-page"));
   app.get("/pcp/v1/skills", (c) => authed(c, runtime, (actor) => runtime.listSkills(actor)));
   app.get("/pcp/v1/skills/:name", async (c) => {
     const actor = await runtime.authenticate(c.req.raw);

@@ -25,11 +25,11 @@ const requiredSentences = [
 ] as const;
 
 describe("product skills", () => {
-  const data = readSkill("data.md");
-  const originalPage = readSkill("original-page.md");
+  const data = readSkill("context-management.md");
+  const originalPage = readSkill("public-page.md");
   const combined = `${data}\n${originalPage}`;
 
-  it("keeps data rules in data.md", () => {
+  it("keeps context rules in context-management.md", () => {
     for (const sentence of [
       "frontmatter",
       "visibility",
@@ -43,7 +43,7 @@ describe("product skills", () => {
     }
   });
 
-  it("keeps site rules in original-page.md", () => {
+  it("keeps site rules in public-page.md", () => {
     for (const sentence of [
       "原始页面能展示的公开字段",
       "name",

@@ -48,10 +48,12 @@ it("omits key tools from MCP and ignores a spoofed forwarding header", async () 
   );
   expect(discovery.openapi).toBe(`${ORIGIN}/openapi.json`);
   expect(JSON.stringify(discovery.operations)).not.toContain("create_api_key");
-  const skill = await (await server.request("/skills/data.md")).text();
-  const apiSkill = await (await server.request("/pcp/v1/skills/data")).text();
+  const skill = await (await server.request("/skills/context-management.md")).text();
+  const apiSkill = await (await server.request("/pcp/v1/skills/context-management")).text();
   expect(skill).toBe(apiSkill);
-  expect((await server.request("/skills/data.md")).headers.get("cache-control")).toBe("no-store");
+  expect((await server.request("/skills/context-management.md")).headers.get("cache-control")).toBe(
+    "no-store",
+  );
 
   for (let index = 0; index < 9; index += 1) {
     const response = await server.request("/admin/login", {
@@ -97,10 +99,10 @@ it("advertises only the device-code OAuth metadata", async () => {
   await server.close();
 });
 
-it("serves the same original-page skill bytes on both paths", async () => {
+it("serves the same public-page skill bytes on both paths", async () => {
   const server = await boot();
-  const anonymous = await server.request("/skills/original-page.md");
-  const api = await server.request("/pcp/v1/skills/original-page");
+  const anonymous = await server.request("/skills/public-page.md");
+  const api = await server.request("/pcp/v1/skills/public-page");
   expect(anonymous.status).toBe(200);
   expect(api.status).toBe(200);
   expect(Array.from(new Uint8Array(await anonymous.arrayBuffer()))).toEqual(

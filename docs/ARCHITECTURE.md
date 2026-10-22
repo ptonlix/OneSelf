@@ -200,8 +200,8 @@ OneSelf/
 ├── openspec/
 ├── .agents/skills/              开发技能。不进镜像，不和产品 Skill 合并
 ├── skills/
-│   ├── data.md                  产品说明。与 /skills/data.md 是同一份字节
-│   └── original-page.md
+│   ├── context-management.md    产品说明。与 /skills/context-management.md 是同一份字节
+│   └── public-page.md           产品说明。与 /skills/public-page.md 是同一份字节
 ├── deploy/
 │   └── Caddyfile                只反代，不放站点文件。cloudflared 和 Tailscale 不另建目录
 ├── tests/
@@ -311,8 +311,8 @@ GET  /media/{id}
 GET  /.well-known/pcp
 GET  /.well-known/oauth-authorization-server
 GET  /openapi.json
-GET  /skills/data.md
-GET  /skills/original-page.md
+GET  /skills/context-management.md
+GET  /skills/public-page.md
 ```
 
 没有 `/pcp/v1/public/files/{id}`，也没有公开的 `query`。`GET /media/{id}` 不是 PCP 操作：所属页公开且未删除则匿名可读；否则只有能读该 source 的凭据得到字节，其他人是 `not_found`。
@@ -380,7 +380,7 @@ GET  /skills/original-page.md
 | GET | `/pcp/v1/sources/{id}` | `sources_status`。软删除目录是 `not_found` |
 | GET | `/pcp/v1/whoami` | `whoami` |
 | GET | `/pcp/v1/skills` | `list_skills` |
-| GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `data` 或 `original-page` |
+| GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `context-management` 或 `public-page` |
 
 `whoami` 返回 `{credential, admin, site_write, sources:[{id, read, write, visibility}]}`。只有所属人会话的 `admin` 为 true。
 
@@ -525,8 +525,8 @@ site_pointers 改指向这一行
   "mcp": "https://主机/mcp",
   "oauth": "https://主机/.well-known/oauth-authorization-server",
   "skills": {
-    "data": "https://主机/skills/data.md",
-    "original_page": "https://主机/skills/original-page.md"
+    "context_management": "https://主机/skills/context-management.md",
+    "public_page": "https://主机/skills/public-page.md"
   }
 }
 ```
@@ -535,8 +535,8 @@ site_pointers 改指向这一行
 
 Skill 有两份：
 
-- 资料写法：frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。
-- 原始页面：这份落地页已经能展示哪些公开资料，如何从源码 zip 定制、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
+- context-management：先查已有页，文字写成 Markdown，原件挂到页上，再读取、写入、修改、删除或恢复。格式仍是 frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。
+- public-page：定制唯一的公开宣传页。说明内置页能展示哪些公开资料，如何从源码 zip 改版式、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
 
 Skill 不写死后端框架。它只写操作名和公开客户端的用法。
 

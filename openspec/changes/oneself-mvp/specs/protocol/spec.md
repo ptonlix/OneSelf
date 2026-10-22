@@ -25,10 +25,10 @@ Every data and site operation MUST appear on both OpenAPI and MCP with the same 
 - **THEN** every absolute URL still uses the configured public origin
 
 ### Requirement: Skill bytes
-`GET /skills/data.md` and `GET /skills/original-page.md` MUST return the same bytes as `GET /pcp/v1/skills/data` and `GET /pcp/v1/skills/original-page`. The data skill MUST document frontmatter, visibility, the two fences, the `files` array, and `[[source/slug]]`. The original-page skill MUST state which public fields the built-in page can show, how to customize from the original source zip, add a real path, build, and avoid reserved paths. It MUST tell the agent to give the activation approval URL to the owner and MUST say not to claim the site has changed before approval. The next customization MUST start from that source zip rather than an uploaded dist. Skills MUST forbid putting secrets or private pages into source or build output, and MUST require `credentials: omit` on public requests. Skill text MUST NOT name the server framework.
+`GET /skills/context-management.md` and `GET /skills/public-page.md` MUST return the same bytes as `GET /pcp/v1/skills/context-management` and `GET /pcp/v1/skills/public-page`. The context skill MUST document frontmatter, visibility, the two fences, the `files` array, and `[[source/slug]]`. The public-page skill MUST state which public fields the built-in page can show, how to customize from the original source zip, add a real path, build, and avoid reserved paths. It MUST tell the agent to give the activation approval URL to the owner and MUST say not to claim the site has changed before approval. The next customization MUST start from that source zip rather than an uploaded dist. Skills MUST forbid putting secrets or private pages into source or build output, and MUST require `credentials: omit` on public requests. Skill text MUST NOT name the server framework.
 
 #### Scenario: Anonymous skill matches the API
-- **WHEN** a client fetches `/skills/data.md` and the PCP skill resource
+- **WHEN** a client fetches `/skills/context-management.md` and the PCP skill resource
 - **THEN** the bodies are byte-for-byte equal
 
 ### Requirement: MCP transport

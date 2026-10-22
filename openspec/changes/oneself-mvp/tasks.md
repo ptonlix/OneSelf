@@ -16,7 +16,7 @@
 - [x] 2.4 `packages/ports`：定义对象存储、时钟和 Markdown 解析端口。`pnpm exec tsc --noEmit` 在该包通过，且源码不引用厂商 SDK。
 - [x] 2.5 `apps/admin`：实现登录、改密、设备码批准、API Key 批准和站点批准页面，只调用 HTTP。批准页在确认前写明：读权限包含该 source 的全部未删除私有页。生产构建成功，页面源码不引用 `packages/domain` 或 `packages/db`。
 - [x] 2.6 `packages/public-client` 与 `packages/original-pages`：客户端请求公开 PCP 时使用 `credentials: omit`。原始页面在没有公开页时显示空状态，有公开页时按 site 规格展示，未知路径构建结果不启用 SPA 回退。相关测试通过。
-- [x] 2.7 `skills/data.md` 与 `skills/original-page.md`：写明 frontmatter、两种 fence、`files`、`[[source/slug]]`、原始页面能展示的公开字段、真实路径、保留路径、`credentials: omit`、不得写入密钥或私有页、批准地址必须交给所属人、同意前不得声称已更换，以及下一轮必须从原始源码 zip 开始。测试断言这些句子存在，且正文不出现 Hono、Express 或 Next.js。
+- [x] 2.7 `skills/context-management.md` 与 `skills/public-page.md`：写明 frontmatter、两种 fence、`files`、`[[source/slug]]`、原始页面能展示的公开字段、真实路径、保留路径、`credentials: omit`、不得写入密钥或私有页、批准地址必须交给所属人、同意前不得声称已更换，以及下一轮必须从原始源码 zip 开始。测试断言这些句子存在，且正文不出现 Hono、Express 或 Next.js。
 
 ## 3. 主代理登记第一波
 

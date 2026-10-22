@@ -185,8 +185,8 @@ export class Runtime {
         console.info(line);
       });
     this.#skills = new Map([
-      ["data", readFileSync(path.join(options.skillsDir, "data.md"))],
-      ["original-page", readFileSync(path.join(options.skillsDir, "original-page.md"))],
+      ["context-management", readFileSync(path.join(options.skillsDir, "context-management.md"))],
+      ["public-page", readFileSync(path.join(options.skillsDir, "public-page.md"))],
     ]);
   }
 
@@ -1212,7 +1212,7 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
-      return ok({ skills: [{ name: "data" }, { name: "original-page" }] });
+      return ok({ skills: [{ name: "context-management" }, { name: "public-page" }] });
     });
   }
 

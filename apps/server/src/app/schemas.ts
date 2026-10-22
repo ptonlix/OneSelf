@@ -109,7 +109,7 @@ export const operationSchemas = {
   sources_status: z.object({ id: sourceName }),
   whoami: z.object({}),
   list_skills: z.object({}),
-  get_skill: z.object({ name: z.enum(["data", "original-page"]) }),
+  get_skill: z.object({ name: z.enum(["context-management", "public-page"]) }),
   list_sites: z.object({}),
   get_site: z.object({}),
   put_site: z.object({ archive_base64: z.string().min(1) }),

@@ -170,8 +170,8 @@ Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/AR
 | 路径                                 | 谁用           | 用途                                                       |
 | ------------------------------------ | -------------- | ---------------------------------------------------------- |
 | `/.well-known/pcp`                   | Agent          | 发现文档：协议版本、操作清单、OpenAPI、MCP、OAuth 和 Skill |
-| `/skills/data.md`                    | Agent          | 上下文怎么写：页面字段、可见性、事实与时间线、原件和链接   |
-| `/skills/original-page.md`           | 站点 Agent     | 原始页面能展示什么、如何定制、上传、预览和申请上线         |
+| `/skills/context-management.md`      | Agent          | 如何整理个人上下文：写成页、挂上原件、读取、修改、删除     |
+| `/skills/public-page.md`             | 站点 Agent     | 如何定制个人公开宣传页：版式、真实路径、预览和申请上线     |
 | `/openapi.json`                      | Agent、脚本    | 由操作注册表生成的 OpenAPI                                 |
 | `POST /mcp`                          | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                         |
 | `/pcp/v1/*`                          | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                 |
@@ -232,7 +232,7 @@ files: []
 - 2024-06-01 | 加入某公司 | 做后端
 ```
 
-页面里只认这两种结构块，解析失败时整次写入回滚。完整规则见 [skills/data.md](skills/data.md)。
+页面里只认这两种结构块，解析失败时整次写入回滚。完整规则见 [skills/context-management.md](skills/context-management.md)。
 
 ## 📁 项目结构
 
@@ -249,7 +249,7 @@ OneSelf/
 │   ├── db/                # Drizzle 表结构与 SQL 迁移
 │   ├── public-client/     # 匿名公开 PCP 客户端，定制站点也用它
 │   └── original-pages/    # 随应用发布的原始落地页源码
-├── skills/                # 产品 Skill：data.md、original-page.md
+├── skills/                # 产品 Skill：context-management.md、public-page.md
 ├── tests/                 # 接口冒烟（smoke）与 Skill 验收测试
 ├── deploy/Caddyfile       # Caddy 入口，只做反向代理
 ├── docs/                  # 产品需求与技术架构
@@ -296,10 +296,10 @@ pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
 
 - [产品需求（PRD）](docs/PRD.md)：目标、非目标、数据组织、PCP 和验收标准
 - [技术架构](docs/ARCHITECTURE.md)：技术选型、代码边界、数据、路径和关键流程
-- [Skill：上下文怎么写](skills/data.md)
-- [Skill：原始页面](skills/original-page.md)
+- [Skill：context-management](skills/context-management.md)
+- [Skill：public-page](skills/public-page.md)
 - [OpenSpec 变更：oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
-- 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/data.md`、`/skills/original-page.md`
+- 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/context-management.md`、`/skills/public-page.md`
 
 ## 🤝 贡献
 
