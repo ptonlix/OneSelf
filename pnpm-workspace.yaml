@@ -8,3 +8,6 @@ autoInstallPeers: true
 allowBuilds:
   esbuild: true
   unrs-resolver: true
+
+overrides:
+  "@esbuild-kit/core-utils>esbuild": 0.25.4
