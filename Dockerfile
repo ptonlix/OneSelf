@@ -7,14 +7,14 @@ COPY apps ./apps
 COPY packages ./packages
 COPY skills ./skills
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @oneself/admin build && pnpm --filter @oneself/original-pages build
+RUN pnpm --filter @oneself/admin build && pnpm --filter @oneself/public-page build
 RUN node --input-type=module - <<'JS'
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { crc32, deflateRawSync } from "node:zlib";
 
-const root = "packages/original-pages";
-const out = "/out/original-page-source.zip";
+const root = "packages/public-page";
+const out = "/out/public-page-source.zip";
 const skip = new Set(["dist", "node_modules", ".git"]);
 mkdirSync("/out", { recursive: true });
 
@@ -86,8 +86,8 @@ COPY apps ./apps
 COPY packages ./packages
 COPY skills ./skills
 COPY --from=build /src/apps/admin/dist ./apps/admin/dist
-COPY --from=build /src/packages/original-pages/dist ./packages/original-pages/dist
-COPY --from=build /out/original-page-source.zip ./packages/original-pages/original-page-source.zip
+COPY --from=build /src/packages/public-page/dist ./packages/public-page/dist
+COPY --from=build /out/public-page-source.zip ./packages/public-page/public-page-source.zip
 RUN pnpm install --frozen-lockfile --prod
 ENV NODE_ENV=production
 EXPOSE 3000

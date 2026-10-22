@@ -16,7 +16,7 @@
 
 - 不创建 skills.sh Pack。
 - 不在 Skill、索引或发现文档里放 API Key、所属人密码或私有页。
-- 不改 PCP 操作表、`original` 指针或 `original-page-source.zip`。
+- 不改 PCP 操作表、`public-page` 指针或 `public-page-source.zip`。
 - 不在站点 zip 里托管安装索引或 Skill archive。
 - 不保留 `context-management` 与 `public-page` 作为 `get_skill` 名字或发现文档字段。
 

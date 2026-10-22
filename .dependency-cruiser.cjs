@@ -17,7 +17,7 @@ module.exports = {
       to: {
         path: [
           "^apps/",
-          "^packages/(db|adapters|operations|original-pages|public-client)/",
+          "^packages/(db|adapters|operations|public-page|public-client)/",
           "(^|/)node_modules/(hono|react|react-dom|drizzle-orm|pg|@aws-sdk)(/|$)",
         ],
       },
@@ -27,7 +27,7 @@ module.exports = {
       severity: "error",
       comment: "Adapters exchange plain port values. The server maps them onto domain types.",
       from: { path: "^packages/adapters/" },
-      to: { path: "^packages/(domain|operations|original-pages|public-client)/|^apps/" },
+      to: { path: "^packages/(domain|operations|public-page|public-client)/|^apps/" },
     },
     {
       name: "db-is-schema-only",
@@ -36,7 +36,7 @@ module.exports = {
       from: { path: "^packages/db/" },
       to: {
         path: [
-          "^packages/(domain|operations|adapters|ports|original-pages|public-client)/",
+          "^packages/(domain|operations|adapters|ports|public-page|public-client)/",
           "^apps/",
           "(^|/)node_modules/(hono|react|react-dom)(/|$)",
         ],
@@ -61,7 +61,7 @@ module.exports = {
       severity: "error",
       comment:
         "Admin, original pages, and the public client call HTTP. They may use the operation registry.",
-      from: { path: "^apps/admin/|^packages/(original-pages|public-client)/" },
+      from: { path: "^apps/admin/|^packages/(public-page|public-client)/" },
       to: { path: "^packages/(domain|db|adapters)/" },
     },
     {

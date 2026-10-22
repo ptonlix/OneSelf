@@ -31,7 +31,7 @@
 
 ## Impact
 
-- 新代码在 `apps/server`、`apps/admin`、`packages/domain`、`packages/operations`、`packages/db`、`packages/ports`、`packages/adapters`、`packages/original-pages`、`packages/public-client`，产品 Skill 在仓库根 `skills/`。
+- 新代码在 `apps/server`、`apps/admin`、`packages/domain`、`packages/operations`、`packages/db`、`packages/ports`、`packages/adapters`、`packages/public-page`、`packages/public-client`，产品 Skill 在仓库根 `skills/`。
 - 新依赖：Hono、Drizzle、PostgreSQL 18、Zod、Vitest、Vite、React、`node-oidc-provider`、官方 MCP TypeScript SDK、Argon2。对象存储运行时是 RustFS。
 - 根上的 `compose.yaml`、锁文件和工作区清单只由主代理修改。并行工作包只写自己的目录。
 - 行为以 `docs/PRD.md` 与 `docs/ARCHITECTURE.md` v0.14 为准。文档和规格冲突时先停，不在实现里另选一种协议。

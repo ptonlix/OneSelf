@@ -197,7 +197,7 @@ export async function loadProjection(
     createdAt: iso(file.created_at),
   }));
   state.site = {
-    pointer: { releaseId: pointer?.release_id ?? "original" },
+    pointer: { releaseId: pointer?.release_id ?? "public-page" },
     releases: releaseRows.map((release) => ({
       id: release.id,
       createdAt: iso(release.created_at),

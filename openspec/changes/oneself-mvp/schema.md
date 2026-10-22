@@ -154,7 +154,7 @@ PostgreSQL 18。时间用 `timestamptz`。哈希都是小写十六进制。正�
 | 列 | 类型 | 约束 |
 | --- | --- | --- |
 | `id` | `integer` | 主键。值只能是 `1` |
-| `release_id` | `text` | 非空。`original` 或某个 `site_releases.id` |
+| `release_id` | `text` | 非空。`public-page` 或某个 `site_releases.id` |
 
 ## site_activations
 
@@ -163,7 +163,7 @@ PostgreSQL 18。时间用 `timestamptz`。哈希都是小写十六进制。正�
 | 列 | 类型 | 约束 |
 | --- | --- | --- |
 | `id` | `text` | 主键 |
-| `release_id` | `text` | 非空。`rel_...` 或 `original` |
+| `release_id` | `text` | 非空。`rel_...` 或 `public-page` |
 | `status` | `text` | 非空。`pending`、`approved`、`rejected` 或 `expired` |
 | `expires_at` | `timestamptz` | 非空。创建后 15 分钟 |
 | `created_at` | `timestamptz` | 非空 |

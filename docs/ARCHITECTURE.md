@@ -230,14 +230,14 @@ OneSelf/
     ├── ports/                   对象存储、时钟、Markdown 解析的类型
     ├── adapters/                S3、Postgres。测试假实现留在这里，生产入口不导出
     ├── public-client/           匿名 PCP 客户端。定制站也用它
-    └── original-pages/          原始落地页源码。不改名为 pages
+    └── public-page/             内置公开页源码。不改名为 pages。指针是 public-page
 ```
 
 `/admin` 的接口放在 `owner/`，不放进 `apps/admin`，也不叫 `server/src/admin`。管理端是 Vite 页面，不能碰 domain 或 db。
 
 依赖不是一条链。`packages/operations` 零依赖，不引用 `packages/domain`。用例在 `apps/server/src/app/`：PCP 和 MCP 都调用它，它再调用 domain，并通过 ports 使用 adapters。不另建 `packages/application`。`packages/adapters` 只依赖 ports 和 db，不依赖 domain。`packages/domain` 不引用服务器、数据库或对象存储 SDK，也不开事务、不读对象。管理端、原始页面和公开客户端不引用 `packages/domain` 或 `packages/db`。它们可以依赖 operations 里的公开路径形状。
 
-站点指针怎么变是纯规则，放在 `packages/domain/src/site-pointer.ts`：预览不改指针，批准才指向 `rel_…` 或 `original`，保留路径整包拒绝。事务由 `app/` 加 adapters 完成。`site-files/` 只按当前指针吐字节。
+站点指针怎么变是纯规则，放在 `packages/domain/src/site-pointer.ts`：预览不改指针，批准才指向 `rel_…` 或 `public-page`，保留路径整包拒绝。事务由 `app/` 加 adapters 完成。`site-files/` 只按当前指针吐字节。
 
 仓库根的 `Dockerfile` 打进管理端 dist、原始页面 dist、源码 zip 和 `skills/`。不放进 `apps/server`。`compose.yaml` 留在仓库根。`deploy/` 只放 Caddyfile；cloudflared 和 Tailscale 只靠环境变量，不为对称再建目录，也不做 `apps/ingress`。仓库根的 `skills/` 是产品说明。`.agents/skills/` 是开发技能，不进镜像，两者不合并、不改名。
 
@@ -263,7 +263,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 | 原件 | `files/{id}` |
 | 站点文件 | `sites/{releaseId}/{path}` |
 
-内置原始页面的 dist 和源码 zip 打进应用镜像，不放进 RustFS。指针取值 `original` 时从镜像读。
+内置原始页面的 dist 和源码 zip 打进应用镜像，不放进 RustFS。指针取值 `public-page` 时从镜像读。
 
 | 表 | 作用 |
 | --- | --- |
@@ -278,7 +278,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 | `timeline_entries` | 当前页 `## Timeline` 的日期、标题和补充 |
 | `site_releases` | 一次上传的不可变元数据。id 为 `rel_` 加 32 位十六进制 |
 | `site_files` | 该 release 里每个路径对应的对象键 |
-| `site_pointers` | 只有一行。`release_id` 为 `original` 或某份 release |
+| `site_pointers` | 只有一行。`release_id` 为 `public-page` 或某份 release |
 | `site_activations` | 待批准的上线申请、目标 release 和过期时间 |
 | `owners` | 唯一所属人。登录名、密码哈希、是否必须改密 |
 | `api_keys` | 已生效密钥的哈希、标签、权限、作废时间、最近使用时间 |
@@ -394,10 +394,10 @@ GET  /.well-known/agent-skills/index.json
 | 方法 | 路径 | 操作 |
 | --- | --- | --- |
 | GET | `/pcp/v1/site` | `list_sites`。当前指针和 release 列表 |
-| GET | `/pcp/v1/site/source` | `get_site`。`application/zip`，文件名 `original-page-source.zip`。需要 `site:write` 或所属人会话 |
+| GET | `/pcp/v1/site/source` | `get_site`。`application/zip`，文件名 `public-page-source.zip`。需要 `site:write` 或所属人会话 |
 | POST | `/pcp/v1/site/releases` | `put_site`。字段 `archive`，zip 根目录必须有 `index.html` |
 | POST | `/pcp/v1/site/releases/{id}/preview` | `preview_site`。返回 `{url}`，url 为 `/_preview/{id}/` |
-| POST | `/pcp/v1/site/activate` | `activate_site`。JSON `{release_id}`，`release_id` 为 `rel_...` 或 `original`。需要 `site:write` 或所属人会话 |
+| POST | `/pcp/v1/site/activate` | `activate_site`。JSON `{release_id}`，`release_id` 为 `rel_...` 或 `public-page`。需要 `site:write` 或所属人会话 |
 
 `activate_site` 写入 `site_activations`，15 分钟有效，响应 `{id, status:"pending", approval_url, expires_at}`。它不修改 `site_pointers`。
 
@@ -467,9 +467,9 @@ site_pointers 改指向这一行
 / 开始返回新文件。release 里有的其他路径一并生效
 ```
 
-应用识别到请求路径属于线上站点时，只查指针和 `site_files`，或在指针为 `original` 时读镜像里的 dist。这个处理函数不能查询 `pages`。资料由浏览器里的公开客户端另一次请求取得。
+应用识别到请求路径属于线上站点时，只查指针和 `site_files`，或在指针为 `public-page` 时读镜像里的 dist。这个处理函数不能查询 `pages`。资料由浏览器里的公开客户端另一次请求取得。
 
-预览路径不使用线上路径，匿名可访问。所属人同意前线上路径保持不变。回到旧版或 `original` 时重新走 `activate_site` 和批准。没有回滚路由。第一版不提供删除 release 的接口。
+预览路径不使用线上路径，匿名可访问。所属人同意前线上路径保持不变。回到旧版或 `public-page` 时重新走 `activate_site` 和批准。没有回滚路由。第一版不提供删除 release 的接口。
 
 缓存：公开 PCP、`/media`、Skill 和站点 `index.html` 使用 `Cache-Control: no-store`。带内容哈希的 CSS 和 JS 使用 `public, max-age=31536000, immutable`。同一进程同源提供页面和 API，不另开 CORS。站点文件不交给入口容器。入口只把 `PUBLIC_ORIGIN` 转到应用进程。
 

@@ -21,6 +21,7 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
       # 进程内测试使用端口假实现，不启动 Compose，也不需要 DATABASE_URL。
+      # check 会先构建管理端和内置公开页。dist 不入库，没有构建时首页会 404。
       - name: Check
         run: pnpm run check
       - name: Audit

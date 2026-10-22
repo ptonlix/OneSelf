@@ -7,14 +7,14 @@
 ## ADDED Requirements
 
 ### Requirement: One site pointer
-The system MUST keep a single site pointer. With no custom release it MUST point at `original`, served from the application image. `list_sites` MUST describe that one pointer and the existing releases. It MUST NOT imply multiple sites. Serving a site path MUST NOT query the pages projection.
+The system MUST keep a single site pointer. With no custom release it MUST point at `public-page`, served from the application image. `list_sites` MUST describe that one pointer and the existing releases. It MUST NOT imply multiple sites. Serving a site path MUST NOT query the pages projection.
 
 #### Scenario: Fresh install serves the built-in page
 - **WHEN** a visitor opens `/` before any activation
-- **THEN** the response is the built-in original page
+- **THEN** the response is the built-in public page
 
 ### Requirement: Original page behavior
-The original page MUST be one landing page, without a separate resume URL and without client-side routing. An unknown path MUST return 404 and MUST NOT fall back to `/`. With no public pages it MUST show an empty state. With public pages it MUST show every public `profile`, plus public `experience` and `education`, and for any other public type the title, type, and body. List data MUST contain only `source`, `slug`, `type`, and `title`. The page MUST NOT call facts, timeline, tags, or links. Body text MUST be loaded from the public single-page read. A later change to public data MUST appear on the next request without another activation. Changing a page to `private` MUST hide it and its media from later anonymous reads. Bytes already stored inside an uploaded zip MUST NOT be rewritten or deleted because of that change.
+The public page MUST be one landing page, without a separate resume URL and without client-side routing. An unknown path MUST return 404 and MUST NOT fall back to `/`. With no public pages it MUST show an empty state. With public pages it MUST show every public `profile`, plus public `experience` and `education`, and for any other public type the title, type, and body. List data MUST contain only `source`, `slug`, `type`, and `title`. The page MUST NOT call facts, timeline, tags, or links. Body text MUST be loaded from the public single-page read. A later change to public data MUST appear on the next request without another activation. Changing a page to `private` MUST hide it and its media from later anonymous reads. Bytes already stored inside an uploaded zip MUST NOT be rewritten or deleted because of that change.
 
 #### Scenario: Missing path is not the landing page
 - **WHEN** a visitor requests a path the current release does not contain
@@ -32,14 +32,14 @@ Anonymous clients MUST be able to call only `GET /pcp/v1/public/sources`, `GET /
 - **THEN** the public page list does not include it and the public single-page read is `not_found`
 
 ### Requirement: Upload is not activation
-`get_site` MUST download the original-page source zip from the image, never an uploaded dist. `put_site` MUST accept a zip of at most 20 MiB and 200 files whose root contains `index.html`. A zip with path traversal, a symlink, an absolute path, or a reserved path (`pcp`, `oauth`, `.well-known`, `admin`, `skills`, `media`, `_preview`) MUST be rejected entirely and MUST NOT create a release. Preview MUST be anonymous at `/_preview/{releaseId}/` and MUST NOT move the pointer. The release id MUST be `rel_` plus 32 hexadecimal characters. The system MUST NOT provide an endpoint that deletes a release.
+`get_site` MUST download the public-page source zip from the image, never an uploaded dist. `put_site` MUST accept a zip of at most 20 MiB and 200 files whose root contains `index.html`. A zip with path traversal, a symlink, an absolute path, or a reserved path (`pcp`, `oauth`, `.well-known`, `admin`, `skills`, `media`, `_preview`) MUST be rejected entirely and MUST NOT create a release. Preview MUST be anonymous at `/_preview/{releaseId}/` and MUST NOT move the pointer. The release id MUST be `rel_` plus 32 hexadecimal characters. The system MUST NOT provide an endpoint that deletes a release.
 
 #### Scenario: Preview leaves the live path unchanged
 - **WHEN** an anonymous visitor opens a preview URL after an upload
 - **THEN** `/` still returns the previous pointer and the preview URL returns the uploaded files
 
 ### Requirement: Activation needs the owner
-`activate_site` MUST create a pending activation for `rel_...` or `original`, valid for 15 minutes, and MUST return an approval URL. The response MUST NOT move the pointer. Only an owner session approving that activation MUST move the pointer. Rejection, expiry, or no decision MUST leave the live path unchanged. Returning to an older release MUST be another activation and approval. An agent MUST NOT be able to call the approval route.
+`activate_site` MUST create a pending activation for `rel_...` or `public-page`, valid for 15 minutes, and MUST return an approval URL. The response MUST NOT move the pointer. Only an owner session approving that activation MUST move the pointer. Rejection, expiry, or no decision MUST leave the live path unchanged. Returning to an older release MUST be another activation and approval. An agent MUST NOT be able to call the approval route.
 
 #### Scenario: Agent approval cannot publish
 - **WHEN** a credential with `site:write` calls `activate_site` and then calls the owner approval route

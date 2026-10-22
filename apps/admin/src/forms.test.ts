@@ -56,8 +56,8 @@ describe("approval payloads", () => {
     expect(body).not.toHaveProperty("key");
   });
 
-  it("accepts original and a 32-hex release id", () => {
-    expect(isReleaseId("original")).toBe(true);
+  it("accepts public-page and a 32-hex release id", () => {
+    expect(isReleaseId("public-page")).toBe(true);
     expect(isReleaseId(`rel_${"a".repeat(32)}`)).toBe(true);
     expect(isReleaseId("rel_short")).toBe(false);
     expect(isReleaseId("../admin")).toBe(false);

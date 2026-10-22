@@ -121,14 +121,14 @@ OWNER_PASSWORD=<自己设一个初始口令>
 ```bash
 pnpm db:migrate
 pnpm --filter @oneself/admin build
-pnpm --filter @oneself/original-pages build
+pnpm --filter @oneself/public-page build
 node --env-file=.env --experimental-strip-types apps/server/src/index.ts
 ```
 
 打开 <http://127.0.0.1:3000> 看原始页面，打开 <http://127.0.0.1:3000/admin> 登录。
 
 > [!TIP]
-> 应用直接启动时会检查 `DATABASE_URL`、`OBJECT_STORAGE_*` 以及 `apps/admin/dist`、`packages/original-pages/dist` 是否存在，缺一项就拒绝启动。还没有所属人账号且没有设置 `OWNER_PASSWORD` 时也会拒绝启动。
+> 应用直接启动时会检查 `DATABASE_URL`、`OBJECT_STORAGE_*` 以及 `apps/admin/dist`、`packages/public-page/dist` 是否存在，缺一项就拒绝启动。还没有所属人账号且没有设置 `OWNER_PASSWORD` 时也会拒绝启动。
 
 ## 🔧 配置
 
@@ -248,7 +248,7 @@ OneSelf/
 │   ├── adapters/          # S3、PostgreSQL 实现与测试用内存实现
 │   ├── db/                # Drizzle 表结构与 SQL 迁移
 │   ├── public-client/     # 匿名公开 PCP 客户端，定制站点也用它
-│   └── original-pages/    # 随应用发布的原始落地页源码
+│   └── public-page/       # 随应用发布的内置公开页源码
 ├── skills/oneself/        # 产品 Skill：SKILL.md 与 references/
 ├── tests/                 # 接口冒烟（smoke）与 Skill 验收测试
 ├── deploy/Caddyfile       # Caddy 入口，只做反向代理

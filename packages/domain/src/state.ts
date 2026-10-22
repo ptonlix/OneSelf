@@ -101,7 +101,7 @@ export function emptyDomainState(): DomainState {
     objects: [],
     files: [],
     site: {
-      pointer: { releaseId: "original" },
+      pointer: { releaseId: "public-page" },
       releases: [],
       activations: [],
     },

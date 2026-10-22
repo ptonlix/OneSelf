@@ -106,7 +106,7 @@ export type ServerOptions = {
   readonly ingress?: IngressMode;
   readonly oauthAuthorizationCode?: boolean;
   readonly skillsDir: string;
-  readonly originalPagesDir: string;
+  readonly publicPageDir: string;
   readonly adminDistDir?: string;
   readonly log?: (line: string) => void;
   readonly postgres?: PostgresHandle;
@@ -152,7 +152,7 @@ export class Runtime {
   #grants: OauthGrantRecord[] = [];
   #engine: OauthEngine | null = null;
   #siteFiles: SiteFileRecord[] = [];
-  #originalDist: string;
+  #publicPageDist: string;
   #adminDist: string;
   #rates = new Map<string, number[]>();
   #tail: Promise<unknown> = Promise.resolve();
@@ -162,7 +162,7 @@ export class Runtime {
   #skillArchive: Uint8Array;
   #skillDescription: string;
   #skillDigest: string;
-  #originalRoot: string;
+  #publicPageRoot: string;
   #log: (line: string) => void;
   #postgres: PostgresHandle | null;
   #store: PostgresStore | null;
@@ -182,8 +182,8 @@ export class Runtime {
     this.#siteFiles = options.loaded?.siteFiles ?? [];
     this.#postgres = options.postgres ?? null;
     this.#store = options.postgres?.store ?? null;
-    this.#originalRoot = options.originalPagesDir;
-    this.#originalDist = path.join(options.originalPagesDir, "dist");
+    this.#publicPageRoot = options.publicPageDir;
+    this.#publicPageDist = path.join(options.publicPageDir, "dist");
     this.#adminDist = options.adminDistDir ?? "";
     this.#log =
       options.log ??
@@ -1297,7 +1297,7 @@ export class Runtime {
           ? fail("unauthorized", "authentication required")
           : fail("forbidden", "site write is required");
       }
-      const files = walkFiles(this.#originalRoot)
+      const files = walkFiles(this.#publicPageRoot)
         .filter(
           (file) =>
             !file.path.split("/").includes("node_modules") &&
@@ -1839,8 +1839,8 @@ export class Runtime {
     }
   }
 
-  readOriginal(relative: string): Uint8Array | null {
-    const absolute = safeJoin(this.#originalDist, relative);
+  readPublicPage(relative: string): Uint8Array | null {
+    const absolute = safeJoin(this.#publicPageDist, relative);
     if (absolute === null) {
       return null;
     }

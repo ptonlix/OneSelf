@@ -15,12 +15,12 @@ describe("listen host", () => {
 
   it("refuses a direct start without storage configuration or built pages", () => {
     const root = mkdtempSync(path.join(tmpdir(), "oneself-start-"));
-    const originalDist = path.join(root, "original");
+    const publicPageDist = path.join(root, "public-page");
     const adminDist = path.join(root, "admin");
-    mkdirSync(originalDist);
+    mkdirSync(publicPageDist);
     mkdirSync(adminDist);
     expect(() => {
-      assertDirectStart({}, { originalDist, adminDist });
+      assertDirectStart({}, { publicPageDist, adminDist });
     }).toThrow(/DATABASE_URL/);
     expect(() => {
       assertDirectStart(
@@ -30,10 +30,10 @@ describe("listen host", () => {
           OBJECT_STORAGE_ACCESS_KEY: "",
           OBJECT_STORAGE_SECRET_KEY: "secret",
         },
-        { originalDist, adminDist },
+        { publicPageDist, adminDist },
       );
     }).toThrow(/OBJECT_STORAGE_ACCESS_KEY/);
-    writeFileSync(path.join(originalDist, "index.html"), "dist");
+    writeFileSync(path.join(publicPageDist, "index.html"), "dist");
     expect(() => {
       assertDirectStart(
         {
@@ -42,7 +42,7 @@ describe("listen host", () => {
           OBJECT_STORAGE_ACCESS_KEY: "key",
           OBJECT_STORAGE_SECRET_KEY: "secret",
         },
-        { originalDist, adminDist },
+        { publicPageDist, adminDist },
       );
     }).toThrow(/admin dist/);
   });

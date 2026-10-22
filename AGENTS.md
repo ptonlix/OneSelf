@@ -39,7 +39,7 @@ packages/ports/          对象存储、时钟、Markdown 解析的类型。
 packages/adapters/       S3 与 Postgres。测试假实现留在这里。
 packages/db/             Drizzle 表和 SQL 迁移。不放查询。
 packages/public-client/  匿名 PCP 客户端。定制站也用它。
-packages/original-pages/ 原始落地页源码。不改名为 pages。
+packages/public-page/    内置公开页源码。不改名为 pages。
 skills/oneself/          给外部 Agent 的产品 Skill。进镜像。
 .agents/skills/          开发技能。不进镜像，不和产品 Skill 合并。
 tests/smoke/             进程内接口冒烟。只打已经启动的进程。
@@ -74,7 +74,7 @@ openspec/changes/<短名>/
 - 产品 Skill 正文用中文，文件名和 `name` 用英文。不要在产品 Skill 或面向用户的协议说明里写出服务端框架名。不要写只给作者看的格式说明。
 - 仓库里的 `SKILL.md` 不写死某台站点的 origin。发出入口和 archive 前才写入 `metadata.oneself_origin`。reference 不插入 origin。`GET /skills/oneself/SKILL.md` 与 `GET /pcp/v1/skills/oneself` 必须是同一份字节。
 - 安装索引由应用生成，不放进站点 zip。上传含 `.well-known` 的站点包仍整包拒绝。
-- 站点指针名 `original` 和源码包名 `original-page-source.zip` 不改。上传不等于上线。Agent 不得调用同意上线的接口，同意前不得声称站点已更换。
+- 站点指针名是 `public-page`，源码包名是 `public-page-source.zip`。上传不等于上线。Agent 不得调用同意上线的接口，同意前不得声称站点已更换。
 - 页面脚本只能匿名调用公开 PCP 和公开媒体。公开请求使用 `credentials: omit`。不要用管理端 Cookie 给公开站点里的脚本授权。
 - 所属人密码、API Key 原文、OAuth 刷新令牌和对象存储密钥不进代码、测试、产品 Skill、页面、公开站或提交说明。库存哈希。
 - 保留路径 `pcp`、`oauth`、`.well-known`、`admin`、`skills`、`media`、`_preview` 不能被站点包占用。Cloudflare 前面不要缓存这些路径。
@@ -107,7 +107,7 @@ pnpm run boundaries
 pnpm run check
 ```
 
-它包含格式、lint、类型、测试、依赖方向和 Knip。编辑器没有报错不能代替这条命令。没有跑过的冒烟不要说成通过。
+它包含格式、lint、类型、管理端与内置公开页构建、测试、依赖方向和 Knip。dist 不入库，测试前必须构建。编辑器没有报错不能代替这条命令。没有跑过的冒烟不要说成通过。
 
 不要主动提交或推送。用户要求提交时，说明用一句祈使句，重点写为什么，而不是罗列文件。
 

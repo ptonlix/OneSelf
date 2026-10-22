@@ -132,7 +132,7 @@ CREATE TABLE "site_activations" (
 	"expires_at" timestamp with time zone NOT NULL,
 	"created_at" timestamp with time zone NOT NULL,
 	"decided_at" timestamp with time zone,
-	CONSTRAINT "site_activations_release_id" CHECK ("site_activations"."release_id" = 'original' or "site_activations"."release_id" ~ '^rel_[0-9a-f]{32}$'),
+	CONSTRAINT "site_activations_release_id" CHECK ("site_activations"."release_id" = 'public-page' or "site_activations"."release_id" ~ '^rel_[0-9a-f]{32}$'),
 	CONSTRAINT "site_activations_status" CHECK ("site_activations"."status" in ('pending', 'approved', 'rejected', 'expired'))
 );
 --> statement-breakpoint
@@ -149,7 +149,7 @@ CREATE TABLE "site_pointers" (
 	"id" integer PRIMARY KEY NOT NULL,
 	"release_id" text NOT NULL,
 	CONSTRAINT "site_pointers_id" CHECK ("site_pointers"."id" = 1),
-	CONSTRAINT "site_pointers_release_id" CHECK ("site_pointers"."release_id" = 'original' or "site_pointers"."release_id" ~ '^rel_[0-9a-f]{32}$')
+	CONSTRAINT "site_pointers_release_id" CHECK ("site_pointers"."release_id" = 'public-page' or "site_pointers"."release_id" ~ '^rel_[0-9a-f]{32}$')
 );
 --> statement-breakpoint
 CREATE TABLE "site_releases" (

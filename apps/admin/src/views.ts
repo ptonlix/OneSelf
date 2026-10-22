@@ -388,7 +388,11 @@ export function SiteCreateView(props: {
       },
     },
     h("h1", null, "申请站点上线"),
-    h("p", { className: "muted" }, "填写 original，或 rel_ 加 32 位十六进制。这一步不移动指针。"),
+    h(
+      "p",
+      { className: "muted" },
+      "填写 public-page，或 rel_ 加 32 位十六进制。这一步不移动指针。",
+    ),
     message(props.message),
     h(
       "label",

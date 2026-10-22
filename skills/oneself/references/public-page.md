@@ -21,7 +21,7 @@
 - 不得写入密钥或私有页。不得把密钥或 private 页写进源码或构建产物。
 - 页面脚本只能调用匿名公开接口和公开媒体地址。公开页面的请求使用 `credentials: omit`。不要携带 API Key、访问令牌或所属人的 Cookie。站点响应不 `Set-Cookie`。带上所属人会话会把私有上下文混进访客请求。
 - 没有客户端路由。当前 release 里没有的路径返回 404，不回退到 `/`。
-- 没有定制 release 时，指针是 `original`，页面来自随应用发布的内置页。内置页已经能展示下面的公开字段。只是换皮时，保留这个运行时读取，不要改成写死的简介。
+- 没有定制 release 时，指针是 `public-page`，页面来自随应用发布的内置页。内置页已经能展示下面的公开字段。只是换皮时，保留这个运行时读取，不要改成写死的简介。
 - 定制需要 `site:write` 或所属人会话。没有就停下来，不要上传。
 - 下一轮必须从原始源码 zip 开始。已上传或已激活的 dist 不能当作下一轮源码。`get_site` 下载的是镜像里的源码，不是线上正在用的构建结果。
 - 上传不是激活。预览不移动指针。同意前不得声称已更换。
@@ -30,7 +30,7 @@
 
 - [ ] 调用 `whoami`。没有 `site:write`、也不是所属人会话时，停下来说明缺权限。
 - [ ] 用公开接口看现在有哪些公开页，确认宣传页有内容可展示。没有公开页时，内置页只显示空状态。要先公开资料，改读 `references/context.md`，不要把私有页抄进站点。
-- [ ] 调用 `get_site`（`GET /pcp/v1/site/source`）下载 `original-page-source.zip`。只在这份源码上改版式。
+- [ ] 调用 `get_site`（`GET /pcp/v1/site/source`）下载 `public-page-source.zip`。只在这份源码上改版式。
 - [ ] 构建一棵静态文件树。根目录有 `index.html`。`/` 读取这个文件。不要把源码 zip 本身上传。
 - [ ] 核对构建产物：没有密钥，没有 private 页，没有保留路径，也没有 `..`、绝对路径或符号链接。
 - [ ] 用 `put_site` 上传构建出的 zip。zip 最大 20 MiB、最多 200 个文件。上传后线上指针不动。
@@ -69,15 +69,15 @@
 
 ## 容易调用错的参数
 
-- `get_site` 没有参数。响应是 zip，文件名是 `original-page-source.zip`。
+- `get_site` 没有参数。响应是 zip，文件名是 `public-page-source.zip`。
 - `put_site`：HTTP 用 multipart 字段 `archive`；MCP 传 `archive_base64`。返回 `{id}`，形如 `rel_` 加上 32 个十六进制字符。这不是激活。
 - `preview_site`：`{id}`。返回 `{url}`，预览地址是 `/_preview/{releaseId}/`。
-- `activate_site`：`{release_id}`。目标只能是 `rel_...` 或 `original`。响应是 `{id, status:"pending", approval_url, expires_at}`，15 分钟有效，当下不移动指针。
+- `activate_site`：`{release_id}`。目标只能是 `rel_...` 或 `public-page`。响应是 `{id, status:"pending", approval_url, expires_at}`，15 分钟有效，当下不移动指针。
 - `list_sites` 只返回这一行指针和已有 release，不表示有多个站点。
 
 ## 批准
 
-批准地址必须交给所属人。Agent 不能调用 `POST /admin/site-activations/{id}/approve`。拒绝、过期或一直没有决定时，线上路径保持不变。过期后要重新申请。回到旧 release 或 `original` 也要重新申请并等待所属人同意。没有删除 release 的接口。
+批准地址必须交给所属人。Agent 不能调用 `POST /admin/site-activations/{id}/approve`。拒绝、过期或一直没有决定时，线上路径保持不变。过期后要重新申请。回到旧 release 或 `public-page` 也要重新申请并等待所属人同意。没有删除 release 的接口。
 
 交给所属人之后，只这样说：
 

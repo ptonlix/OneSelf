@@ -38,7 +38,7 @@ function entry(path: string, size = 1, symlink = false): SiteArchiveEntry {
 }
 
 describe("site pointer", () => {
-  it("starts at original and does not move for preview or a pending activation", () => {
+  it("starts at public-page and does not move for preview or a pending activation", () => {
     const pointer = initialSitePointer();
     const releases = [
       { id: releaseId, createdAt: NOW },
@@ -50,9 +50,9 @@ describe("site pointer", () => {
     if (!preview.ok) {
       return;
     }
-    expect(preview.value.pointer).toEqual({ releaseId: "original" });
+    expect(preview.value.pointer).toEqual({ releaseId: "public-page" });
     expect(preview.value.url).toBe(`/_preview/${releaseId}/`);
-    expect(pointer.releaseId).toBe("original");
+    expect(pointer.releaseId).toBe("public-page");
 
     const requested = requestSiteActivation({
       pointer,
@@ -72,7 +72,7 @@ describe("site pointer", () => {
     expect(requested.value.activation.expiresAt).toBe(addMilliseconds(NOW, SITE_ACTIVATION_TTL_MS));
   });
 
-  it("moves the pointer only when the owner approves rel_ or original", () => {
+  it("moves the pointer only when the owner approves rel_ or public-page", () => {
     const pointer = initialSitePointer();
     const releases = [
       { id: releaseId, createdAt: NOW },
@@ -147,7 +147,7 @@ describe("site pointer", () => {
       releases,
       credential: owner,
       activationId: "act_original",
-      releaseId: "original",
+      releaseId: "public-page",
       now: NOW,
     });
     if (!original.ok) {
@@ -164,7 +164,7 @@ describe("site pointer", () => {
     if (!restored.ok) {
       return;
     }
-    expect(restored.value.pointer.releaseId).toBe("original");
+    expect(restored.value.pointer.releaseId).toBe("public-page");
   });
 
   it("leaves the live pointer unchanged on rejection, expiry, or no decision", () => {

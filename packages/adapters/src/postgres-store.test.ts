@@ -129,7 +129,7 @@ describe.skipIf(!runPostgresTests)("postgres store", () => {
     await store.insertSiteFiles([
       { release_id: RELEASE, path: "index.html", object_key: `sites/${RELEASE}/index.html` },
     ]);
-    await store.upsertSitePointer({ id: 1, release_id: "original" });
+    await store.upsertSitePointer({ id: 1, release_id: "public-page" });
     await store.upsertSitePointer({ id: 1, release_id: RELEASE });
     expect(await store.findSitePointer()).toMatchObject({ id: 1, release_id: RELEASE });
     expect(await store.listLinks({ to_source: "life", to_slug: "other" })).toHaveLength(1);

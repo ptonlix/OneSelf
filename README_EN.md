@@ -121,14 +121,14 @@ Run migrations, build the two front-end packages, then start the app:
 ```bash
 pnpm db:migrate
 pnpm --filter @oneself/admin build
-pnpm --filter @oneself/original-pages build
+pnpm --filter @oneself/public-page build
 node --env-file=.env --experimental-strip-types apps/server/src/index.ts
 ```
 
 Open <http://127.0.0.1:3000> for the original page and <http://127.0.0.1:3000/admin> to sign in.
 
 > [!TIP]
-> On direct start the app checks `DATABASE_URL`, `OBJECT_STORAGE_*`, `apps/admin/dist`, and `packages/original-pages/dist`, and refuses to start if any is missing. It also refuses to start when no account exists yet and `OWNER_PASSWORD` is not set.
+> On direct start the app checks `DATABASE_URL`, `OBJECT_STORAGE_*`, `apps/admin/dist`, and `packages/public-page/dist`, and refuses to start if any is missing. It also refuses to start when no account exists yet and `OWNER_PASSWORD` is not set.
 
 ## 🔧 Configuration
 
@@ -248,7 +248,7 @@ OneSelf/
 │   ├── adapters/          # S3 and PostgreSQL implementations plus in-memory test fakes
 │   ├── db/                # Drizzle schema and SQL migrations
 │   ├── public-client/     # Anonymous public PCP client, also used by custom sites
-│   └── original-pages/    # Source of the built-in landing page
+│   └── public-page/       # Source of the built-in public page
 ├── skills/oneself/        # Product skill: SKILL.md and references/
 ├── tests/                 # API smoke tests and skill acceptance tests
 ├── deploy/Caddyfile       # Caddy ingress, reverse proxy only

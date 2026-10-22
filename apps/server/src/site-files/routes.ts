@@ -54,8 +54,8 @@ async function serveRelease(
   }
   for (const candidate of candidates(relative)) {
     const bytes =
-      releaseId === "original"
-        ? runtime.readOriginal(candidate)
+      releaseId === "public-page"
+        ? runtime.readPublicPage(candidate)
         : await runtime.readReleaseFile(releaseId, candidate);
     if (bytes === null) {
       continue;

@@ -29,11 +29,11 @@ import { mountSiteFiles } from "./site-files/routes.js";
 export type { IngressMode };
 
 export type CreateServerOptions = Partial<
-  Omit<ServerOptions, "objectStore" | "skillsDir" | "originalPagesDir" | "adminDistDir">
+  Omit<ServerOptions, "objectStore" | "skillsDir" | "publicPageDir" | "adminDistDir">
 > & {
   readonly objectStore?: ServerOptions["objectStore"];
   readonly skillsDir?: string;
-  readonly originalPagesDir?: string;
+  readonly publicPageDir?: string;
   readonly adminDistDir?: string;
 };
 
@@ -53,7 +53,7 @@ export async function createServer(options: CreateServerOptions = {}): Promise<S
     {
       clock,
       skillsDir: options.skillsDir ?? path.join(root, "skills"),
-      originalPagesDir: options.originalPagesDir ?? path.join(root, "packages", "original-pages"),
+      publicPageDir: options.publicPageDir ?? path.join(root, "packages", "public-page"),
       adminDistDir: options.adminDistDir ?? path.join(root, "apps", "admin", "dist"),
       ...(options.publicOrigin === undefined ? {} : { publicOrigin: options.publicOrigin }),
       ...(options.ownerLogin === undefined ? {} : { ownerLogin: options.ownerLogin }),
@@ -132,7 +132,7 @@ export function resolveListenHost(value: string | undefined): string {
 export function assertDirectStart(
   env: NodeJS.ProcessEnv,
   paths: {
-    originalDist: string;
+    publicPageDist: string;
     adminDist: string;
   },
 ): void {
@@ -148,8 +148,8 @@ export function assertDirectStart(
       throw new Error(`${name} is required`);
     }
   }
-  if (!existsSync(path.join(paths.originalDist, "index.html"))) {
-    throw new Error("original page dist is missing");
+  if (!existsSync(path.join(paths.publicPageDist, "index.html"))) {
+    throw new Error("public page dist is missing");
   }
   if (!existsSync(path.join(paths.adminDist, "index.html"))) {
     throw new Error("admin dist is missing");
@@ -158,10 +158,10 @@ export function assertDirectStart(
 
 async function listen(): Promise<void> {
   const root = repoRoot();
-  const originalPagesDir = path.join(root, "packages", "original-pages");
+  const publicPageDir = path.join(root, "packages", "public-page");
   const adminDistDir = path.join(root, "apps", "admin", "dist");
   assertDirectStart(process.env, {
-    originalDist: path.join(originalPagesDir, "dist"),
+    publicPageDist: path.join(publicPageDir, "dist"),
     adminDist: adminDistDir,
   });
   const clock = new SystemClock();
@@ -192,7 +192,7 @@ async function listen(): Promise<void> {
     oauthAuthorizationCode: env("OAUTH_TEST_AUTHORIZATION_CODE") === "1",
     clock,
     objectStore,
-    originalPagesDir,
+    publicPageDir,
     adminDistDir,
     postgres,
     ...(publicOrigin === undefined ? {} : { publicOrigin }),

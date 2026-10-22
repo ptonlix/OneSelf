@@ -31,9 +31,9 @@ export type SourceGrant = {
 
 const timestamptz = (name: string) => timestamp(name, { withTimezone: true });
 
-/** `original` is the built-in site, so this column cannot be a foreign key. */
+/** `public-page` is the built-in site, so this column cannot be a foreign key. */
 const releasePointer = (column: AnyPgColumn) =>
-  sql`${column} = 'original' or ${column} ~ '^rel_[0-9a-f]{32}$'`;
+  sql`${column} = 'public-page' or ${column} ~ '^rel_[0-9a-f]{32}$'`;
 
 export const sources = pgTable(
   "sources",

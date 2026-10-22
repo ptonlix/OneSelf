@@ -11,12 +11,13 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "build": "pnpm --filter @oneself/admin build && pnpm --filter @oneself/public-page build",
     "test": "vitest run",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "db:migrate": "node --env-file=.env scripts/db-migrate.mjs",
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
     "knip": "knip",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run boundaries && pnpm run knip"
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test && pnpm run boundaries && pnpm run knip"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

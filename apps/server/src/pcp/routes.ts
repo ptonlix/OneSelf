@@ -325,7 +325,7 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
       status: 200,
       headers: {
         "content-type": "application/zip",
-        "content-disposition": 'attachment; filename="original-page-source.zip"',
+        "content-disposition": 'attachment; filename="public-page-source.zip"',
       },
     });
   });

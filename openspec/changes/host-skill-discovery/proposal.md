@@ -11,7 +11,7 @@
 - 应用提供 `GET /.well-known/agent-skills/index.json`。索引只有一条 `oneself`，`type` 为 `archive`，因为安装必须带上 `references/`。`url` 指向由应用生成的压缩包，`digest` 是该压缩包原始字节的 SHA-256。
 - 压缩包根目录是插入了 `metadata.oneself_origin` 的 `SKILL.md`，以及两份 reference。单独的 `GET /skills/oneself/SKILL.md` 与 `GET /pcp/v1/skills/oneself` 是同一份入口字节。reference 也可按 `/skills/oneself/references/<file>` 单独读取。请求的 `Host` 不能改写 origin。
 - 入口指定客户端配置文件：`$XDG_CONFIG_HOME/oneself/config.json`，否则 `~/.config/oneself/config.json`；Windows 为 `%APPDATA%\oneself\config.json`。其中保存 origin，以及 API Key 或 refresh token。密钥不写入 Skill 文件、Skill 安装目录、页面或公开站。
-- 不创建 skills.sh Pack，不把安装索引放进站点 zip。不改 PCP 操作表、站点指针 `original` 或源码包名 `original-page-source.zip`。
+- 不创建 skills.sh Pack，不把安装索引放进站点 zip。不改 PCP 操作表、站点指针 `public-page` 或源码包名 `public-page-source.zip`。
 
 ## Capabilities
 

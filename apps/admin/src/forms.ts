@@ -1,6 +1,6 @@
 import type { CreateApiKeyBody, DeviceApprovalBody, GrantFlag, SourceDraft } from "./types";
 
-const RELEASE_ID = /^(?:original|rel_[0-9a-fA-F]{32})$/;
+const RELEASE_ID = /^(?:public-page|rel_[0-9a-fA-F]{32})$/;
 
 export function draftsFromDirectories(ids: readonly string[]): SourceDraft[] {
   return ids.map((id) => ({ id, read: false, write: false, visibility: false }));

@@ -42,7 +42,7 @@
 | db | `packages/db` | 无。只放表和 migration |
 | ports | `packages/ports` | 无。对象存储、时钟、Markdown 解析的类型 |
 | admin | `apps/admin` | 只调用 HTTP |
-| pages | `packages/original-pages`、`packages/public-client` | 公开 PCP 的形状 |
+| pages | `packages/public-page`、`packages/public-client` | 公开 PCP 的形状 |
 | skills | `skills/` | 无。两份产品说明 |
 
 第二波等第一波合并到 `main` 之后再开：
@@ -68,7 +68,7 @@ PRD 和架构没有列类型。`schema.md` 是 migration 的列清单。其中 `
 
 `apps/server/src` 用 `app/`、`pcp/`、`mcp/`、`oauth/`、`owner/`、`site-files/`。不用 `http/` 或 `site/`，也不叫 `admin/`。站点指针规则在 `packages/domain/src/site-pointer.ts`；domain 不开事务、不读对象。`site-files/` 只按当前指针吐文件，不查询 `pages`。
 
-以下不改：不合并或再拆 domain、operations、db、ports、adapters；db 不放查询；内存假实现留在 adapters 且生产入口不导出；adapters 不依赖 domain；`skills/` 与 `.agents/skills/` 不合并不改名；Dockerfile 和 compose 留在仓库根；不做 `apps/ingress`；`public-client` 不并进 `original-pages`；`original-pages` 不改名为 `pages`。
+以下不改：不合并或再拆 domain、operations、db、ports、adapters；db 不放查询；内存假实现留在 adapters 且生产入口不导出；adapters 不依赖 domain；`skills/` 与 `.agents/skills/` 不合并不改名；Dockerfile 和 compose 留在仓库根；不做 `apps/ingress`；`public-client` 不并进 `public-page`；`public-page` 不改名为 `pages`。
 
 ### 写入顺序
 

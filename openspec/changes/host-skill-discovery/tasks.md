@@ -19,4 +19,4 @@
 
 ## 4. 验收
 
-- [x] 4.1 跑 Skill 验收测试和协议冒烟。确认旧的两个 Skill URL 和 `get_skill` 名字不可用，PCP 操作表、`original` 指针和 `original-page-source.zip` 未改。
+- [x] 4.1 跑 Skill 验收测试和协议冒烟。确认旧的两个 Skill URL 和 `get_skill` 名字不可用，PCP 操作表、`public-page` 指针和 `public-page-source.zip` 未改。

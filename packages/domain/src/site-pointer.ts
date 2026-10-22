@@ -3,7 +3,7 @@ import { addMilliseconds, SITE_ACTIVATION_TTL_MS, timestampMs } from "./clock.js
 import { fail, ok, type DomainErrorCode, type DomainResult } from "./result.js";
 import type { SiteActivationRecord, SiteReleaseRecord } from "./state.js";
 
-export const ORIGINAL_RELEASE_ID = "original";
+export const PUBLIC_PAGE_RELEASE_ID = "public-page";
 
 /** Paths the static tree must not cover. A single hit rejects the whole archive. */
 export const RESERVED_SITE_PATHS = [
@@ -37,7 +37,7 @@ export type SiteDecision = {
 };
 
 export function initialSitePointer(): SitePointer {
-  return { releaseId: ORIGINAL_RELEASE_ID };
+  return { releaseId: PUBLIC_PAGE_RELEASE_ID };
 }
 
 export function isSiteReleaseId(value: string): boolean {
@@ -45,7 +45,7 @@ export function isSiteReleaseId(value: string): boolean {
 }
 
 export function isSitePointerTarget(value: string): boolean {
-  return value === ORIGINAL_RELEASE_ID || isSiteReleaseId(value);
+  return value === PUBLIC_PAGE_RELEASE_ID || isSiteReleaseId(value);
 }
 
 export function describeSite(
@@ -132,7 +132,7 @@ export function requestSiteActivation(input: {
     return fail("invalid", "release id is invalid");
   }
   if (
-    input.releaseId !== ORIGINAL_RELEASE_ID &&
+    input.releaseId !== PUBLIC_PAGE_RELEASE_ID &&
     !input.releases.some((release) => release.id === input.releaseId)
   ) {
     return fail("not_found", "release not found");

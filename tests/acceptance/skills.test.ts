@@ -82,7 +82,7 @@ describe("product skills", () => {
       "批准地址必须交给所属人",
       "同意前不得声称已更换",
       "下一轮必须从原始源码 zip 开始",
-      "original-page-source.zip",
+      "public-page-source.zip",
     ]) {
       expect(publicPage, sentence).toContain(sentence);
     }
@@ -93,7 +93,7 @@ describe("product skills", () => {
       expect(combined, sentence).toContain(sentence);
     }
     expect(entry).not.toContain("## Facts");
-    expect(entry).not.toContain("original-page-source.zip");
+    expect(entry).not.toContain("public-page-source.zip");
     expect(entry).not.toContain("http://");
     expect(entry).not.toContain("https://");
   });

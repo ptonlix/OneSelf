@@ -86,7 +86,7 @@ export {
   isSiteReleaseId,
   MAX_SITE_ARCHIVE_BYTES,
   MAX_SITE_ARCHIVE_FILES,
-  ORIGINAL_RELEASE_ID,
+  PUBLIC_PAGE_RELEASE_ID,
   previewSite,
   RELEASE_ID_PATTERN,
   requestSiteActivation,

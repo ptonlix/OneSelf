@@ -51,13 +51,13 @@ it("serves the original dist and keeps source HTML out of the live page", async 
     path.join(root, "index.html"),
     '<title>SOURCE-TITLE</title><script type="module" src="/src/main.ts"></script>',
   );
-  writeFileSync(path.join(root, "package.json"), '{"name":"@oneself/original-pages"}');
+  writeFileSync(path.join(root, "package.json"), '{"name":"@oneself/public-page"}');
   writeFileSync(
     path.join(root, "dist", "index.html"),
     '<title>DIST-TITLE</title><script src="/assets/app.js"></script>',
   );
   writeFileSync(path.join(root, "dist", "assets", "app.js"), "console.log('dist')");
-  const server = await boot({ originalPagesDir: root });
+  const server = await boot({ publicPageDir: root });
   const home = await server.request("/");
   const text = await home.text();
   expect(text).toContain("DIST-TITLE");

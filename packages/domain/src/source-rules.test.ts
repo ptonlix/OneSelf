@@ -203,7 +203,7 @@ describe("source delete and restore", () => {
     expect(purged.sources.some((source) => source.id === "health")).toBe(false);
     expect(purged.pages.some((page) => page.source === "health")).toBe(false);
     expect(purged.files[0]).toMatchObject({ id: "scan", pageSource: null, pageSlug: null });
-    expect(purged.site.pointer.releaseId).toBe("original");
+    expect(purged.site.pointer.releaseId).toBe("public-page");
     const readded = sourcesAdd(purged, owner, { id: "health" });
     expect(readded.ok).toBe(true);
   });

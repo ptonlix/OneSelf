@@ -861,7 +861,7 @@
       "checkConstraints": {
         "site_activations_release_id": {
           "name": "site_activations_release_id",
-          "value": "\"site_activations\".\"release_id\" = 'original' or \"site_activations\".\"release_id\" ~ '^rel_[0-9a-f]{32}$'"
+          "value": "\"site_activations\".\"release_id\" = 'public-page' or \"site_activations\".\"release_id\" ~ '^rel_[0-9a-f]{32}$'"
         },
         "site_activations_status": {
           "name": "site_activations_status",
@@ -954,7 +954,7 @@
         },
         "site_pointers_release_id": {
           "name": "site_pointers_release_id",
-          "value": "\"site_pointers\".\"release_id\" = 'original' or \"site_pointers\".\"release_id\" ~ '^rel_[0-9a-f]{32}$'"
+          "value": "\"site_pointers\".\"release_id\" = 'public-page' or \"site_pointers\".\"release_id\" ~ '^rel_[0-9a-f]{32}$'"
         }
       },
       "isRLSEnabled": false

@@ -21,7 +21,7 @@ const apiKey: ApiKeyRequest = {
 
 const activation: SiteActivation = {
   id: "act_1",
-  release_id: "original",
+  release_id: "public-page",
   status: "pending",
   expires_at: "2026-05-21T00:15:00Z",
 };
