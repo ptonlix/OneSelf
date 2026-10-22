@@ -99,6 +99,8 @@ pnpm exec vitest run <相关测试文件>
 pnpm run boundaries
 ```
 
+推送到 GitHub 后，`.github/workflows/ci.yml` 会跑同一条 `pnpm run check`，并构建一次应用镜像但不推送。版本标签 `v1.2.3` 才会由 `release-image.yml` 推送 Docker Hub 上的应用镜像。不要把入口程序或密钥写进这个镜像。
+
 准备提交或声明完成时，运行：
 
 ```bash

@@ -143,7 +143,7 @@ node --env-file=.env --experimental-strip-types apps/server/src/index.ts
 | `OBJECT_STORAGE_*`                                                | S3 兼容对象存储的端点、区域、桶和密钥。Compose 中由 `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` 提供 |
 | `COMPOSE_PROFILES`                                                | 公网入口：`cloudflared`（默认）、`caddy` 或 `tailscale`，同一时间只启用一个                        |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`、`ACME_EMAIL` / `TAILSCALE_AUTHKEY` | 分别给 cloudflared、Caddy、Tailscale 使用                                                          |
-| `ONESELF_IMAGE`                                                   | 应用镜像标签，默认 `oneself:local`                                                                 |
+| `ONESELF_IMAGE`                                                   | 应用镜像。本机默认 `oneself:local` 并现场构建。正式安装用 `docker.io/用户名/oneself:latest` |
 | `HOST` / `PORT`                                                   | 监听地址和端口，默认 `127.0.0.1:3000`；容器内设为 `0.0.0.0`                                        |
 
 ## 🧱 架构
@@ -276,7 +276,7 @@ pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
 <details>
 <summary><strong>Docker Compose 部署与公网入口详解</strong></summary>
 
-`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像由仓库根目录的 `Dockerfile` 构建，打进管理端、原始页面、原始页面源码 zip 和 `skills/`，监听 `3000`。生产请把 `ONESELF_IMAGE` 设为写死的版本标签，不要用 `latest`。
+`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像由仓库根目录的 `Dockerfile` 构建，打进管理端、原始页面、原始页面源码 zip 和 `skills/`，监听 `3000`。正式安装把 `ONESELF_IMAGE` 设为 `docker.io/<Docker Hub 用户名>/oneself:latest`。推送 `v1.2.3` 这样的正式标签后，发布工作流会把 `oneself:1.2.3` 推到 Docker Hub，并同时移动 `latest`。预发布只推版本号，不移动 `latest`。更新时执行 `docker compose pull && docker compose up -d`。仓库变量 `DOCKERHUB_USERNAME` 和 secret `DOCKERHUB_TOKEN` 必须先配好。同一标签包含 `linux/amd64` 和 `linux/arm64`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进这个镜像。
 
 公网入口是互斥的 Compose profile，由 `.env` 的 `COMPOSE_PROFILES` 选择，换入口不需要改应用镜像：
 

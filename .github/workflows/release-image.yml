@@ -1,0 +1,131 @@
+name: release-image
+
+# GitHub tag 过滤是 glob，不是正则。+ 不会表示“一位或多位”，写成 v[0-9]+ 会匹配不到 v1.2.3。
+# 这里只负责让版本形标签进入工作流。真正的形状检查在登录前的脚本里，不匹配就不登录、不推送。
+on:
+  push:
+    tags:
+      - "v[0-9]*.[0-9]*.[0-9]*"
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.9.1 --activate
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Check
+        run: pnpm run check
+
+  publish:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve image tags
+        id: tags
+        env:
+          DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Refusing non-version tag: ${tag}" >&2
+            exit 1
+          fi
+          if [[ -z "${DOCKERHUB_USERNAME}" || "${DOCKERHUB_USERNAME}" =~ [/[:space:]@:] ]]; then
+            echo "DOCKERHUB_USERNAME must be a single Docker Hub namespace" >&2
+            exit 1
+          fi
+          if [[ -z "${DOCKERHUB_TOKEN}" ]]; then
+            echo "DOCKERHUB_TOKEN is not set" >&2
+            exit 1
+          fi
+          version="${tag#v}"
+          image="docker.io/${DOCKERHUB_USERNAME}/oneself"
+          tags="${image}:${version}"
+          if [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            tags="${tags}"$'\n'"${image}:latest"
+            echo "Stable release ${image}:${version} and ${image}:latest"
+          else
+            echo "Prerelease ${image}:${version}; latest will not move"
+          fi
+          {
+            echo "image=${image}"
+            echo "version=${version}"
+            echo "tags<<EOF"
+            echo "${tags}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # 不传 build-args，不挂载 secret。PUBLIC_ORIGIN、所属人密码和对象存储密钥不进构建。
+      # 入口程序不在这个镜像里。buildx 一次推出含 linux/amd64 和 linux/arm64 的清单。
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - uses: docker/setup-buildx-action@v3
+        with:
+          name: oneself
+          driver: docker-container
+      - name: Build and push with buildx
+        env:
+          TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r tag; do
+            if [[ -n "${tag}" ]]; then
+              args+=(--tag "${tag}")
+            fi
+          done <<< "${TAGS}"
+          docker buildx build \
+            --builder oneself \
+            --platform linux/amd64,linux/arm64 \
+            --file Dockerfile \
+            --provenance=false \
+            --sbom=false \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --push \
+            "${args[@]}" \
+            .
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.tags.outputs.image }}
+          VERSION: ${{ steps.tags.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          notes="${RUNNER_TEMP}/release-notes.txt"
+          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'OneSelf %s\n\n正式安装使用 %s:latest。\n这个版本同时也是 %s:%s。同一标签包含 linux/amd64 和 linux/arm64。\n更新时执行 docker compose pull && docker compose up -d。\n入口容器不在这个镜像里。\n' "${tag}" "${IMAGE}" "${IMAGE}" "${VERSION}" > "${notes}"
+            prerelease=()
+          else
+            printf 'OneSelf %s\n\n这是预发布。应用镜像：%s:%s\nlatest 不会移动。\n' "${tag}" "${IMAGE}" "${VERSION}" > "${notes}"
+            prerelease=(--prerelease)
+          fi
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release edit "${tag}" --notes-file "${notes}"
+          else
+            gh release create "${tag}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}" "${prerelease[@]}"
+          fi

@@ -143,7 +143,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
 | `COMPOSE_PROFILES`                                                | Public ingress: `cloudflared` (default), `caddy`, or `tailscale`; only one at a time                                                                 |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`, `ACME_EMAIL` / `TAILSCALE_AUTHKEY` | For cloudflared, Caddy, and Tailscale respectively                                                                                                   |
-| `ONESELF_IMAGE`                                                   | App image tag, default `oneself:local`                                                                                                               |
+| `ONESELF_IMAGE`                                                   | App image. Local default is `oneself:local`, built from the Dockerfile. A production install uses `docker.io/username/oneself:latest` |
 | `HOST` / `PORT`                                                   | Listen address and port, default `127.0.0.1:3000`; `0.0.0.0` inside the container                                                                    |
 
 ## 🧱 Architecture
@@ -276,7 +276,7 @@ pnpm db:migrate       # Apply migrations to DATABASE_URL from .env
 <details>
 <summary><strong>Docker Compose and public ingress in detail</strong></summary>
 
-`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is built from the root `Dockerfile`, bundles the admin UI, the original page, its source zip, and `skills/`, and listens on `3000`. In production set `ONESELF_IMAGE` to a pinned version tag, not `latest`.
+`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is built from the root `Dockerfile`, bundles the admin UI, the original page, its source zip, and `skills/`, and listens on `3000`. A production install sets `ONESELF_IMAGE` to `docker.io/<Docker Hub username>/oneself:latest`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version and does not move `latest`. Update with `docker compose pull && docker compose up -d`. Set the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret first. The same tag includes `linux/amd64` and `linux/arm64`. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image.
 
 The public ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env`; switching ingress does not change the app image:
 
