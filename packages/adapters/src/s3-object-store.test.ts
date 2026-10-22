@@ -7,13 +7,13 @@ import {
 } from "@aws-sdk/client-s3";
 import { describe, expect, it } from "vitest";
 
-import { expectObjectStoreKeepsExistingKeys } from "./object-store-contract.js";
+import { expectObjectStoreKeepsExistingKeys } from "./object-store-contract.ts";
 import {
   objectStoreFromBucket,
   s3BucketFromClient,
   s3ClientConfig,
   type S3CommandClient,
-} from "./s3-object-store.js";
+} from "./s3-object-store.ts";
 
 describe("s3 object store", () => {
   it("does not rewrite an existing key and does not open a socket", async () => {

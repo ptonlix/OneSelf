@@ -1,9 +1,9 @@
 import type { Hono } from "hono";
 
-import { isRecord, parseGrants, rateLimited, readJson, sendError, sendJson } from "../app/json.js";
-import { parseOperation } from "../app/schemas.js";
-import type { Runtime } from "../app/runtime.js";
-import { adminPage, wantsJson } from "./static.js";
+import { isRecord, parseGrants, rateLimited, readJson, sendError, sendJson } from "../app/json.ts";
+import { parseOperation } from "../app/schemas.ts";
+import type { Runtime } from "../app/runtime.ts";
+import { adminPage, wantsJson } from "./static.ts";
 
 export function mountOwner(app: Hono, runtime: Runtime): void {
   app.post("/admin/login", async (c) => {

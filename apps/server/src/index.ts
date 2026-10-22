@@ -11,20 +11,20 @@ import { openPostgres, openS3ObjectStore } from "@oneself/adapters";
 import { memoryObjectStore } from "@oneself/adapters/testing";
 import { Hono } from "hono";
 
-import { ManualClock, SystemClock } from "./app/clock.js";
+import { ManualClock, SystemClock } from "./app/clock.ts";
 import {
   openRuntime,
   StartupRefused,
   type IngressMode,
   type Runtime,
   type ServerOptions,
-} from "./app/runtime.js";
-import { mountMcp } from "./mcp/routes.js";
-import { mountOauth } from "./oauth/routes.js";
-import { mountOwner } from "./owner/routes.js";
-import { mountAdminPages } from "./owner/static.js";
-import { mountPcp } from "./pcp/routes.js";
-import { mountSiteFiles } from "./site-files/routes.js";
+} from "./app/runtime.ts";
+import { mountMcp } from "./mcp/routes.ts";
+import { mountOauth } from "./oauth/routes.ts";
+import { mountOwner } from "./owner/routes.ts";
+import { mountAdminPages } from "./owner/static.ts";
+import { mountPcp } from "./pcp/routes.ts";
+import { mountSiteFiles } from "./site-files/routes.ts";
 
 export type { IngressMode };
 
@@ -129,6 +129,20 @@ export function resolveListenHost(value: string | undefined): string {
   return value;
 }
 
+export function listenUrls(input: { host: string; port: number; publicOrigin?: string }): {
+  site: string;
+  admin: string;
+} {
+  const origin = (input.publicOrigin ?? localOrigin(input.host, input.port)).replace(/\/$/, "");
+  return { site: origin, admin: `${origin}/admin` };
+}
+
+function localOrigin(host: string, port: number): string {
+  const visible = host === "0.0.0.0" || host === "::" ? "127.0.0.1" : host;
+  const hostname = visible.includes(":") ? `[${visible}]` : visible;
+  return `http://${hostname}:${String(port)}`;
+}
+
 export function assertDirectStart(
   env: NodeJS.ProcessEnv,
   paths: {
@@ -201,13 +215,13 @@ async function listen(): Promise<void> {
     ...(ownerResetPassword === undefined ? {} : { ownerResetPassword }),
   });
   const port = Number(env("PORT") ?? "3000");
+  const host = resolveListenHost(env("HOST"));
   const httpServer = createHttpServer((request, response) => {
     void forward(server, request, response);
   });
   try {
     await new Promise<void>((resolve, reject) => {
       httpServer.once("error", reject);
-      const host = resolveListenHost(env("HOST"));
       httpServer.listen(port, host, () => {
         resolve();
       });
@@ -216,7 +230,8 @@ async function listen(): Promise<void> {
     await server.close();
     throw error;
   }
-  console.info(`oneself listening on ${String(port)}`);
+  const urls = listenUrls({ host, port, ...(publicOrigin === undefined ? {} : { publicOrigin }) });
+  console.info(`oneself listening\n${urls.site}\n${urls.admin}`);
 }
 
 async function forward(

@@ -1,4 +1,4 @@
-export type { SourceGrant } from "./schema.js";
+export type { SourceGrant } from "./schema.ts";
 export {
   api_key_requests,
   api_keys,
@@ -17,4 +17,4 @@ export {
   sources,
   tags,
   timeline_entries,
-} from "./schema.js";
+} from "./schema.ts";

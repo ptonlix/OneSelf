@@ -116,13 +116,11 @@ OWNER_LOGIN=owner
 OWNER_PASSWORD=<choose an initial password>
 ```
 
-Run migrations, build the two front-end packages, then start the app:
+Run migrations, then start the app. `pnpm dev` builds the admin UI and the built-in public page, then starts the server with `.env`. The app requires Node.js 24; the root `.node-version` pins it, so fnm, nvm, asdf, and volta switch automatically:
 
 ```bash
 pnpm db:migrate
-pnpm --filter @oneself/admin build
-pnpm --filter @oneself/public-page build
-node --env-file=.env --experimental-strip-types apps/server/src/index.ts
+pnpm dev
 ```
 
 Open <http://127.0.0.1:3000> for the original page and <http://127.0.0.1:3000/admin> to sign in.
@@ -267,6 +265,7 @@ pnpm test             # Unit and in-process API tests (no Compose needed)
 pnpm test:smoke       # Closed-loop smoke test against real PostgreSQL and RustFS from compose.dev.yaml
 pnpm boundaries       # Package dependency direction only
 pnpm db:migrate       # Apply migrations to DATABASE_URL from .env
+pnpm dev              # Build the admin UI and built-in public page, then start the app
 ```
 
 `pnpm check` is the local gate before merging. Install dependencies with pnpm only. Behavior follows [docs/PRD.md](docs/PRD.md); paths, transactions, and deployment follow [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

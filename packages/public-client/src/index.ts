@@ -1,4 +1,4 @@
-export { createPublicClient, PublicClientFailure } from "./client";
+export { createPublicClient, PublicClientFailure } from "./client.ts";
 export type {
   PublicClient,
   PublicClientOptions,
@@ -8,4 +8,4 @@ export type {
   PublicPageSummary,
   PublicSearchHit,
   PublicSearchQuery,
-} from "./client";
+} from "./client.ts";

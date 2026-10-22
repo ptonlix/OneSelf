@@ -1,4 +1,4 @@
-export { openS3ObjectStore, type S3ObjectStoreConfig } from "./s3-object-store.js";
+export { openS3ObjectStore, type S3ObjectStoreConfig } from "./s3-object-store.ts";
 export {
   openPostgres,
   type ApiKeyInsert,
@@ -50,4 +50,4 @@ export {
   type TagRow,
   type TimelineInsert,
   type TimelineRow,
-} from "./postgres-store.js";
+} from "./postgres-store.ts";

@@ -1,7 +1,7 @@
 import type { Hono } from "hono";
 
-import { isRecord, parseGrants, rateLimited, sendError, sendJson } from "../app/json.js";
-import type { Runtime } from "../app/runtime.js";
+import { isRecord, parseGrants, rateLimited, sendError, sendJson } from "../app/json.ts";
+import type { Runtime } from "../app/runtime.ts";
 
 export function mountOauth(app: Hono, runtime: Runtime): void {
   app.post("/oauth/device/auth", async (c) => {

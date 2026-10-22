@@ -4,10 +4,10 @@ import { generateTransports } from "@oneself/operations";
 import type { Hono } from "hono";
 import { z } from "zod";
 
-import { isRecord } from "../app/json.js";
-import { operationSchemas, type OperationSchemaName } from "../app/schemas.js";
-import type { Runtime } from "../app/runtime.js";
-import { callTool } from "./call.js";
+import { isRecord } from "../app/json.ts";
+import { operationSchemas, type OperationSchemaName } from "../app/schemas.ts";
+import type { Runtime } from "../app/runtime.ts";
+import { callTool } from "./call.ts";
 
 function schemaFor(name: string): z.ZodType {
   if (Object.hasOwn(operationSchemas, name)) {

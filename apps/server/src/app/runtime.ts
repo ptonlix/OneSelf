@@ -53,7 +53,7 @@ import {
 import type { PostgresHandle, PostgresStore } from "@oneself/adapters";
 import type { MarkdownParser, ObjectStore } from "@oneself/ports";
 
-import { ManualClock } from "./clock.js";
+import { ManualClock } from "./clock.ts";
 import {
   apiKeyInsert,
   apiKeyRequestInsert,
@@ -66,12 +66,12 @@ import {
   type OauthGrantRecord,
   type OwnerRecord,
   type SiteFileRecord,
-} from "./postgres-state.js";
-import { hashesEqual, randomId, randomToken, sha256Bytes, sha256Hex } from "./ids.js";
-import { createMarkdownParser } from "./markdown-port.js";
-import { agentSkillsIndex as agentSkillsIndexDocument, loadServedSkill } from "./skill-pack.js";
-import { hashPassword, verifyPassword } from "./password.js";
-import { buildSnippet, parseLimit, parseOffset, searchPages, visiblePages } from "./search.js";
+} from "./postgres-state.ts";
+import { hashesEqual, randomId, randomToken, sha256Bytes, sha256Hex } from "./ids.ts";
+import { createMarkdownParser } from "./markdown-port.ts";
+import { agentSkillsIndex as agentSkillsIndexDocument, loadServedSkill } from "./skill-pack.ts";
+import { hashPassword, verifyPassword } from "./password.ts";
+import { buildSnippet, parseLimit, parseOffset, searchPages, visiblePages } from "./search.ts";
 import {
   addLink,
   addTag,
@@ -80,9 +80,9 @@ import {
   rememberFact,
   removeLink,
   removeTag,
-} from "./structure.js";
-import { readZip, writeStoredZip } from "./zip.js";
-import { createOauthEngine, type OauthEngine, type PersistedGrant } from "../oauth/engine.js";
+} from "./structure.ts";
+import { readZip, writeStoredZip } from "./zip.ts";
+import { createOauthEngine, type OauthEngine, type PersistedGrant } from "../oauth/engine.ts";
 
 const FILE_LIMIT = 20 * 1024 * 1024;
 const MEDIA_TYPES = new Set([

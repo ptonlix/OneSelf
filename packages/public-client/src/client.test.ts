@@ -2,8 +2,8 @@ import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { createPublicClient, PublicClientFailure } from "./client";
-import type { PublicFetch, PublicSearchQuery } from "./client";
+import { createPublicClient, PublicClientFailure } from "./client.ts";
+import type { PublicFetch, PublicSearchQuery } from "./client.ts";
 
 const baseUrl = "https://oneself.test";
 

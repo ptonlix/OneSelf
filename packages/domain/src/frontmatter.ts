@@ -1,4 +1,4 @@
-import { fail, ok, type DomainResult } from "./result.js";
+import { fail, ok, type DomainResult } from "./result.ts";
 
 type FrontmatterScalar = string | number | boolean | null;
 

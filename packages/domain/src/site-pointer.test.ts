@@ -14,7 +14,7 @@ import {
   SITE_ACTIVATION_TTL_MS,
   type Credential,
   type SiteArchiveEntry,
-} from "./index.js";
+} from "./index.ts";
 
 const NOW = "2026-04-01T00:00:00.000Z";
 const releaseId = `rel_${"ab".repeat(16)}`;

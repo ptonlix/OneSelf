@@ -25,7 +25,7 @@ import {
   type DomainState,
   type PageWrite,
   type StoredFile,
-} from "./index.js";
+} from "./index.ts";
 
 const NOW = "2026-03-01T00:00:00.000Z";
 const owner: Credential = { kind: "owner" };

@@ -1,8 +1,8 @@
-import type { PageChunk } from "./chunks.js";
-import type { Fact, TimelineEntry } from "./fences.js";
-import type { Frontmatter } from "./frontmatter.js";
-import type { PageLink } from "./links.js";
-import type { Visibility } from "./markdown.js";
+import type { PageChunk } from "./chunks.ts";
+import type { Fact, TimelineEntry } from "./fences.ts";
+import type { Frontmatter } from "./frontmatter.ts";
+import type { PageLink } from "./links.ts";
+import type { Visibility } from "./markdown.ts";
 
 export type StoredObjectKind = "page" | "file" | "site";
 

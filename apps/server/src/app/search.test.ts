@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { emptyDomainState, type PageRecord } from "@oneself/domain";
 
-import { buildSnippet, searchPages } from "./search.js";
+import { buildSnippet, searchPages } from "./search.ts";
 
 const owner = { kind: "owner" } as const;
 

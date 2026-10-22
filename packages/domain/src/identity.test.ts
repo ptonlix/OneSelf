@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { sha256Hex } from "./hash.js";
-import { isSlug, isSourceName, isTypeName, PRELOADED_SOURCE_NAMES } from "./identity.js";
-import { emptyDomainState, sourcesAdd } from "./index.js";
+import { sha256Hex } from "./hash.ts";
+import { isSlug, isSourceName, isTypeName, PRELOADED_SOURCE_NAMES } from "./identity.ts";
+import { emptyDomainState, sourcesAdd } from "./index.ts";
 
 describe("page identity", () => {
   it("rejects a slug that contains a slash or starts with a hyphen", () => {

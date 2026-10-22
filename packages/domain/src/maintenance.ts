@@ -1,12 +1,12 @@
-import { fileObjectKey, sha256Hex } from "./hash.js";
+import { fileObjectKey, sha256Hex } from "./hash.ts";
 import {
   isPastRetention,
   SOFT_DELETE_RETENTION_MS,
   timestampMs,
   UNREFERENCED_OBJECT_RETENTION_MS,
-} from "./clock.js";
-import { projectMarkdown } from "./markdown.js";
-import { cloneState, type DomainState, type PageRecord, type PageVersion } from "./state.js";
+} from "./clock.ts";
+import { projectMarkdown } from "./markdown.ts";
+import { cloneState, type DomainState, type PageRecord, type PageVersion } from "./state.ts";
 
 export function runHourlyMaintenance(state: DomainState, now: string): DomainState {
   if (timestampMs(now) === null) {

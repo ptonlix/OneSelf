@@ -1,7 +1,7 @@
 import { fail, type DomainResult, type PageEdit, type PutPageInput } from "@oneself/domain";
 
-import { isRecord } from "../app/json.js";
-import type { Actor, Runtime } from "../app/runtime.js";
+import { isRecord } from "../app/json.ts";
+import type { Actor, Runtime } from "../app/runtime.ts";
 
 export async function callTool(
   runtime: Runtime,

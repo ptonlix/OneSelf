@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { getTableConfig, type PgTable } from "drizzle-orm/pg-core";
 import { expect, it } from "vitest";
 
-import * as db from "./index.js";
+import * as db from "./index.ts";
 import {
   api_key_requests,
   api_keys,
@@ -24,7 +24,7 @@ import {
   sources,
   tags,
   timeline_entries,
-} from "./schema.js";
+} from "./schema.ts";
 
 type ColumnSpec = {
   name: string;

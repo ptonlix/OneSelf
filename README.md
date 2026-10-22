@@ -116,13 +116,11 @@ OWNER_LOGIN=owner
 OWNER_PASSWORD=<自己设一个初始口令>
 ```
 
-执行迁移、构建两个前端包，再启动应用：
+先迁移，再启动应用。`pnpm dev` 会先构建管理端和内置公开页，再读取 `.env` 启动服务。应用要 Node.js 24，仓库根的 `.node-version` 已写明版本，fnm、nvm、asdf、volta 会自动切换：
 
 ```bash
 pnpm db:migrate
-pnpm --filter @oneself/admin build
-pnpm --filter @oneself/public-page build
-node --env-file=.env --experimental-strip-types apps/server/src/index.ts
+pnpm dev
 ```
 
 打开 <http://127.0.0.1:3000> 看原始页面，打开 <http://127.0.0.1:3000/admin> 登录。
@@ -267,6 +265,7 @@ pnpm test             # 单元测试和进程内接口测试（不需要启动 C
 pnpm test:smoke       # 闭环冒烟：用 compose.dev.yaml 起真实 PostgreSQL 和 RustFS
 pnpm boundaries       # 只检查包之间的依赖方向
 pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
+pnpm dev              # 构建管理端和内置公开页，再启动应用
 ```
 
 `pnpm check` 是合并前的本地门禁。依赖只用 pnpm 安装。行为以 [docs/PRD.md](docs/PRD.md) 为准，路径、事务和部署以 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 为准。

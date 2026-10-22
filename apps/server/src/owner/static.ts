@@ -2,7 +2,7 @@ import path from "node:path";
 
 import type { Context, Hono } from "hono";
 
-import type { Runtime } from "../app/runtime.js";
+import type { Runtime } from "../app/runtime.ts";
 
 const ADMIN_PAGES = new Set([
   "",

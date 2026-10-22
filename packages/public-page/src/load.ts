@@ -1,7 +1,7 @@
 import { PublicClientFailure } from "@oneself/public-client";
 import type { PublicClient, PublicPage } from "@oneself/public-client";
-import { fileIds, renderOriginalPage, renderStatus } from "./render";
-import type { DisplayFile, DisplayPage } from "./render";
+import { fileIds, renderOriginalPage } from "./render.ts";
+import type { DisplayFile, DisplayPage } from "./render.ts";
 
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
@@ -13,7 +13,7 @@ export async function loadOriginalPage(
 ): Promise<string> {
   const summaries = await client.listPages();
   if (summaries.length === 0) {
-    return renderStatus("empty", "没有公开页");
+    return renderOriginalPage([]);
   }
 
   const pages: DisplayPage[] = [];

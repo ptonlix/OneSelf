@@ -17,7 +17,7 @@ import {
   sourcesStatus,
   type Credential,
   type DomainState,
-} from "./index.js";
+} from "./index.ts";
 
 const NOW = "2026-03-01T00:00:00.000Z";
 const owner: Credential = { kind: "owner" };

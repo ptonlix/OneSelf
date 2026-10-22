@@ -2,8 +2,8 @@ import path from "node:path";
 
 import type { Hono } from "hono";
 
-import { sendError } from "../app/json.js";
-import type { Runtime } from "../app/runtime.js";
+import { sendError } from "../app/json.ts";
+import type { Runtime } from "../app/runtime.ts";
 
 const RESERVED = new Set(["pcp", "oauth", ".well-known", "admin", "skills", "media", "_preview"]);
 

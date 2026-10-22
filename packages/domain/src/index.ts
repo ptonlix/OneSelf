@@ -5,8 +5,8 @@ export {
   canRequestSiteActivation,
   knowsSource,
   sourceFlags,
-} from "./access.js";
-export type { Credential, SourceFlags, SourceGrant } from "./access.js";
+} from "./access.ts";
+export type { Credential, SourceFlags, SourceGrant } from "./access.ts";
 
 export {
   addMilliseconds,
@@ -15,9 +15,9 @@ export {
   SOFT_DELETE_RETENTION_MS,
   timestampMs,
   UNREFERENCED_OBJECT_RETENTION_MS,
-} from "./clock.js";
+} from "./clock.ts";
 
-export { fileObjectKey, pageObjectKey, sha256Hex } from "./hash.js";
+export { fileObjectKey, pageObjectKey, sha256Hex } from "./hash.ts";
 
 export {
   isSlug,
@@ -26,21 +26,21 @@ export {
   PRELOADED_SOURCE_NAMES,
   SLUG_PATTERN,
   SOURCE_PATTERN,
-} from "./identity.js";
+} from "./identity.ts";
 
-export { projectMarkdown } from "./markdown.js";
-export type { PageProjection, Visibility } from "./markdown.js";
+export { projectMarkdown } from "./markdown.ts";
+export type { PageProjection, Visibility } from "./markdown.ts";
 
-export { parseFences } from "./fences.js";
-export type { Fact, TimelineEntry } from "./fences.js";
+export { parseFences } from "./fences.ts";
+export type { Fact, TimelineEntry } from "./fences.ts";
 
-export { chunkBody } from "./chunks.js";
-export type { PageChunk } from "./chunks.js";
+export { chunkBody } from "./chunks.ts";
+export type { PageChunk } from "./chunks.ts";
 
-export { extractLinks } from "./links.js";
-export type { PageLink } from "./links.js";
+export { extractLinks } from "./links.ts";
+export type { PageLink } from "./links.ts";
 
-export { rebuildProjections, referencedObjectKeys, runHourlyMaintenance } from "./maintenance.js";
+export { rebuildProjections, referencedObjectKeys, runHourlyMaintenance } from "./maintenance.ts";
 
 export {
   deletePage,
@@ -54,7 +54,7 @@ export {
   resolveSlugs,
   restorePage,
   revertPage,
-} from "./pages.js";
+} from "./pages.ts";
 export type {
   CommandContext,
   ListPagesQuery,
@@ -66,7 +66,7 @@ export type {
   PutPageInput,
   SlugResolution,
   VersionView,
-} from "./pages.js";
+} from "./pages.ts";
 
 export {
   sourcesAdd,
@@ -74,8 +74,8 @@ export {
   sourcesList,
   sourcesRestore,
   sourcesStatus,
-} from "./sources.js";
-export type { SourceStatus } from "./sources.js";
+} from "./sources.ts";
+export type { SourceStatus } from "./sources.ts";
 
 export {
   assessSiteArchive,
@@ -91,10 +91,10 @@ export {
   RELEASE_ID_PATTERN,
   requestSiteActivation,
   RESERVED_SITE_PATHS,
-} from "./site-pointer.js";
-export type { SiteArchiveEntry, SiteDecision, SitePointer } from "./site-pointer.js";
+} from "./site-pointer.ts";
+export type { SiteArchiveEntry, SiteDecision, SitePointer } from "./site-pointer.ts";
 
-export { cloneState, emptyDomainState, VERSION_LIMIT } from "./state.js";
+export { cloneState, emptyDomainState, VERSION_LIMIT } from "./state.ts";
 export type {
   DomainState,
   PageRecord,
@@ -107,7 +107,7 @@ export type {
   StoredFile,
   StoredObject,
   StoredObjectKind,
-} from "./state.js";
+} from "./state.ts";
 
-export { fail, ok } from "./result.js";
-export type { DomainErrorCode, DomainFailure, DomainResult, DomainSuccess } from "./result.js";
+export { fail, ok } from "./result.ts";
+export type { DomainErrorCode, DomainFailure, DomainResult, DomainSuccess } from "./result.ts";

@@ -46,7 +46,85 @@ h2 {
   white-space: pre-wrap;
 }
 
-[data-state="empty"],
+body:has([data-state="empty"]) {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 50% 42%, rgb(56 189 248 / 16%), transparent 26rem),
+    linear-gradient(rgb(125 211 252 / 7%) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(125 211 252 / 7%) 1px, transparent 1px),
+    #07111f;
+  background-size:
+    auto,
+    3.5rem 3.5rem,
+    3.5rem 3.5rem,
+    auto;
+  color: #e7f6ff;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+body:has([data-state="empty"]) main {
+  display: grid;
+  min-height: 100vh;
+  max-width: none;
+  place-items: center;
+  padding: 2rem 1.25rem;
+}
+
+[data-state="empty"] {
+  width: min(100%, 28rem);
+  margin: 0;
+  text-align: center;
+}
+
+[data-field="signal"] {
+  width: 0.7rem;
+  height: 0.7rem;
+  margin: 0 auto 1.25rem;
+  border-radius: 50%;
+  background: #67e8f9;
+  box-shadow: 0 0 0 0.45rem rgb(103 232 249 / 16%);
+}
+
+[data-state="empty"] h1 {
+  font-size: clamp(2.4rem, 8vw, 4.2rem);
+  font-weight: 560;
+  letter-spacing: -0.045em;
+  line-height: 0.95;
+}
+
+[data-state="empty"] [data-field="lead"] {
+  margin: 1rem 0 0;
+  color: #9fb4c9;
+}
+
+[data-state="empty"] code {
+  color: #67e8f9;
+  font-family: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  font-size: 0.92em;
+  font-style: normal;
+}
+
+[data-state="empty"] a {
+  display: inline-block;
+  margin-top: 1.6rem;
+  color: #07111f;
+  background: #67e8f9;
+  padding: 0.55rem 0.9rem;
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-field="signal"] {
+    animation: pulse 2.8s ease-out infinite;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: 0 0 0 0.9rem rgb(103 232 249 / 0%);
+  }
+}
+
 [data-state="error"] {
   margin: 0;
   color: var(--muted);

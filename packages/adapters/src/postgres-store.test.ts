@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import postgres from "postgres";
 
-import { openPostgres, type PostgresHandle, type PostgresStore } from "./postgres-store.js";
+import { openPostgres, type PostgresHandle, type PostgresStore } from "./postgres-store.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 const postgresUrl =

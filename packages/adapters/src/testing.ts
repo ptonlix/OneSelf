@@ -1,1 +1,1 @@
-export { memoryObjectStore } from "./memory-object-store.js";
+export { memoryObjectStore } from "./memory-object-store.ts";

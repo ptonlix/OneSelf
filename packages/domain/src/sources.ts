@@ -1,8 +1,8 @@
-import { canAddSource, canDeleteOrRestoreSource, sourceFlags, type Credential } from "./access.js";
-import { isPastRetention, SOFT_DELETE_RETENTION_MS, timestampMs } from "./clock.js";
-import { isSourceName } from "./identity.js";
-import { fail, ok, type DomainResult } from "./result.js";
-import { cloneState, type DomainState } from "./state.js";
+import { canAddSource, canDeleteOrRestoreSource, sourceFlags, type Credential } from "./access.ts";
+import { isPastRetention, SOFT_DELETE_RETENTION_MS, timestampMs } from "./clock.ts";
+import { isSourceName } from "./identity.ts";
+import { fail, ok, type DomainResult } from "./result.ts";
+import { cloneState, type DomainState } from "./state.ts";
 
 export type SourceStatus = {
   readonly id: string;

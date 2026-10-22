@@ -7,7 +7,7 @@ import {
   operations,
   type HttpMethod,
   type Operation,
-} from "./index";
+} from "./index.ts";
 
 const documentedOperations: readonly Operation[] = [
   { name: "put_page", method: "PUT", path: "/pcp/v1/pages/{source}/{slug}", httpOnly: false },

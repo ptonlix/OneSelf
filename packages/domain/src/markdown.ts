@@ -1,16 +1,16 @@
 import { z } from "zod";
 
-import { chunkBody, type PageChunk } from "./chunks.js";
-import { parseFences, type Fact, type TimelineEntry } from "./fences.js";
+import { chunkBody, type PageChunk } from "./chunks.ts";
+import { parseFences, type Fact, type TimelineEntry } from "./fences.ts";
 import {
   parseFrontmatterBlock,
   splitFrontmatter,
   type Frontmatter,
   type FrontmatterValue,
-} from "./frontmatter.js";
-import { isTypeName } from "./identity.js";
-import { extractLinks, type PageLink } from "./links.js";
-import { fail, ok, type DomainResult } from "./result.js";
+} from "./frontmatter.ts";
+import { isTypeName } from "./identity.ts";
+import { extractLinks, type PageLink } from "./links.ts";
+import { fail, ok, type DomainResult } from "./result.ts";
 
 export type Visibility = "public" | "private";
 

@@ -1,4 +1,4 @@
-import { isSlug, isSourceName } from "./identity.js";
+import { isSlug, isSourceName } from "./identity.ts";
 
 export type PageLink = {
   readonly toSource: string;

@@ -1,7 +1,7 @@
-import { canApproveSiteActivation, canRequestSiteActivation, type Credential } from "./access.js";
-import { addMilliseconds, SITE_ACTIVATION_TTL_MS, timestampMs } from "./clock.js";
-import { fail, ok, type DomainErrorCode, type DomainResult } from "./result.js";
-import type { SiteActivationRecord, SiteReleaseRecord } from "./state.js";
+import { canApproveSiteActivation, canRequestSiteActivation, type Credential } from "./access.ts";
+import { addMilliseconds, SITE_ACTIVATION_TTL_MS, timestampMs } from "./clock.ts";
+import { fail, ok, type DomainErrorCode, type DomainResult } from "./result.ts";
+import type { SiteActivationRecord, SiteReleaseRecord } from "./state.ts";
 
 export const PUBLIC_PAGE_RELEASE_ID = "public-page";
 

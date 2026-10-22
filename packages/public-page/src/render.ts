@@ -15,13 +15,22 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif
 
 export function renderOriginalPage(pages: readonly DisplayPage[]): string {
   if (pages.length === 0) {
-    return renderStatus("empty", "没有公开页");
+    return renderEmpty();
   }
   return pages.map((entry) => renderPage(entry)).join("");
 }
 
-export function renderStatus(state: "empty" | "error", text: string): string {
+export function renderStatus(state: "error", text: string): string {
   return `<p data-state="${state}">${escapeText(text)}</p>`;
+}
+
+function renderEmpty(): string {
+  return `<section data-state="empty">
+<p data-field="signal" aria-hidden="true"></p>
+<h1>还没有公开页</h1>
+<p data-field="lead">写一页，标成 <code>visibility: public</code></p>
+<a href="/admin">管理</a>
+</section>`;
 }
 
 export function markdownBody(markdown: string): string {

@@ -4,13 +4,24 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { assertDirectStart, resolveListenHost } from "./index.js";
+import { assertDirectStart, listenUrls, resolveListenHost } from "./index.ts";
 
 describe("listen host", () => {
   it("defaults to loopback and uses HOST when set", () => {
     expect(resolveListenHost(undefined)).toBe("127.0.0.1");
     expect(resolveListenHost("")).toBe("127.0.0.1");
     expect(resolveListenHost("0.0.0.0")).toBe("0.0.0.0");
+    expect(listenUrls({ host: "127.0.0.1", port: 3000 })).toEqual({
+      site: "http://127.0.0.1:3000",
+      admin: "http://127.0.0.1:3000/admin",
+    });
+    expect(listenUrls({ host: "0.0.0.0", port: 3000 }).site).toBe("http://127.0.0.1:3000");
+    expect(
+      listenUrls({ host: "0.0.0.0", port: 3000, publicOrigin: "https://oneself.example/" }),
+    ).toEqual({
+      site: "https://oneself.example",
+      admin: "https://oneself.example/admin",
+    });
   });
 
   it("refuses a direct start without storage configuration or built pages", () => {

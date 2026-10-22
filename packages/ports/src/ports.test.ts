@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
-import type { Clock } from "./clock";
+import type { Clock } from "./clock.ts";
 import type {
   Frontmatter,
   MarkdownParseResult,
@@ -11,14 +11,14 @@ import type {
   ParsedFact,
   ParsedMarkdown,
   ParsedTimelineEntry,
-} from "./markdown-parser";
-import type { ObjectHead, ObjectStore, PutObjectResult, StoredObject } from "./object-store";
+} from "./markdown-parser.ts";
+import type { ObjectHead, ObjectStore, PutObjectResult, StoredObject } from "./object-store.ts";
 
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 
 describe("port modules", () => {
   it("exports no runtime value", async () => {
-    const ports: object = await import("./index");
+    const ports: object = await import("./index.ts");
     expect(Object.keys(ports)).toEqual([]);
   });
 

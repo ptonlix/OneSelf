@@ -1,10 +1,10 @@
-import { knowsSource, sourceFlags, type Credential } from "./access.js";
-import { isPastRetention, SOFT_DELETE_RETENTION_MS, timestampMs } from "./clock.js";
-import { pageObjectKey, sha256Hex } from "./hash.js";
-import { isSlug, isSourceName } from "./identity.js";
-import type { PageProjection, Visibility } from "./markdown.js";
-import { projectMarkdown } from "./markdown.js";
-import { fail, ok, type DomainResult } from "./result.js";
+import { knowsSource, sourceFlags, type Credential } from "./access.ts";
+import { isPastRetention, SOFT_DELETE_RETENTION_MS, timestampMs } from "./clock.ts";
+import { pageObjectKey, sha256Hex } from "./hash.ts";
+import { isSlug, isSourceName } from "./identity.ts";
+import type { PageProjection, Visibility } from "./markdown.ts";
+import { projectMarkdown } from "./markdown.ts";
+import { fail, ok, type DomainResult } from "./result.ts";
 import {
   VERSION_LIMIT,
   cloneState,
@@ -12,7 +12,7 @@ import {
   type PageRecord,
   type PageVersion,
   type StoredFile,
-} from "./state.js";
+} from "./state.ts";
 
 export type CommandContext = {
   readonly credential: Credential;

@@ -1,8 +1,8 @@
 import type { Clock } from "@oneself/ports";
 import { describe, expect, it } from "vitest";
 
-import { memoryObjectStore } from "./memory-object-store.js";
-import { expectObjectStoreKeepsExistingKeys } from "./object-store-contract.js";
+import { memoryObjectStore } from "./memory-object-store.ts";
+import { expectObjectStoreKeepsExistingKeys } from "./object-store-contract.ts";
 
 describe("memoryObjectStore", () => {
   it("keeps an existing key, lists by prefix, and deletes idempotently", async () => {

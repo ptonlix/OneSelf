@@ -4,7 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import Provider from "oidc-provider";
 import type { SourceGrant } from "@oneself/domain";
 
-import { sha256Hex } from "../app/ids.js";
+import { sha256Hex } from "../app/ids.ts";
 
 const CLIENT_ID = "oneself";
 const ACCOUNT_ID = "owner";

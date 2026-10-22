@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { PublicClientFailure } from "@oneself/public-client";
 import type { PublicClient } from "@oneself/public-client";
-import { mountOriginalPage } from "./main";
+import { mountOriginalPage } from "./main.ts";
 
 function fakeDocument(): {
   innerHTML: string;

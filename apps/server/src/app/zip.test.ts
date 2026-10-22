@@ -2,7 +2,7 @@ import { deflateRawSync } from "node:zlib";
 
 import { describe, expect, it } from "vitest";
 
-import { readZip, writeStoredZip } from "./zip.js";
+import { readZip, writeStoredZip } from "./zip.ts";
 
 describe("readZip", () => {
   it("rejects an inflated entry larger than 20 MiB", () => {

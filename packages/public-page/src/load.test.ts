@@ -6,7 +6,7 @@ import type {
   PublicPage,
   PublicPageSummary,
 } from "@oneself/public-client";
-import { loadOriginalPage } from "./load";
+import { loadOriginalPage } from "./load.ts";
 
 const profile: PublicPage = {
   source: "life",

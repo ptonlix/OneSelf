@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { markdownBody, renderOriginalPage } from "./render";
-import type { DisplayPage } from "./render";
+import { markdownBody, renderOriginalPage } from "./render.ts";
+import type { DisplayPage } from "./render.ts";
 import type { PublicPage } from "@oneself/public-client";
 
 function page(overrides: Partial<PublicPage> & Pick<PublicPage, "type" | "title">): PublicPage {
@@ -24,7 +24,11 @@ describe("renderOriginalPage", () => {
   it("shows only an empty state when there are no public pages", () => {
     const html = renderOriginalPage([]);
     expect(html).toContain('data-state="empty"');
-    expect(html).toContain("没有公开页");
+    expect(html).toContain("还没有公开页");
+    expect(html).toContain("visibility: public");
+    expect(html).toContain('href="/admin"');
+    expect(html).not.toContain("<ol");
+    expect(html).not.toContain("私有页");
     expect(html).not.toContain("<article");
     expect(html).not.toContain("/resume");
   });

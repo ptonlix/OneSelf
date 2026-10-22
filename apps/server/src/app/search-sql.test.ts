@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PageSearch, PostgresHandle, PostgresStore } from "@oneself/adapters";
 
-import { createServer } from "../index.js";
+import { createServer } from "../index.ts";
 
 describe("search", () => {
   it("uses the postgres store instead of an in-memory scan", async () => {

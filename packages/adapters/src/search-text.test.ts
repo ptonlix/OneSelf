@@ -1,7 +1,7 @@
 import { PgDialect } from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 
-import { pageSearchTextClause } from "./postgres-store.js";
+import { pageSearchTextClause } from "./postgres-store.ts";
 
 describe("pageSearchTextClause", () => {
   it("matches type with a case-sensitive substring", () => {

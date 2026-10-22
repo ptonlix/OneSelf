@@ -1,4 +1,4 @@
-export type { Clock } from "./clock";
+export type { Clock } from "./clock.ts";
 
 export type {
   Frontmatter,
@@ -10,6 +10,6 @@ export type {
   ParsedFact,
   ParsedMarkdown,
   ParsedTimelineEntry,
-} from "./markdown-parser";
+} from "./markdown-parser.ts";
 
-export type { ObjectHead, ObjectStore, PutObjectResult, StoredObject } from "./object-store";
+export type { ObjectHead, ObjectStore, PutObjectResult, StoredObject } from "./object-store.ts";

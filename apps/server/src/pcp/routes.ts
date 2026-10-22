@@ -9,10 +9,10 @@ import {
   readJson,
   sendError,
   sendJson,
-} from "../app/json.js";
-import { parseOperation } from "../app/schemas.js";
-import type { Actor, Runtime } from "../app/runtime.js";
-import { discoveryDocument, oauthMetadata, openApiDocument } from "./discovery.js";
+} from "../app/json.ts";
+import { parseOperation } from "../app/schemas.ts";
+import type { Actor, Runtime } from "../app/runtime.ts";
+import { discoveryDocument, oauthMetadata, openApiDocument } from "./discovery.ts";
 
 export function mountPcp(app: Hono, runtime: Runtime): void {
   app.get("/.well-known/pcp", () => sendJson(discoveryDocument(runtime.origin)));

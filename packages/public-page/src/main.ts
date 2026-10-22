@@ -1,8 +1,8 @@
 import { createPublicClient } from "@oneself/public-client";
 import type { PublicClient } from "@oneself/public-client";
-import { loadOriginalPage } from "./load";
-import type { ObjectUrlFactory } from "./load";
-import { renderStatus } from "./render";
+import { loadOriginalPage } from "./load.ts";
+import type { ObjectUrlFactory } from "./load.ts";
+import { renderStatus } from "./render.ts";
 
 type MountPoint = {
   innerHTML: string;

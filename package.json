@@ -12,6 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "build": "pnpm --filter @oneself/admin build && pnpm --filter @oneself/public-page build",
+    "dev": "pnpm run build && pnpm --filter @oneself/server dev",
     "test": "vitest run",
     "test:smoke": "vitest run --config vitest.smoke.config.ts",
     "db:migrate": "node --env-file=.env scripts/db-migrate.mjs",

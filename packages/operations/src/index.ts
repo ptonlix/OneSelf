@@ -13,4 +13,4 @@ export {
   type OperationErrorBody,
   type OperationName,
   type TransportProjection,
-} from "./registry";
+} from "./registry.ts";
