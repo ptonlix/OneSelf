@@ -116,9 +116,7 @@ describe("product skills", () => {
     const rule =
       "调用前按这个顺序取 origin：先 `ONESELF_ORIGIN`，再 `~/.config/oneself/config.json`（设置了 `XDG_CONFIG_HOME` 时为 `$XDG_CONFIG_HOME/oneself/config.json`，Windows 为 `%APPDATA%\\oneself\\config.json`），再 `metadata.oneself_origin`。三者都没有才问一次，并把答案写入该配置文件。";
     expect(entry).toContain(rule);
-    expect(entry.match(/调用前按这个顺序取 origin/g)).toEqual([
-      "调用前按这个顺序取 origin",
-    ]);
+    expect(entry.match(/调用前按这个顺序取 origin/g)).toEqual(["调用前按这个顺序取 origin"]);
     expect(entry).toContain("`metadata.oneself_origin` 标出这一台实例");
     expect(entry).toContain("已有其中任一来源时不要再问");
     expect(entry).not.toContain("有 `metadata.oneself_origin` 时，调用这一台实例");

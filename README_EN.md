@@ -143,7 +143,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
 | `COMPOSE_PROFILES`                                                | Public ingress: `cloudflared` (default), `caddy`, or `tailscale`; only one at a time                                                                 |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`, `ACME_EMAIL` / `TAILSCALE_AUTHKEY` | For cloudflared, Caddy, and Tailscale respectively                                                                                                   |
-| `ONESELF_IMAGE`                                                   | App image. Local default is `oneself:local`, built from the Dockerfile. A production install uses `docker.io/username/oneself:latest` |
+| `ONESELF_IMAGE`                                                   | App image. Local default is `oneself:local`, built from the Dockerfile. A production install uses `docker.io/username/oneself:latest`                |
 | `HOST` / `PORT`                                                   | Listen address and port, default `127.0.0.1:3000`; `0.0.0.0` inside the container                                                                    |
 
 ## 🧱 Architecture
@@ -167,19 +167,19 @@ For the Mermaid system overview, code boundaries, tables, and key flows, see [do
 
 ## 🤖 Agent entry points
 
-| Path                                 | Who                    | Purpose                                                                         |
-| ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
-| `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills        |
-| `/.well-known/agent-skills/index.json` | Installers           | Archive index for the single product skill `oneself`                            |
-| `/skills/oneself/SKILL.md`           | Agents                 | The only product skill. Read the context reference before writing, and the public-page reference before customizing the public page |
-| `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                   |
-| `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                       |
-| `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations     |
-| `/pcp/v1/public/*`                   | Anyone                 | Only `visibility: public`, non-deleted pages                                    |
-| `/media/{id}`                        | Depends on owning page | Original bytes; anonymous when the owning page is public                        |
-| `/oauth/device/auth`, `/oauth/token` | Agents                 | Request a device code; obtain and refresh access tokens                         |
-| `/admin`                             | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches     |
-| `/_preview/{releaseId}/`             | Anyone                 | Preview an unreleased build without moving the live pointer                     |
+| Path                                   | Who                    | Purpose                                                                                                                             |
+| -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/.well-known/pcp`                     | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills                                                            |
+| `/.well-known/agent-skills/index.json` | Installers             | Archive index for the single product skill `oneself`                                                                                |
+| `/skills/oneself/SKILL.md`             | Agents                 | The only product skill. Read the context reference before writing, and the public-page reference before customizing the public page |
+| `/openapi.json`                        | Agents, scripts        | OpenAPI generated from the operation registry                                                                                       |
+| `POST /mcp`                            | MCP clients            | Streamable HTTP; same auth headers as PCP                                                                                           |
+| `/pcp/v1/*`                            | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations                                                         |
+| `/pcp/v1/public/*`                     | Anyone                 | Only `visibility: public`, non-deleted pages                                                                                        |
+| `/media/{id}`                          | Depends on owning page | Original bytes; anonymous when the owning page is public                                                                            |
+| `/oauth/device/auth`, `/oauth/token`   | Agents                 | Request a device code; obtain and refresh access tokens                                                                             |
+| `/admin`                               | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches                                                         |
+| `/_preview/{releaseId}/`               | Anyone                 | Preview an unreleased build without moving the live pointer                                                                         |
 
 Agents connect with either an API key (`Authorization: ApiKey <key>` or `X-Api-Key`) or an access token from the OAuth 2.1 device flow (`Authorization: Bearer <token>`). You approve both, and the same permissions give the same results. Errors are always `{ "error", "message" }`. Paths are defined in [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts).
 
