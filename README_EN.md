@@ -57,7 +57,7 @@ OneSelf is open-source, self-hosted **personal context management**. Your résum
 
 **⚡ Efficiency**
 
-- **Agent-first, any AI can onboard itself**: an agent reads `/.well-known/pcp` and two skills to learn how to use it; one operation table serves both HTTP (OpenAPI) and MCP, so any AI that speaks either can connect, with identical results.
+- **Agent-first, any AI can onboard itself**: an agent reads `/.well-known/pcp` and the `oneself` skill to learn how to use it; one operation table serves both HTTP (OpenAPI) and MCP, so any AI that speaks either can connect, with identical results.
 - **AI keeps it current, no more repeating yourself**: agents can read originals you upload and turn them into pages, remember or forget a fact, add a timeline entry, tags, and links, so the next AI always reads the latest you.
 
 ## 🚀 Quick start
@@ -170,8 +170,8 @@ For the Mermaid system overview, code boundaries, tables, and key flows, see [do
 | Path                                 | Who                    | Purpose                                                                         |
 | ------------------------------------ | ---------------------- | ------------------------------------------------------------------------------- |
 | `/.well-known/pcp`                   | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills        |
-| `/skills/context-management.md`      | Agents                 | How to manage personal context: pages, originals, reads, edits, deletes         |
-| `/skills/public-page.md`             | Site agents            | How to customize the public page: layout, real paths, preview, request launch  |
+| `/.well-known/agent-skills/index.json` | Installers           | Archive index for the single product skill `oneself`                            |
+| `/skills/oneself/SKILL.md`           | Agents                 | The only product skill. Read the context reference before writing, and the public-page reference before customizing the public page |
 | `/openapi.json`                      | Agents, scripts        | OpenAPI generated from the operation registry                                   |
 | `POST /mcp`                          | MCP clients            | Streamable HTTP; same auth headers as PCP                                       |
 | `/pcp/v1/*`                          | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations     |
@@ -232,7 +232,7 @@ Builds personal tools and developer products.
 - 2024-06-01 | Joined a company | Backend work
 ```
 
-Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/context-management.md](skills/context-management.md).
+Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/oneself/references/context.md](skills/oneself/references/context.md).
 
 ## 📁 Project structure
 
@@ -249,7 +249,7 @@ OneSelf/
 │   ├── db/                # Drizzle schema and SQL migrations
 │   ├── public-client/     # Anonymous public PCP client, also used by custom sites
 │   └── original-pages/    # Source of the built-in landing page
-├── skills/                # Product skills: context-management.md, public-page.md
+├── skills/oneself/        # Product skill: SKILL.md and references/
 ├── tests/                 # API smoke tests and skill acceptance tests
 ├── deploy/Caddyfile       # Caddy ingress, reverse proxy only
 ├── docs/                  # PRD and architecture
@@ -288,7 +288,7 @@ The public ingress is a mutually exclusive Compose profile selected by `COMPOSE_
 
 Every ingress only forwards HTTPS to the app and never stores site files. `PUBLIC_ORIGIN` must match the chosen ingress's public address. Without a tunnel token or auth key the ingress container may fail while the app and database keep running.
 
-Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/admin`, `/skills`, `/media`, or `/_preview`. The app has simple built-in rate limits per IP per minute: 10 for login and device codes, 30 for public search and uploads; the client address is taken only from the ingress's own header.
+Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`. The app has simple built-in rate limits per IP per minute: 10 for login and device codes, 30 for public search and uploads; the client address is taken only from the ingress's own header.
 
 </details>
 
@@ -296,10 +296,10 @@ Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/admin`, `/skills`, `/media`,
 
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
-- [Skill: context management](skills/context-management.md)
-- [Skill: public page](skills/public-page.md)
+- [Skill: oneself](skills/oneself/SKILL.md)
 - [OpenSpec change: oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
-- On a running instance: `/.well-known/pcp`, `/openapi.json`, `/skills/context-management.md`, `/skills/public-page.md`
+- On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
+- Install: `npx skills add https://your-site`
 
 ## 🤝 Contributing
 

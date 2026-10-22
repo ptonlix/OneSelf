@@ -18,17 +18,17 @@ Every data and site operation MUST appear on both OpenAPI and MCP with the same 
 - **THEN** both succeed or both fail with the same error code and the stored hash matches
 
 ### Requirement: Discovery document
-`GET /.well-known/pcp` MUST return protocol `pcp`, version `1`, the operation list excluding the three key-management operations, and absolute URLs for OpenAPI, MCP, OAuth metadata, and the two skills. Those absolute URLs MUST use the configured public origin. A request `Host` or forwarded host that differs from that origin MUST NOT change them.
+`GET /.well-known/pcp` MUST return protocol `pcp`, version `1`, the operation list excluding the three key-management operations, and absolute URLs for OpenAPI, MCP, OAuth metadata, and the `oneself` skill. Those absolute URLs MUST use the configured public origin. A request `Host` or forwarded host that differs from that origin MUST NOT change them. `context-management` and `public-page` are not product skill names.
 
 #### Scenario: Host header does not rewrite discovery
 - **WHEN** discovery is requested with a `Host` other than the configured public origin
 - **THEN** every absolute URL still uses the configured public origin
 
 ### Requirement: Skill bytes
-`GET /skills/context-management.md` and `GET /skills/public-page.md` MUST return the same bytes as `GET /pcp/v1/skills/context-management` and `GET /pcp/v1/skills/public-page`. The context skill MUST document frontmatter, visibility, the two fences, the `files` array, and `[[source/slug]]`. The public-page skill MUST state which public fields the built-in page can show, how to customize from the original source zip, add a real path, build, and avoid reserved paths. It MUST tell the agent to give the activation approval URL to the owner and MUST say not to claim the site has changed before approval. The next customization MUST start from that source zip rather than an uploaded dist. Skills MUST forbid putting secrets or private pages into source or build output, and MUST require `credentials: omit` on public requests. Skill text MUST NOT name the server framework.
+The product skill name is `oneself`. `GET /skills/oneself/SKILL.md` MUST return the same bytes as `GET /pcp/v1/skills/oneself`. `context-management` and `public-page` are not product skill names and MUST NOT be served. The context reference MUST document frontmatter, visibility, the two fences, the `files` array, and `[[source/slug]]`. The public-page reference MUST state which public fields the built-in page can show, how to customize from the original source zip, add a real path, build, and avoid reserved paths. It MUST tell the agent to give the activation approval URL to the owner and MUST say not to claim the site has changed before approval. The next customization MUST start from that source zip rather than an uploaded dist. Skill text MUST forbid putting secrets or private pages into source or build output, MUST require `credentials: omit` on public requests, and MUST NOT name the server framework.
 
 #### Scenario: Anonymous skill matches the API
-- **WHEN** a client fetches `/skills/context-management.md` and the PCP skill resource
+- **WHEN** a client fetches `/skills/oneself/SKILL.md` and the PCP skill resource
 - **THEN** the bodies are byte-for-byte equal
 
 ### Requirement: MCP transport

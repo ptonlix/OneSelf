@@ -199,9 +199,11 @@ OneSelf/
 ├── docs/
 ├── openspec/
 ├── .agents/skills/              开发技能。不进镜像，不和产品 Skill 合并
-├── skills/
-│   ├── context-management.md    产品说明。与 /skills/context-management.md 是同一份字节
-│   └── public-page.md           产品说明。与 /skills/public-page.md 是同一份字节
+├── skills/oneself/
+│   ├── SKILL.md                 产品 Skill 入口。发出前写入 metadata.oneself_origin
+│   └── references/
+│       ├── context.md           写页规则。不插入 origin
+│       └── public-page.md       公开页规则。不插入 origin
 ├── deploy/
 │   └── Caddyfile                只反代，不放站点文件。cloudflared 和 Tailscale 不另建目录
 ├── tests/
@@ -311,8 +313,11 @@ GET  /media/{id}
 GET  /.well-known/pcp
 GET  /.well-known/oauth-authorization-server
 GET  /openapi.json
-GET  /skills/context-management.md
-GET  /skills/public-page.md
+GET  /skills/oneself/SKILL.md
+GET  /skills/oneself/references/context.md
+GET  /skills/oneself/references/public-page.md
+GET  /skills/oneself.tar.gz
+GET  /.well-known/agent-skills/index.json
 ```
 
 没有 `/pcp/v1/public/files/{id}`，也没有公开的 `query`。`GET /media/{id}` 不是 PCP 操作：所属页公开且未删除则匿名可读；否则只有能读该 source 的凭据得到字节，其他人是 `not_found`。
@@ -380,7 +385,7 @@ GET  /skills/public-page.md
 | GET | `/pcp/v1/sources/{id}` | `sources_status`。软删除目录是 `not_found` |
 | GET | `/pcp/v1/whoami` | `whoami` |
 | GET | `/pcp/v1/skills` | `list_skills` |
-| GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `context-management` 或 `public-page` |
+| GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `oneself`。其他名字是 `not_found` |
 
 `whoami` 返回 `{credential, admin, site_write, sources:[{id, read, write, visibility}]}`。只有所属人会话的 `admin` 为 true。
 
@@ -410,7 +415,8 @@ GET  /skills/public-page.md
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
-| GET | `/.well-known/pcp` | 绝对地址形式的协议版本、操作清单、OpenAPI、MCP、OAuth 和两份 Skill |
+| GET | `/.well-known/pcp` | 绝对地址形式的协议版本、操作清单、OpenAPI、MCP、OAuth 和产品 Skill |
+| GET | `/.well-known/agent-skills/index.json` | 安装索引。只有 `oneself`，`type` 为 `archive`，`Cache-Control` 为 `no-store` |
 | GET | `/.well-known/oauth-authorization-server` | 生产只广告设备码 |
 | POST | `/oauth/device/auth` | 申请设备码。验证页是 `/admin/device` |
 | POST | `/oauth/token` | 换访问令牌或刷新 |
@@ -525,18 +531,16 @@ site_pointers 改指向这一行
   "mcp": "https://主机/mcp",
   "oauth": "https://主机/.well-known/oauth-authorization-server",
   "skills": {
-    "context_management": "https://主机/skills/context-management.md",
-    "public_page": "https://主机/skills/public-page.md"
+    "oneself": "https://主机/skills/oneself/SKILL.md"
   }
 }
 ```
 
-`operations` 来自注册表，不含三个密钥管理操作。`/pcp/v1/skills/*` 与 `/skills/*.md` 是同一份字节。
+`operations` 来自注册表，不含三个密钥管理操作。`GET /pcp/v1/skills/oneself` 与 `GET /skills/oneself/SKILL.md` 是同一份字节。请求的 `Host` 不改写这些地址。产品 Skill 只有 `oneself`。`context-management` 和 `public-page` 不是产品名字。
 
-Skill 有两份：
+安装命令是 `npx skills add https://站点`。安装器读 `GET /.well-known/agent-skills/index.json`。索引只有一条 `oneself`，`type` 为 `archive`，`url` 是 `{origin}/skills/oneself.tar.gz`，`digest` 是这次压缩包字节的 SHA-256。压缩包和索引由应用生成，不放进站点 zip。
 
-- context-management：先查已有页，文字写成 Markdown，原件挂到页上，再读取、写入、修改、删除或恢复。格式仍是 frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。
-- public-page：定制唯一的公开宣传页。说明内置页能展示哪些公开资料，如何从源码 zip 改版式、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
+入口只写连接配置，以及动手前读哪一份 reference。写页规则在 `references/context.md`：先查已有页，文字写成 Markdown，原件挂到页上，再读取、写入、修改、删除或恢复。格式仍是 frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。公开页规则在 `references/public-page.md`：说明内置页能展示哪些公开资料，如何从源码 zip 改版式、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
 
 Skill 不写死后端框架。它只写操作名和公开客户端的用法。
 

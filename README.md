@@ -57,7 +57,7 @@ OneSelf 是开源、自托管的**个人上下文管理**系统。你的简历�
 
 **⚡ 效率**
 
-- **Agent-first，每个 AI 都能自助接入**：Agent 读 `/.well-known/pcp` 和两份 Skill 就知道怎么用；同一张操作表同时提供 HTTP（OpenAPI）和 MCP，任何支持其中一种的 AI 都能接入，结果一致。
+- **Agent-first，每个 AI 都能自助接入**：Agent 读 `/.well-known/pcp` 和产品 Skill `oneself` 就知道怎么用；同一张操作表同时提供 HTTP（OpenAPI）和 MCP，任何支持其中一种的 AI 都能接入，结果一致。
 - **AI 帮你维护，不用反复解释**：Agent 可以读取你上传的原件并整理成页面、记住或忘掉一条事实、补一条时间线、加标签和链接；下一次任何 AI 读到的，都是最新的你。
 
 ## 🚀 快速开始
@@ -170,8 +170,8 @@ Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/AR
 | 路径                                 | 谁用           | 用途                                                       |
 | ------------------------------------ | -------------- | ---------------------------------------------------------- |
 | `/.well-known/pcp`                   | Agent          | 发现文档：协议版本、操作清单、OpenAPI、MCP、OAuth 和 Skill |
-| `/skills/context-management.md`      | Agent          | 如何整理个人上下文：写成页、挂上原件、读取、修改、删除     |
-| `/skills/public-page.md`             | 站点 Agent     | 如何定制个人公开宣传页：版式、真实路径、预览和申请上线     |
+| `/.well-known/agent-skills/index.json` | 安装器       | 产品 Skill `oneself` 的 archive 索引                       |
+| `/skills/oneself/SKILL.md`           | Agent          | 唯一产品 Skill。写页前读 context reference，改公开页前读 public-page reference |
 | `/openapi.json`                      | Agent、脚本    | 由操作注册表生成的 OpenAPI                                 |
 | `POST /mcp`                          | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                         |
 | `/pcp/v1/*`                          | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                 |
@@ -232,7 +232,7 @@ files: []
 - 2024-06-01 | 加入某公司 | 做后端
 ```
 
-页面里只认这两种结构块，解析失败时整次写入回滚。完整规则见 [skills/context-management.md](skills/context-management.md)。
+页面里只认这两种结构块，解析失败时整次写入回滚。完整规则见 [skills/oneself/references/context.md](skills/oneself/references/context.md)。
 
 ## 📁 项目结构
 
@@ -249,7 +249,7 @@ OneSelf/
 │   ├── db/                # Drizzle 表结构与 SQL 迁移
 │   ├── public-client/     # 匿名公开 PCP 客户端，定制站点也用它
 │   └── original-pages/    # 随应用发布的原始落地页源码
-├── skills/                # 产品 Skill：context-management.md、public-page.md
+├── skills/oneself/        # 产品 Skill：SKILL.md 与 references/
 ├── tests/                 # 接口冒烟（smoke）与 Skill 验收测试
 ├── deploy/Caddyfile       # Caddy 入口，只做反向代理
 ├── docs/                  # 产品需求与技术架构
@@ -288,7 +288,7 @@ pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
 
 三个入口都只把 HTTPS 转给应用，不保存站点文件。`PUBLIC_ORIGIN` 必须与所选入口的对外地址一致。没有隧道令牌或 auth key 时入口容器可以失败，应用和数据库仍会保留运行。
 
-使用 Cloudflare 时，不要缓存 `/pcp`、`/oauth`、`/admin`、`/skills`、`/media`、`/_preview`。应用内置简单限流：每个 IP 每分钟登录和设备码 10 次，公开搜索和上传 30 次，客户端地址只取入口送来的头。
+使用 Cloudflare 时，不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。应用内置简单限流：每个 IP 每分钟登录和设备码 10 次，公开搜索和上传 30 次，客户端地址只取入口送来的头。
 
 </details>
 
@@ -296,10 +296,10 @@ pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
 
 - [产品需求（PRD）](docs/PRD.md)：目标、非目标、数据组织、PCP 和验收标准
 - [技术架构](docs/ARCHITECTURE.md)：技术选型、代码边界、数据、路径和关键流程
-- [Skill：context-management](skills/context-management.md)
-- [Skill：public-page](skills/public-page.md)
+- [Skill：oneself](skills/oneself/SKILL.md)
 - [OpenSpec 变更：oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
-- 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/context-management.md`、`/skills/public-page.md`
+- 运行中的实例：`/.well-known/pcp`、`/.well-known/agent-skills/index.json`、`/openapi.json`、`/skills/oneself/SKILL.md`
+- 安装：`npx skills add https://站点`
 
 ## 🤝 贡献
 

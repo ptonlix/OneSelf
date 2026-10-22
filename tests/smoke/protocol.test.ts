@@ -1,3 +1,8 @@
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { expect, it } from "vitest";
 
 import { operations } from "../../packages/operations/src/index.js";
@@ -48,12 +53,12 @@ it("omits key tools from MCP and ignores a spoofed forwarding header", async () 
   );
   expect(discovery.openapi).toBe(`${ORIGIN}/openapi.json`);
   expect(JSON.stringify(discovery.operations)).not.toContain("create_api_key");
-  const skill = await (await server.request("/skills/context-management.md")).text();
-  const apiSkill = await (await server.request("/pcp/v1/skills/context-management")).text();
-  expect(skill).toBe(apiSkill);
-  expect((await server.request("/skills/context-management.md")).headers.get("cache-control")).toBe(
-    "no-store",
-  );
+  const discoverySkills = discovery.skills as Record<string, string>;
+  expect(discoverySkills).toEqual({ oneself: `${ORIGIN}/skills/oneself/SKILL.md` });
+  expect(discoverySkills).not.toHaveProperty("context_management");
+  expect(discoverySkills).not.toHaveProperty("public_page");
+  expect(JSON.stringify(discovery.operations)).toContain("get_skill");
+  expect(JSON.stringify(discovery.operations)).toContain("get_site");
 
   for (let index = 0; index < 9; index += 1) {
     const response = await server.request("/admin/login", {
@@ -99,14 +104,123 @@ it("advertises only the device-code OAuth metadata", async () => {
   await server.close();
 });
 
-it("serves the same public-page skill bytes on both paths", async () => {
+it("serves one oneself skill and rejects the old names", async () => {
   const server = await boot();
-  const anonymous = await server.request("/skills/public-page.md");
-  const api = await server.request("/pcp/v1/skills/public-page");
+  const listed = await readJson(await server.request("/pcp/v1/skills"));
+  expect(listed.skills).toEqual([{ name: "oneself" }]);
+
+  const anonymous = await server.request("/skills/oneself/SKILL.md", {
+    headers: { host: "evil.example" },
+  });
+  const api = await server.request("/pcp/v1/skills/oneself", {
+    headers: { host: "evil.example" },
+  });
   expect(anonymous.status).toBe(200);
   expect(api.status).toBe(200);
-  expect(Array.from(new Uint8Array(await anonymous.arrayBuffer()))).toEqual(
-    Array.from(new Uint8Array(await api.arrayBuffer())),
+  expect(anonymous.headers.get("cache-control")).toBe("no-store");
+  expect(api.headers.get("cache-control")).toBe("no-store");
+  const entry = new Uint8Array(await anonymous.arrayBuffer());
+  expect(Array.from(entry)).toEqual(Array.from(new Uint8Array(await api.arrayBuffer())));
+  const text = new TextDecoder().decode(entry);
+  expect(text).toContain(`oneself_origin: "${ORIGIN}"`);
+  expect(text).not.toContain("evil.example");
+  expect(text).not.toContain("osk_");
+  expect(text).not.toContain("OWNER_PASSWORD");
+
+  const context = await server.request("/skills/oneself/references/context.md");
+  const publicPage = await server.request("/skills/oneself/references/public-page.md");
+  expect(context.status).toBe(200);
+  expect(publicPage.status).toBe(200);
+  const contextText = await context.text();
+  const publicPageText = await publicPage.text();
+  const skillRoot = resolve(
+    dirname(fileURLToPath(import.meta.url)),
+    "../../skills/oneself/references",
+  );
+  expect(contextText).toBe(readFileSync(resolve(skillRoot, "context.md"), "utf8"));
+  expect(publicPageText).toBe(readFileSync(resolve(skillRoot, "public-page.md"), "utf8"));
+  expect(contextText).not.toContain("oneself_origin");
+  expect(publicPageText).not.toContain("oneself_origin");
+  expect(contextText).not.toContain(ORIGIN);
+  expect(publicPageText).not.toContain(ORIGIN);
+
+  for (const path of [
+    "/skills/context-management.md",
+    "/skills/public-page.md",
+    "/pcp/v1/skills/context-management",
+    "/pcp/v1/skills/public-page",
+  ]) {
+    const missing = await server.request(path);
+    expect(missing.status, path).toBe(404);
+    expect((await readJson(missing)).error).toBe("not_found");
+  }
+  const mcp = await mcpCall(server, "get_skill", { name: "context-management" });
+  expect(mcp.error).toBe("not_found");
+  const publicPageSkill = await mcpCall(server, "get_skill", { name: "public-page" });
+  expect(publicPageSkill.error).toBe("not_found");
+  await server.close();
+});
+
+it("serves an anonymous agent-skills archive index that ignores Host", async () => {
+  const server = await boot();
+  const response = await server.request("/.well-known/agent-skills/index.json", {
+    headers: { host: "evil.example" },
+  });
+  expect(response.status).toBe(200);
+  expect(response.headers.get("content-type")).toContain("application/json");
+  expect(response.headers.get("cache-control")).toBe("no-store");
+  const index = await readJson(response);
+  expect(index.$schema).toBe("https://schemas.agentskills.io/discovery/0.2.0/schema.json");
+  const skills = index.skills as {
+    name: string;
+    type: string;
+    description: string;
+    url: string;
+    digest: string;
+  }[];
+  expect(skills).toHaveLength(1);
+  const skill = skills[0];
+  expect(skill?.name).toBe("oneself");
+  expect(skill?.type).toBe("archive");
+  expect(skill?.description.length).toBeGreaterThan(0);
+  expect(skill?.description.length).toBeLessThanOrEqual(1024);
+  expect(skill?.description).toContain("写成");
+  expect(skill?.description).toContain("定制");
+  expect(skill?.description).toContain("公开宣传页");
+  expect(skill?.url).toBe(`${ORIGIN}/skills/oneself.tar.gz`);
+  expect(skill?.url).not.toContain("evil.example");
+  expect(skill?.digest).toMatch(/^sha256:[0-9a-f]{64}$/);
+
+  const archive = await server.request("/skills/oneself.tar.gz", {
+    headers: { host: "evil.example" },
+  });
+  expect(archive.status).toBe(200);
+  expect(archive.headers.get("cache-control")).toBe("no-store");
+  const raw = new Uint8Array(await archive.arrayBuffer());
+  expect(createHash("sha256").update(raw).digest("hex")).toBe(
+    skill?.digest.slice("sha256:".length),
+  );
+  const files = unpackTarGz(raw);
+  expect([...files.keys()].sort()).toEqual([
+    "SKILL.md",
+    "references/context.md",
+    "references/public-page.md",
+  ]);
+  const archivedEntry = files.get("SKILL.md");
+  const archivedContext = files.get("references/context.md");
+  const archivedPublicPage = files.get("references/public-page.md");
+  const servedEntry = new Uint8Array(
+    await (await server.request("/skills/oneself/SKILL.md")).arrayBuffer(),
+  );
+  expect(archivedEntry).toEqual(servedEntry);
+  expect(new TextDecoder().decode(archivedEntry ?? new Uint8Array())).toContain(
+    `oneself_origin: "${ORIGIN}"`,
+  );
+  expect(new TextDecoder().decode(archivedContext ?? new Uint8Array())).not.toContain(
+    "oneself_origin",
+  );
+  expect(new TextDecoder().decode(archivedPublicPage ?? new Uint8Array())).not.toContain(
+    "oneself_origin",
   );
   await server.close();
 });
@@ -267,6 +381,28 @@ function operationIds(paths: unknown): string[] {
     }
   }
   return ids.sort();
+}
+
+function unpackTarGz(bytes: Uint8Array): Map<string, Uint8Array> {
+  const tar = gunzipSync(bytes);
+  const files = new Map<string, Uint8Array>();
+  let offset = 0;
+  while (offset + 512 <= tar.length) {
+    const header = tar.subarray(offset, offset + 512);
+    offset += 512;
+    if (header.every((byte) => byte === 0)) {
+      break;
+    }
+    const name = new TextDecoder().decode(header.subarray(0, 100)).replace(/\0+$/, "");
+    const sizeText = new TextDecoder()
+      .decode(header.subarray(124, 136))
+      .replace(/\0.*$/, "")
+      .trim();
+    const size = Number.parseInt(sizeText, 8);
+    files.set(name, new Uint8Array(tar.subarray(offset, offset + size)));
+    offset += Math.ceil(size / 512) * 512;
+  }
+  return files;
 }
 
 async function expectRateLimited(response: Response): Promise<void> {

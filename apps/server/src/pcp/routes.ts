@@ -16,6 +16,9 @@ import { discoveryDocument, oauthMetadata, openApiDocument } from "./discovery.j
 
 export function mountPcp(app: Hono, runtime: Runtime): void {
   app.get("/.well-known/pcp", () => sendJson(discoveryDocument(runtime.origin)));
+  app.get("/.well-known/agent-skills/index.json", () =>
+    sendJson(runtime.agentSkillsIndex(), 200, noStoreHeaders()),
+  );
   app.get("/.well-known/oauth-authorization-server", () => sendJson(oauthMetadata(runtime.origin)));
   app.get("/openapi.json", () => sendJson(openApiDocument(runtime.origin)));
 
@@ -41,8 +44,12 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
     return publicResult(c, runtime, (actor) => runtime.search(actor, body, true));
   });
 
-  app.get("/skills/context-management.md", () => skillFile(runtime, "context-management"));
-  app.get("/skills/public-page.md", () => skillFile(runtime, "public-page"));
+  app.get("/skills/oneself/SKILL.md", () => skillFile(runtime, "oneself"));
+  app.get("/skills/oneself.tar.gz", () => skillArchive(runtime));
+  app.get("/skills/oneself/references/context.md", () => skillReference(runtime, "context.md"));
+  app.get("/skills/oneself/references/public-page.md", () =>
+    skillReference(runtime, "public-page.md"),
+  );
   app.get("/pcp/v1/skills", (c) => authed(c, runtime, (actor) => runtime.listSkills(actor)));
   app.get("/pcp/v1/skills/:name", async (c) => {
     const actor = await runtime.authenticate(c.req.raw);
@@ -386,6 +393,28 @@ function skillFile(runtime: Runtime, name: string): Response {
   if (bytes === null) {
     return sendError("not_found", "skill not found");
   }
+  return markdown(bytes);
+}
+
+function skillReference(runtime: Runtime, name: string): Response {
+  const bytes = runtime.skillReference(name);
+  if (bytes === null) {
+    return sendError("not_found", "skill not found");
+  }
+  return markdown(bytes);
+}
+
+function skillArchive(runtime: Runtime): Response {
+  return new Response(bytesBody(runtime.skillArchive()), {
+    status: 200,
+    headers: {
+      "content-type": "application/gzip",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+function markdown(bytes: Uint8Array): Response {
   return new Response(bytesBody(bytes), {
     status: 200,
     headers: {
@@ -393,6 +422,10 @@ function skillFile(runtime: Runtime, name: string): Response {
       "cache-control": "no-store",
     },
   });
+}
+
+function noStoreHeaders(): Headers {
+  return new Headers({ "cache-control": "no-store" });
 }
 
 async function publicResult(

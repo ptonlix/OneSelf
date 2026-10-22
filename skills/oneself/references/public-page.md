@@ -1,41 +1,10 @@
----
-name: public-page
-description: 定制 OneSelf 唯一的个人公开宣传页。先看已公开的上下文，再从原始源码改版式或增加真实地址，构建静态页后预览并申请上线。用户要改公开主页、落地页、宣传页版式、加路径、上传 release 或申请激活时使用。写资料、改可见性或记事实时不要用，改读 context-management。公开请求使用 credentials: omit。同意前不得声称已更换。
-compatibility: OneSelf PCP。文件与 get_skill 的名字是 public-page，经 /skills/public-page.md 整份下发。开头 YAML 是 Skill 元数据，不是页面源码。
-metadata:
-  author: oneself
-  version: "2"
----
+# 公开页
 
-# public-page
+这份 reference 只写怎么定制公开宣传页。连接和凭据在入口 `SKILL.md`，不在这里。
 
-上面的 YAML 只描述这份 Skill。不要把它写进源码或构建产物。
-
-定制唯一的个人公开宣传页。它只有 `/` 这一个线上入口，没有单独的简历地址。整理个人上下文不要用这份，改读 `/skills/context-management.md`。`GET /skills/public-page.md` 与 `GET /pcp/v1/skills/public-page` 是同一份字节。
+定制唯一的个人公开宣传页。它只有 `/` 这一个线上入口，没有单独的简历地址。整理个人上下文不要用这份，改读 `references/context.md`。
 
 发现文档给出 OpenAPI 和 MCP。两边操作名相同，按操作名调用，不要另造路径。
-
-## 连接配置
-
-凭据和站点地址不要写进这份 Skill，也不要写进 Skill 安装目录。`npx skills update` 会覆盖那个目录。统一读写用户配置目录里的这一个文件：
-
-- 设置了 `XDG_CONFIG_HOME` 时：`$XDG_CONFIG_HOME/oneself/config.json`
-- 否则：`~/.config/oneself/config.json`
-- Windows：`%APPDATA%\oneself\config.json`
-
-文件不存在就创建，权限设为仅当前用户可读。不要提交到仓库。
-
-```json
-{
-  "origin": "https://oneself.example",
-  "auth": "api_key",
-  "api_key": "osk_..."
-}
-```
-
-`auth` 只能是 `api_key` 或 `oauth`。用设备码时不写 `api_key`，改为 `refresh_token`。不要写所属人密码，不要只存 15 分钟的 access token，也不要存批准地址或设备码。
-
-调用前按这个顺序取 origin：`ONESELF_ORIGIN`、配置文件、本 Skill 的 `metadata.oneself_origin`。都没有就问一次，并写入配置文件。配置文件还没有 origin、而 Skill 里有 `oneself_origin` 时，先抄进去。API Key 优先读 `ONESELF_API_KEY`，没有再读配置文件。设备码换到 refresh token 后立刻写入配置文件。下次先用这份配置，不要重新问所属人要已经发过的 `osk_`。
 
 ## 何时用
 
@@ -60,7 +29,7 @@ metadata:
 ## 怎么定制
 
 - [ ] 调用 `whoami`。没有 `site:write`、也不是所属人会话时，停下来说明缺权限。
-- [ ] 用公开接口看现在有哪些公开页，确认宣传页有内容可展示。没有公开页时，内置页只显示空状态。要先公开资料，改用 context-management，不要把私有页抄进站点。
+- [ ] 用公开接口看现在有哪些公开页，确认宣传页有内容可展示。没有公开页时，内置页只显示空状态。要先公开资料，改读 `references/context.md`，不要把私有页抄进站点。
 - [ ] 调用 `get_site`（`GET /pcp/v1/site/source`）下载 `original-page-source.zip`。只在这份源码上改版式。
 - [ ] 构建一棵静态文件树。根目录有 `index.html`。`/` 读取这个文件。不要把源码 zip 本身上传。
 - [ ] 核对构建产物：没有密钥，没有 private 页，没有保留路径，也没有 `..`、绝对路径或符号链接。
@@ -78,7 +47,7 @@ metadata:
 
 公开列表只含 `source`、`slug`、`type`、`title`。正文再从公开单页读取。公开单页返回 `source`、`slug`、`type`、`title`、`visibility`、`frontmatter`、`markdown`、`hash`，其中 `visibility` 一定是 `public`。
 
-原始页面不调用 facts、timeline、tags 或 links。这些结构留在正文里。要改它们，用 context-management，不要写进构建产物。
+原始页面不调用 facts、timeline、tags 或 links。这些结构留在正文里。要改它们，改读 `references/context.md`，不要写进构建产物。
 
 页面脚本只能调用：
 

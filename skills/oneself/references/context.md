@@ -1,41 +1,10 @@
----
-name: context-management
-description: 管理 OneSelf 的个人上下文。用户给出简历、经历、笔记、对话、照片或证件时，先查已有页，把文字写成 Markdown，把图片和 PDF 作为原件上传并挂接，再按授权读取、写入、修改、删除或恢复。定制公开宣传页、上传站点或申请上线时不要用，改读 public-page。
-compatibility: OneSelf PCP。文件与 get_skill 的名字是 context-management，经 /skills/context-management.md 整份下发。开头 YAML 是 Skill 元数据，不是页面 frontmatter。
-metadata:
-  author: oneself
-  version: "2"
----
+# 上下文
 
-# context-management
+这份 reference 只写怎么管理个人上下文。连接和凭据在入口 `SKILL.md`，不在这里。定制公开宣传页不要用这份，改读 `references/public-page.md`。
 
-上面的 YAML 只描述这份 Skill。不要把它写进页面。
+公开请求使用 `credentials: omit`。不得写入密钥或私有页。不得把密钥或 private 页写进源码或构建产物。
 
-维护一份默认私有的个人上下文：文字是 Markdown 页，图片和 PDF 是原件。定制公开宣传页不要用这份，改读 `/skills/public-page.md`。`GET /skills/context-management.md` 与 `GET /pcp/v1/skills/context-management` 是同一份字节。
-
-发现文档给出 OpenAPI 和 MCP。两边操作名相同，按操作名调用，不要另造路径。参数以工具 schema 或 OpenAPI 为准；下面只写容易调用错的部分。
-
-## 连接配置
-
-凭据和站点地址不要写进这份 Skill，也不要写进 Skill 安装目录。`npx skills update` 会覆盖那个目录。统一读写用户配置目录里的这一个文件：
-
-- 设置了 `XDG_CONFIG_HOME` 时：`$XDG_CONFIG_HOME/oneself/config.json`
-- 否则：`~/.config/oneself/config.json`
-- Windows：`%APPDATA%\oneself\config.json`
-
-文件不存在就创建，权限设为仅当前用户可读。不要提交到仓库。
-
-```json
-{
-  "origin": "https://oneself.example",
-  "auth": "api_key",
-  "api_key": "osk_..."
-}
-```
-
-`auth` 只能是 `api_key` 或 `oauth`。用设备码时不写 `api_key`，改为 `refresh_token`。不要写所属人密码，不要只存 15 分钟的 access token，也不要存批准地址或设备码。
-
-调用前按这个顺序取 origin：`ONESELF_ORIGIN`、配置文件、本 Skill 的 `metadata.oneself_origin`。都没有就问一次，并写入配置文件。配置文件还没有 origin、而 Skill 里有 `oneself_origin` 时，先抄进去。API Key 优先读 `ONESELF_API_KEY`，没有再读配置文件。设备码换到 refresh token 后立刻写入配置文件。下次先用这份配置，不要重新问所属人要已经发过的 `osk_`。
+发现文档给出 OpenAPI 和 MCP。两边操作名相同，按操作名调用，不要另造路径。参数以工具 schema 或 OpenAPI 为准。
 
 ## 何时用
 

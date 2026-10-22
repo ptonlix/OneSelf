@@ -69,6 +69,7 @@ import {
 } from "./postgres-state.js";
 import { hashesEqual, randomId, randomToken, sha256Bytes, sha256Hex } from "./ids.js";
 import { createMarkdownParser } from "./markdown-port.js";
+import { agentSkillsIndex as agentSkillsIndexDocument, loadServedSkill } from "./skill-pack.js";
 import { hashPassword, verifyPassword } from "./password.js";
 import { buildSnippet, parseLimit, parseOffset, searchPages, visiblePages } from "./search.js";
 import {
@@ -155,7 +156,12 @@ export class Runtime {
   #adminDist: string;
   #rates = new Map<string, number[]>();
   #tail: Promise<unknown> = Promise.resolve();
-  #skills: ReadonlyMap<string, Uint8Array>;
+  #skillEntry: Uint8Array;
+  #skillContext: Uint8Array;
+  #skillPublicPage: Uint8Array;
+  #skillArchive: Uint8Array;
+  #skillDescription: string;
+  #skillDigest: string;
   #originalRoot: string;
   #log: (line: string) => void;
   #postgres: PostgresHandle | null;
@@ -184,10 +190,19 @@ export class Runtime {
       ((line) => {
         console.info(line);
       });
-    this.#skills = new Map([
-      ["context-management", readFileSync(path.join(options.skillsDir, "context-management.md"))],
-      ["public-page", readFileSync(path.join(options.skillsDir, "public-page.md"))],
-    ]);
+    const skillRoot = path.join(options.skillsDir, "oneself");
+    const served = loadServedSkill({
+      entry: readFileSync(path.join(skillRoot, "SKILL.md"), "utf8"),
+      context: readFileSync(path.join(skillRoot, "references", "context.md")),
+      publicPage: readFileSync(path.join(skillRoot, "references", "public-page.md")),
+      origin: this.origin,
+    });
+    this.#skillEntry = served.entry;
+    this.#skillContext = served.context;
+    this.#skillPublicPage = served.publicPage;
+    this.#skillArchive = served.archive;
+    this.#skillDescription = served.description;
+    this.#skillDigest = served.digest;
   }
 
   async bootstrap(
@@ -1212,7 +1227,7 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
-      return ok({ skills: [{ name: "context-management" }, { name: "public-page" }] });
+      return ok({ skills: [{ name: "oneself" }] });
     });
   }
 
@@ -1222,16 +1237,33 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
-      const bytes = this.#skills.get(name);
-      if (bytes === undefined) {
+      if (name !== "oneself") {
         return fail("not_found", "skill not found");
       }
-      return ok(bytes);
+      return ok(this.#skillEntry);
     });
   }
 
   skillBytes(name: string): Uint8Array | null {
-    return this.#skills.get(name) ?? null;
+    return name === "oneself" ? this.#skillEntry : null;
+  }
+
+  skillReference(name: string): Uint8Array | null {
+    if (name === "context.md") {
+      return this.#skillContext;
+    }
+    if (name === "public-page.md") {
+      return this.#skillPublicPage;
+    }
+    return null;
+  }
+
+  skillArchive(): Uint8Array {
+    return this.#skillArchive;
+  }
+
+  agentSkillsIndex(): Record<string, unknown> {
+    return agentSkillsIndexDocument(this.origin, this.#skillDescription, this.#skillDigest);
   }
 
   listSites(actor: Actor): Promise<DomainResult<Record<string, unknown>>> {

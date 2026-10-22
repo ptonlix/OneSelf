@@ -15,8 +15,7 @@ export function discoveryDocument(origin: string): Record<string, unknown> {
     mcp: `${origin}/mcp`,
     oauth: `${origin}/.well-known/oauth-authorization-server`,
     skills: {
-      context_management: `${origin}/skills/context-management.md`,
-      public_page: `${origin}/skills/public-page.md`,
+      oneself: `${origin}/skills/oneself/SKILL.md`,
     },
   };
 }

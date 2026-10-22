@@ -7,6 +7,7 @@ import {
   expectError,
   issueApiKey,
   jsonHeaders,
+  ORIGIN,
   owner,
   readJson,
   uploadArchive,
@@ -113,6 +114,36 @@ it("rejects reserved site paths, has no release delete route, and forbids agent 
   );
   expect(approved.status).toBe(200);
   expect(await (await server.request("/")).text()).toContain("RELEASE-MARKER");
+  await server.close();
+});
+
+it("rejects an uploaded agent-skills index and keeps the application index", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const rejected = await uploadArchive(
+    server,
+    cookie,
+    writeStoredZip([
+      { path: "index.html", data: new TextEncoder().encode("nope") },
+      {
+        path: ".well-known/agent-skills/index.json",
+        data: new TextEncoder().encode('{"skills":[{"name":"uploaded-skill"}]}'),
+      },
+    ]),
+  );
+  expect(rejected.status).toBe(400);
+  expect((await readJson(rejected)).error).toBe("invalid");
+  const index = await server.request("/.well-known/agent-skills/index.json");
+  expect(index.status).toBe(200);
+  const body = await index.text();
+  expect(body).not.toContain("uploaded-skill");
+  const parsed = JSON.parse(body) as { skills: { name: string; url: string }[] };
+  expect(parsed.skills).toEqual([
+    expect.objectContaining({
+      name: "oneself",
+      url: `${ORIGIN}/skills/oneself.tar.gz`,
+    }),
+  ]);
   await server.close();
 });
 

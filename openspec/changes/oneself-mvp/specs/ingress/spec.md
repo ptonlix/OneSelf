@@ -32,7 +32,7 @@ Rate limits MUST be 30 public searches, 30 uploads, and 10 logins per client add
 - **THEN** the rate limit bucket is not that spoofed address
 
 ### Requirement: Cache and timeout boundaries
-Responses for public PCP, `/media`, skills, and site `index.html` MUST send `Cache-Control: no-store`. Hashed CSS and JavaScript MAY be cached as immutable. When Cloudflare or another cache sits in front, it MUST NOT cache `/pcp`, `/oauth`, `/admin`, `/skills`, `/media`, or `/_preview`. The deployment notes MUST state that a response which does not finish within the Cloudflare proxy read timeout can be closed, while ordinary page, login, device, and MCP calls are expected to finish inside it.
+Responses for public PCP, `/media`, skills, and site `index.html` MUST send `Cache-Control: no-store`. Hashed CSS and JavaScript MAY be cached as immutable. When Cloudflare or another cache sits in front, it MUST NOT cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`. The deployment notes MUST state that a response which does not finish within the Cloudflare proxy read timeout can be closed, while ordinary page, login, device, and MCP calls are expected to finish inside it.
 
 #### Scenario: Public page API is not cached
 - **WHEN** an anonymous client reads a public page
