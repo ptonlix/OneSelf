@@ -85,7 +85,7 @@ openspec/changes/<短名>/
 - 错误沿用现有 `{ error, message }` 和已有错误码。不要为了措辞新增错误码。
 - 新迁移只追加 SQL 文件，不改已经应用过的迁移。Markdown 的权威副本是对象，不是表里的正文。不为一种资料建表。
 - 单元测试与被测源码放在一起，文件名 `*.test.ts`。领域规则直接测纯函数，不启动 HTTP 或数据库。外部存储用端口假实现。
-- `tests/smoke/` 按模块分文件，和 `pnpm test` 一起跑，不启动 Compose。`closed-loop` 才用 `vitest.smoke.config.ts`，打已经用 `compose.dev.yaml` 起来的数据库和对象存储。不要把领域规则搬进冒烟。
+- `tests/smoke/` 按模块分文件，和 `pnpm test` 一起跑，不启动 Compose。`closed-loop` 才用 `vitest.smoke.config.ts`，复用已经用 `compose.dev.yaml` 起来的 PostgreSQL 和 RustFS，但只用单独的 `oneself_smoke` 库和 `oneself-smoke` 桶（`SMOKE_*` 环境变量可覆盖，名字不含 `smoke` 或等于 `oneself` 时拒绝运行），自己不调用 Docker。不要把领域规则搬进冒烟。
 - 改了产品 Skill、发现文档、认证门或站点发布，要补或更新对应测试。管理端页面不要求单元测试。
 - 注释只解释非显而易见的约束。不要复述代码在做什么。
 

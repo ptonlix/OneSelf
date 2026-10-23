@@ -262,11 +262,13 @@ OneSelf/
 ```bash
 pnpm check            # Prettier, ESLint, tsc, Vitest, dependency-cruiser, Knip, in order
 pnpm test             # Unit and in-process API tests (no Compose needed)
-pnpm test:smoke       # Closed-loop smoke test against real PostgreSQL and RustFS from compose.dev.yaml
+pnpm test:smoke       # Closed-loop smoke test on the running compose.dev.yaml services, separate DB and bucket
 pnpm boundaries       # Package dependency direction only
 pnpm db:migrate       # Apply migrations to DATABASE_URL from .env
 pnpm dev              # Build the admin UI and built-in public page, then start the app
 ```
+
+`pnpm test:smoke` starts and stops no containers; bring the dev services up first with `docker compose -f compose.dev.yaml up -d`. It creates and resets a separate `oneself_smoke` database in the same PostgreSQL and creates and empties a separate `oneself-smoke` bucket in the same RustFS, never touching dev data, and leaves both in place afterwards. It does not read `DATABASE_URL` or `OBJECT_STORAGE_*` from `.env`; override with `SMOKE_POSTGRES_ADMIN_URL` (default `postgres://oneself:oneself@127.0.0.1:5432/postgres`), `SMOKE_DATABASE`, `SMOKE_OBJECT_STORAGE_ENDPOINT`, `SMOKE_OBJECT_STORAGE_BUCKET`, `SMOKE_OBJECT_STORAGE_ACCESS_KEY_ID`, `SMOKE_OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `SMOKE_OBJECT_STORAGE_REGION`. A database or bucket name without `smoke`, or named `oneself`, is refused.
 
 `pnpm check` is the local gate before merging. Install dependencies with pnpm only. Behavior follows [docs/PRD.md](docs/PRD.md); paths, transactions, and deployment follow [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 

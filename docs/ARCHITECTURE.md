@@ -195,7 +195,7 @@ OneSelf/
 ├── Dockerfile                   仓库根。打进管理端 dist、原始页面 dist、源码 zip 和 skills/
 ├── .env.example
 ├── vitest.config.ts             单元测试和进程内契约。不启动 compose
-├── vitest.smoke.config.ts       只跑 tests/smoke
+├── vitest.smoke.config.ts       只跑 tests/smoke/closed-loop（复用开发服务，单独的库和桶）
 ├── docs/
 ├── openspec/
 ├── .agents/skills/              开发技能。不进镜像，不和产品 Skill 合并
@@ -243,7 +243,7 @@ OneSelf/
 
 单元测试与被测源码放在一起，文件名 `*.test.ts`。领域规则在 `packages/domain`，不启动 HTTP 或数据库。注册表、表结构、适配器、公开客户端和原始页面的测试留在各自的包里。服务器的进程内契约测试留在 `apps/server`，用内存端口，不连生产端点；HTTP 和 MCP 各有一条，断言同一资料操作的结果一致，并断言 MCP 没有密钥管理工具。管理端页面不要求单元测试。
 
-接口测试放在 `tests/smoke/`，按模块分文件：`owner`、`pages`、`retrieval`、`site`、`access`、`protocol`。它们不启动 compose，跟普通 `pnpm test` 一起跑。`closed-loop.test.ts` 才用 `vitest.smoke.config.ts` 单独跑，打的是已经用 `compose.dev.yaml` 起来的数据库和对象存储。不把领域规则搬进这些文件。冒烟里的路径清单若存在，只给冒烟用，不是第二份路由表；路由仍以 `packages/operations` 为准。
+接口测试放在 `tests/smoke/`，按模块分文件：`owner`、`pages`、`retrieval`、`site`、`access`、`protocol`。它们不启动 compose，跟普通 `pnpm test` 一起跑。`closed-loop.test.ts` 才用 `vitest.smoke.config.ts` 单独跑，复用已经用 `compose.dev.yaml` 起来的 PostgreSQL 和 RustFS，但用单独的 `oneself_smoke` 库和 `oneself-smoke` 桶：开始时建库、重置 `public` 并按 journal 顺序执行全部迁移，建桶并清空；结束时保留。它不调用 Docker，只读 `SMOKE_*` 环境变量，不读 `.env` 里的开发连接；库名或桶名不含 `smoke` 或等于 `oneself` 时拒绝运行。不把领域规则搬进这些文件。冒烟里的路径清单若存在，只给冒烟用，不是第二份路由表；路由仍以 `packages/operations` 为准。
 
 `pnpm check` 按这个顺序跑：Prettier、ESLint、`tsc --noEmit`、Vitest、dependency-cruiser、Knip。ESLint 使用 `typescript-eslint` 的 `strictTypeChecked`，不使用 Next.js 的配置。TypeScript 在 `strict` 之外还打开 `noUncheckedIndexedAccess`、`exactOptionalPropertyTypes`、`noImplicitOverride`、`noImplicitReturns`、`noUnusedLocals`、`noUnusedParameters`、`noFallthroughCasesInSwitch` 和 `verbatimModuleSyntax`。dependency-cruiser 锁住第 4 节的依赖方向：`operations` 不引用包外代码，`domain` 不引用服务器、React、数据库和对象存储 SDK，`adapters` 不引用 `domain`，管理端、原始页面和公开客户端不引用 `domain` 或 `db`。包还没有源码时，Knip 先不扫这些空包；出现入口文件后必须把该包从 `knip.json` 的 `ignoreWorkspaces` 去掉。
 

@@ -262,11 +262,13 @@ OneSelf/
 ```bash
 pnpm check            # Prettier、ESLint、tsc、Vitest、dependency-cruiser、Knip 依次执行
 pnpm test             # 单元测试和进程内接口测试（不需要启动 Compose）
-pnpm test:smoke       # 闭环冒烟：用 compose.dev.yaml 起真实 PostgreSQL 和 RustFS
+pnpm test:smoke       # 闭环冒烟：复用已启动的 compose.dev.yaml 服务，用单独的库和桶
 pnpm boundaries       # 只检查包之间的依赖方向
 pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
 pnpm dev              # 构建管理端和内置公开页，再启动应用
 ```
+
+`pnpm test:smoke` 不启动也不停止任何容器，需要先用 `docker compose -f compose.dev.yaml up -d` 起好开发服务。它在同一个 PostgreSQL 里建并重置单独的 `oneself_smoke` 库，在同一个 RustFS 里建并清空单独的 `oneself-smoke` 桶，不碰开发数据，跑完保留这两份。不读 `.env` 里的 `DATABASE_URL` 和 `OBJECT_STORAGE_*`；需要时用 `SMOKE_POSTGRES_ADMIN_URL`（默认 `postgres://oneself:oneself@127.0.0.1:5432/postgres`）、`SMOKE_DATABASE`、`SMOKE_OBJECT_STORAGE_ENDPOINT`、`SMOKE_OBJECT_STORAGE_BUCKET`、`SMOKE_OBJECT_STORAGE_ACCESS_KEY_ID`、`SMOKE_OBJECT_STORAGE_SECRET_ACCESS_KEY`、`SMOKE_OBJECT_STORAGE_REGION` 覆盖。库名和桶名必须含 `smoke` 且不能是 `oneself`，否则直接报错。
 
 `pnpm check` 是合并前的本地门禁。依赖只用 pnpm 安装。行为以 [docs/PRD.md](docs/PRD.md) 为准，路径、事务和部署以 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 为准。
 
