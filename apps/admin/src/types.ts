@@ -75,3 +75,46 @@ export interface SourceDraft {
   write: boolean;
   visibility: boolean;
 }
+
+export interface ApiKeySummary {
+  id: string;
+  label: string;
+  unrestricted_data: boolean;
+  site_write: boolean;
+  sources: SourceGrant[];
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+}
+
+export interface SourceStatus {
+  id: string;
+  page_count: number;
+  latest_write_at: string | null;
+}
+
+export interface SiteRelease {
+  id: string;
+  created_at: string;
+}
+
+export interface SiteList {
+  pointer: string;
+  releases: SiteRelease[];
+}
+
+export interface PublicPageSummary {
+  source: string;
+  slug: string;
+  type: string;
+  title: string;
+}
+
+/** One row of `GET /admin/oauth-grants`; mirrors the server's `OauthGrantView` field for field. */
+export interface OauthGrantView {
+  id: string;
+  site_write: boolean;
+  sources: SourceGrant[];
+  created_at: string;
+  revoked_at: string | null;
+}

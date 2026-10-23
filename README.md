@@ -165,19 +165,19 @@ Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/AR
 
 ## 🤖 Agent 入口
 
-| 路径                                   | 谁用           | 用途                                                                           |
-| -------------------------------------- | -------------- | ------------------------------------------------------------------------------ |
-| `/.well-known/pcp`                     | Agent          | 发现文档：协议版本、操作清单、OpenAPI、MCP、OAuth 和 Skill                     |
-| `/.well-known/agent-skills/index.json` | 安装器         | 产品 Skill `oneself` 的 archive 索引                                           |
-| `/skills/oneself/SKILL.md`             | Agent          | 唯一产品 Skill。写页前读 context reference，改公开页前读 public-page reference |
-| `/openapi.json`                        | Agent、脚本    | 由操作注册表生成的 OpenAPI                                                     |
-| `POST /mcp`                            | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                                             |
-| `/pcp/v1/*`                            | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                                     |
-| `/pcp/v1/public/*`                     | 任何人         | 只返回 `visibility: public` 且未删除的页                                       |
-| `/media/{id}`                          | 视所属页而定   | 原件字节。所属页公开时匿名可读                                                 |
-| `/oauth/device/auth`、`/oauth/token`   | Agent          | 申请设备码、换取和刷新访问令牌                                                 |
-| `/admin`                               | 所属人         | 登录、改密、批准设备码、API Key 和站点上线                                     |
-| `/_preview/{releaseId}/`               | 任何人         | 未上线 release 的预览，不移动线上指针                                          |
+| 路径                                   | 谁用           | 用途                                                                                   |
+| -------------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| `/.well-known/pcp`                     | Agent          | 发现文档：协议版本、操作清单、认证头、公开接口、上传限制、OpenAPI、MCP、OAuth 和 Skill |
+| `/.well-known/agent-skills/index.json` | 安装器         | 产品 Skill `oneself` 的 archive 索引                                                   |
+| `/skills/oneself/SKILL.md`             | Agent          | 唯一产品 Skill。写页前读 context reference，改公开页前读 public-page reference         |
+| `/openapi.json`                        | Agent、脚本    | 由操作注册表和 MCP 同一份输入 schema 生成的 OpenAPI，含参数、请求体和认证方式          |
+| `POST /mcp`                            | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                                                     |
+| `/pcp/v1/*`                            | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                                             |
+| `/pcp/v1/public/*`                     | 任何人         | 只返回 `visibility: public` 且未删除的页                                               |
+| `/media/{id}`                          | 视所属页而定   | 原件字节。所属页公开时匿名可读                                                         |
+| `/oauth/device/auth`、`/oauth/token`   | Agent          | 申请设备码、换取和刷新访问令牌                                                         |
+| `/admin`                               | 所属人         | 登录、改密、批准设备码、API Key 和站点上线                                             |
+| `/_preview/{releaseId}/`               | 任何人         | 未上线 release 的预览，不移动线上指针                                                  |
 
 接入方式二选一：API Key（`Authorization: ApiKey <key>` 或 `X-Api-Key`），或 OAuth 2.1 设备码换来的访问令牌（`Authorization: Bearer <token>`）。两种方式都要所属人批准，权限相同时结果一致。错误体统一为 `{ "error", "message" }`。路径以 [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts) 为准。
 

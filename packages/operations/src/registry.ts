@@ -127,6 +127,33 @@ export const operations: readonly Operation[] = Object.freeze(registeredOperatio
 
 export type OperationName = (typeof registeredOperations)[number]["name"];
 
+/**
+ * Anonymous reads for public sites, architecture section 6. They are not PCP
+ * operations: no credential, no MCP tool. Discovery and OpenAPI list them so a
+ * site author can find them without the Skill.
+ */
+export type PublicEndpoint = {
+  readonly name: string;
+  readonly method: HttpMethod;
+  readonly path: string;
+};
+
+const registeredPublicEndpoints = [
+  { name: "public_sources", method: "GET", path: "/pcp/v1/public/sources" },
+  { name: "public_pages", method: "GET", path: "/pcp/v1/public/pages" },
+  { name: "public_page", method: "GET", path: "/pcp/v1/public/pages/{source}/{slug}" },
+  { name: "public_search", method: "POST", path: "/pcp/v1/public/search" },
+  { name: "media", method: "GET", path: "/media/{id}" },
+] as const satisfies readonly PublicEndpoint[];
+
+for (const endpoint of registeredPublicEndpoints) {
+  Object.freeze(endpoint);
+}
+
+export const publicEndpoints: readonly PublicEndpoint[] = Object.freeze(registeredPublicEndpoints);
+
+export type PublicEndpointName = (typeof registeredPublicEndpoints)[number]["name"];
+
 const registeredErrorCodes = [
   { error: "not_found", status: 404 },
   { error: "unauthorized", status: 401 },

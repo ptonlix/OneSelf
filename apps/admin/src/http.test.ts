@@ -195,3 +195,174 @@ describe("admin http client", () => {
     expect(error).toMatchObject({ code: "not_found", message: "没有这份申请" });
   });
 });
+
+const activeKey = {
+  id: "key_1",
+  label: "laptop",
+  unrestricted_data: false,
+  site_write: true,
+  sources: [{ id: "notes", read: true, write: false, visibility: false }],
+  created_at: "2026-10-01T00:00:00Z",
+  last_used_at: null,
+  revoked_at: null,
+};
+
+const grant = {
+  id: "grant_1",
+  site_write: false,
+  sources: [{ id: "notes", read: true, write: false, visibility: false }],
+  created_at: "2026-10-01T00:00:00Z",
+  revoked_at: null,
+};
+
+function browserCalls(body: unknown): {
+  fetchImpl: typeof fetch;
+  calls: { input: string; init: RequestInit }[];
+} {
+  const calls: { input: string; init: RequestInit }[] = [];
+  const fetchImpl: typeof fetch = (input, init) => {
+    calls.push({ input: requestUrl(input), init: init ?? {} });
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+  };
+  return { fetchImpl, calls };
+}
+
+describe("admin overview client", () => {
+  it("reads the overview through the existing operations", async () => {
+    const { transport, seen } = scripted([
+      { status: 200, body: { api_keys: [activeKey] } },
+      { status: 200, body: { id: "notes", page_count: 3, latest_write_at: null } },
+      {
+        status: 200,
+        body: {
+          pointer: { release_id: "public-page" },
+          releases: [{ id: "rel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", created_at: "2026-10-01" }],
+        },
+      },
+      { status: 200, body: [{ source: "notes", slug: "a", type: "note", title: "A" }] },
+      { status: 200, body: { oauth_grants: [grant] } },
+    ]);
+    const client = createAdminClient(transport);
+    await expect(client.listApiKeys()).resolves.toEqual([activeKey]);
+    await expect(client.sourceStatus("my notes")).resolves.toEqual({
+      id: "notes",
+      page_count: 3,
+      latest_write_at: null,
+    });
+    await expect(client.listSites()).resolves.toEqual({
+      pointer: "public-page",
+      releases: [{ id: "rel_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", created_at: "2026-10-01" }],
+    });
+    await expect(client.listPublicPages()).resolves.toHaveLength(1);
+    await expect(client.listOauthGrants()).resolves.toEqual([grant]);
+    expect(seen).toEqual([
+      { method: "GET", path: "/pcp/v1/api-keys" },
+      { method: "GET", path: "/pcp/v1/sources/my%20notes" },
+      { method: "GET", path: "/pcp/v1/site" },
+      { method: "GET", path: "/pcp/v1/public/pages", anonymous: true },
+      { method: "GET", path: "/admin/oauth-grants" },
+    ]);
+  });
+
+  it("revokes an api key with DELETE and a grant with the existing POST route", async () => {
+    const { transport, seen } = scripted([
+      { status: 200, body: { id: "key_1" } },
+      { status: 200, body: { id: "grant 1" } },
+    ]);
+    const client = createAdminClient(transport);
+    await client.revokeApiKey("key_1");
+    await client.revokeOauthGrant("grant 1");
+    expect(seen).toEqual([
+      { method: "DELETE", path: "/pcp/v1/api-keys/key_1" },
+      { method: "POST", path: "/admin/oauth-grants/grant%201/revoke", json: {} },
+    ]);
+  });
+
+  it("reads public pages without the owner cookie", async () => {
+    const { fetchImpl, calls } = browserCalls([]);
+    await createAdminClient(browserTransport(fetchImpl)).listPublicPages();
+    expect(calls[0]?.input).toBe("/pcp/v1/public/pages");
+    expect(calls[0]?.init.credentials).toBe("omit");
+  });
+
+  it("lists grants with the owner cookie and asks for JSON", async () => {
+    const { fetchImpl, calls } = browserCalls({ oauth_grants: [] });
+    await createAdminClient(browserTransport(fetchImpl)).listOauthGrants();
+    expect(calls[0]?.input).toBe("/admin/oauth-grants");
+    expect(calls[0]?.init.method).toBe("GET");
+    expect(calls[0]?.init.credentials).toBe("include");
+    expect(new Headers(calls[0]?.init.headers).get("accept")).toBe("application/json");
+  });
+
+  it("rejects key material anywhere in the overview responses", async () => {
+    const cases: [
+      HttpResponse,
+      (client: ReturnType<typeof createAdminClient>) => Promise<unknown>,
+    ][] = [
+      [
+        { status: 200, body: { api_keys: [{ ...activeKey, key: "osk_x" }] } },
+        (c) => c.listApiKeys(),
+      ],
+      [{ status: 200, body: { id: "key_1", key: "osk_x" } }, (c) => c.revokeApiKey("key_1")],
+      [
+        { status: 200, body: { id: "notes", page_count: 1, latest_write_at: null, key: "x" } },
+        (c) => c.sourceStatus("notes"),
+      ],
+      [
+        { status: 200, body: { pointer: { release_id: "public-page" }, releases: [], key: "x" } },
+        (c) => c.listSites(),
+      ],
+      [
+        { status: 200, body: [{ source: "a", slug: "b", type: "c", title: "d", key: "x" }] },
+        (c) => c.listPublicPages(),
+      ],
+      [
+        { status: 200, body: { oauth_grants: [{ ...grant, key: "x" }] } },
+        (c) => c.listOauthGrants(),
+      ],
+    ];
+    for (const [response, call] of cases) {
+      const { transport } = scripted([response]);
+      await expect(call(createAdminClient(transport))).rejects.toBeInstanceOf(ParseError);
+    }
+  });
+
+  it("rejects token-like fields and unknown shapes in the grant list", async () => {
+    for (const extra of ["access_token", "refresh_token_payload", "refreshTokenHash", "hash"]) {
+      const { transport } = scripted([
+        { status: 200, body: { oauth_grants: [{ ...grant, [extra]: "x" }] } },
+      ]);
+      await expect(createAdminClient(transport).listOauthGrants()).rejects.toBeInstanceOf(
+        ParseError,
+      );
+    }
+    const missing: Record<string, unknown> = { ...grant };
+    delete missing.revoked_at;
+    for (const body of [
+      { oauth_grants: [missing] },
+      { oauth_grants: [{ ...grant, label: "laptop" }] },
+      { oauth_grants: [{ ...grant, site_write: "no" }] },
+      { grants: [] },
+      [],
+    ]) {
+      const { transport } = scripted([{ status: 200, body }]);
+      await expect(createAdminClient(transport).listOauthGrants()).rejects.toBeInstanceOf(
+        ParseError,
+      );
+    }
+  });
+
+  it("rejects unknown shapes in the other overview responses", async () => {
+    const cases: [unknown, (client: ReturnType<typeof createAdminClient>) => Promise<unknown>][] = [
+      [{ keys: [] }, (c) => c.listApiKeys()],
+      [{ api_keys: [{ ...activeKey, created_at: 1 }] }, (c) => c.listApiKeys()],
+      [{ id: "notes", page_count: "3" }, (c) => c.sourceStatus("notes")],
+      [{ pointer: "public-page", releases: [] }, (c) => c.listSites()],
+      [{ pages: [] }, (c) => c.listPublicPages()],
+    ];
+    for (const [body, call] of cases) {
+      const { transport } = scripted([{ status: 200, body }]);
+      await expect(call(createAdminClient(transport))).rejects.toBeInstanceOf(ParseError);
+    }
+  });
+});

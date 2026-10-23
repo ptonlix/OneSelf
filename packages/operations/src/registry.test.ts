@@ -5,6 +5,7 @@ import {
   errorCodes,
   generateTransports,
   operations,
+  publicEndpoints,
   type HttpMethod,
   type Operation,
 } from "./index.ts";
@@ -187,5 +188,20 @@ describe("operation registry", () => {
       });
       expect(transports.mcp.map((tool) => tool.name)).not.toContain(operation.name);
     }
+  });
+
+  it("lists the anonymous public endpoints apart from the operations", () => {
+    expect(publicEndpoints).toEqual([
+      { name: "public_sources", method: "GET", path: "/pcp/v1/public/sources" },
+      { name: "public_pages", method: "GET", path: "/pcp/v1/public/pages" },
+      { name: "public_page", method: "GET", path: "/pcp/v1/public/pages/{source}/{slug}" },
+      { name: "public_search", method: "POST", path: "/pcp/v1/public/search" },
+      { name: "media", method: "GET", path: "/media/{id}" },
+    ]);
+    const operationNames = new Set(operations.map((operation) => operation.name));
+    for (const endpoint of publicEndpoints) {
+      expect(operationNames.has(endpoint.name)).toBe(false);
+    }
+    expect(generateTransports().mcp.map((tool) => tool.name)).not.toContain("public_search");
   });
 });

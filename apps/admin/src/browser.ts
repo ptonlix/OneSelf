@@ -7,12 +7,34 @@ export function readInputChecked(target: EventTarget | null): boolean {
   return readProp(target, "checked") === true;
 }
 
-export function readBrowserLocation(): { pathname: string; search: string } {
+export function readBrowserLocation(): {
+  pathname: string;
+  search: string;
+  host: string;
+  origin: string;
+} {
   const location = readGlobal("location");
   return {
     pathname: typeof location.pathname === "string" ? location.pathname : "/admin/",
     search: typeof location.search === "string" ? location.search : "",
+    host: typeof location.host === "string" ? location.host : "",
+    origin: typeof location.origin === "string" ? location.origin : "",
   };
+}
+
+/** Copies text with the async clipboard API; resolves false when the browser refuses. */
+export async function writeClipboard(text: string): Promise<boolean> {
+  const navigator = (globalThis as { navigator?: { clipboard?: { writeText?: unknown } } })
+    .navigator;
+  const clipboard = navigator?.clipboard;
+  const writeText = clipboard?.writeText;
+  if (typeof writeText !== "function") return false;
+  try {
+    await (writeText as (this: unknown, value: string) => Promise<void>).call(clipboard, text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function pushBrowserPath(url: string): void {
@@ -61,6 +83,8 @@ function readGlobal(key: "location" | "history" | "document"): {
   target: object;
   pathname?: unknown;
   search?: unknown;
+  host?: unknown;
+  origin?: unknown;
   pushState?: unknown;
   getElementById?: unknown;
 } {
@@ -71,6 +95,8 @@ function readGlobal(key: "location" | "history" | "document"): {
     target: candidate,
     pathname: record.pathname,
     search: record.search,
+    host: record.host,
+    origin: record.origin,
     pushState: record.pushState,
     getElementById: record.getElementById,
   };

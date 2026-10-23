@@ -16,11 +16,14 @@ import {
   fileObjectKey,
   getPage,
   getVersions,
+  isFileMediaType,
   isPastRetention,
   isSiteReleaseId,
   isSlug,
   isSourceName,
   listPages,
+  MAX_FILE_BYTES,
+  MAX_SITE_ARCHIVE_BYTES,
   ok,
   previewSite,
   putPage,
@@ -84,14 +87,6 @@ import {
 import { readZip, writeStoredZip } from "./zip.ts";
 import { createOauthEngine, type OauthEngine, type PersistedGrant } from "../oauth/engine.ts";
 
-const FILE_LIMIT = 20 * 1024 * 1024;
-const MEDIA_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-]);
 const RATE_WINDOW_MS = 60_000;
 
 export type IngressMode = "none" | "cloudflared" | "caddy" | "tailscale";
@@ -121,6 +116,24 @@ export type Actor = {
   readonly credential: Credential;
   readonly mustChangePassword: boolean;
   readonly sessionId: string | null;
+};
+
+/**
+ * The owner-visible shape of one OAuth grant: exactly these five fields, never token hashes or
+ * refresh payloads. `GET /admin/oauth-grants` returns `{ oauth_grants: OauthGrantView[] }`; the
+ * admin client parses the same five fields into its own `OauthGrantView`.
+ */
+export type OauthGrantView = {
+  readonly id: string;
+  readonly site_write: boolean;
+  readonly sources: readonly {
+    readonly id: string;
+    readonly read: boolean;
+    readonly write: boolean;
+    readonly visibility: boolean;
+  }[];
+  readonly created_at: string;
+  readonly revoked_at: string | null;
 };
 
 export type OauthHttpResult = {
@@ -643,10 +656,10 @@ export class Runtime {
       if (!canUpload(actor.credential)) {
         return fail("forbidden", "write permission is required");
       }
-      if (!MEDIA_TYPES.has(mediaType)) {
+      if (!isFileMediaType(mediaType)) {
         return fail("invalid", "media type is not allowed");
       }
-      if (bytes.byteLength > FILE_LIMIT) {
+      if (bytes.byteLength > MAX_FILE_BYTES) {
         return fail("payload_too_large", "file exceeds 20 MiB");
       }
       const id = randomId("file_");
@@ -1319,7 +1332,7 @@ export class Runtime {
           ? fail("unauthorized", "authentication required")
           : fail("forbidden", "site write is required");
       }
-      if (bytes.byteLength > FILE_LIMIT) {
+      if (bytes.byteLength > MAX_SITE_ARCHIVE_BYTES) {
         return fail("payload_too_large", "archive exceeds the site upload limit");
       }
       const zip = readZip(bytes);
@@ -1799,6 +1812,35 @@ export class Runtime {
       });
       const response = await this.#requireEngine().handle(request, "/token");
       return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+    });
+  }
+
+  listOauthGrants(actor: Actor): Promise<DomainResult<{ oauth_grants: OauthGrantView[] }>> {
+    return this.exclusive(async () => {
+      const allowed = this.#ownerActor(actor);
+      if (!allowed.ok) {
+        return allowed;
+      }
+      // Copy the five owner-visible fields one by one; token hashes and refresh payloads stay inside.
+      const grants = [...this.#grants].sort((left, right) =>
+        left.createdAt === right.createdAt
+          ? left.id.localeCompare(right.id)
+          : left.createdAt.localeCompare(right.createdAt),
+      );
+      return ok({
+        oauth_grants: grants.map((grant): OauthGrantView => ({
+          id: grant.id,
+          site_write: grant.siteWrite,
+          sources: grant.sources.map((source) => ({
+            id: source.id,
+            read: source.read,
+            write: source.write,
+            visibility: source.visibility,
+          })),
+          created_at: grant.createdAt,
+          revoked_at: grant.revokedAt,
+        })),
+      });
     });
   }
 

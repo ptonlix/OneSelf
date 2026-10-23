@@ -287,10 +287,6 @@ importers:
   packages/public-client: {}
 
   packages/public-page:
-    dependencies:
-      '@oneself/public-client':
-        specifier: workspace:*
-        version: link:../public-client
     devDependencies:
       vite:
         specifier: 8.3.4

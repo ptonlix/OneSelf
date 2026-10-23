@@ -1,5 +1,19 @@
-import { createElement, useCallback, useEffect, useMemo, useState, type ReactElement } from "react";
-import { browserTransport, createAdminClient, failureMessage, type AdminClient } from "./http";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
+import {
+  AdminRequestError,
+  browserTransport,
+  createAdminClient,
+  failureMessage,
+  type AdminClient,
+} from "./http";
 import {
   createApiKeyBody,
   deviceApprovalBody,
@@ -10,12 +24,26 @@ import {
 import { hrefFor, parseAdminRoute, type AdminRoute } from "./routes";
 import { isPasswordGate, isUnauthorized, sessionFromProbeFailure, type Session } from "./session";
 import type { ApiKeyRequest, SiteActivation, SourceDraft } from "./types";
-import { pushBrowserPath, readBrowserLocation, subscribeToLocation } from "./browser";
+import {
+  pushBrowserPath,
+  readBrowserLocation,
+  subscribeToLocation,
+  writeClipboard,
+} from "./browser";
+import {
+  countPublic,
+  greetingFor,
+  HomeView,
+  LOADING_OVERVIEW,
+  runLimited,
+  STATUS_CONCURRENCY,
+  type OverviewData,
+  type SourceRow,
+} from "./overview";
 import {
   ApiKeyApprovalView,
   ApiKeyCreateView,
   DeviceApprovalView,
-  HomeView,
   LoginView,
   PasswordView,
   Shell,
@@ -86,6 +114,7 @@ export function AdminApp(): ReactElement {
   if (session.status === "loading") {
     return shell(
       false,
+      route,
       go,
       logout,
       createElement(StatusView, { title: "管理", message: "正在确认会话" }),
@@ -95,6 +124,7 @@ export function AdminApp(): ReactElement {
   if (session.status === "anonymous") {
     return shell(
       false,
+      route,
       go,
       logout,
       createElement(LoginScreen, {
@@ -116,6 +146,7 @@ export function AdminApp(): ReactElement {
   if (session.status === "password-change") {
     return shell(
       false,
+      route,
       go,
       logout,
       createElement(PasswordScreen, {
@@ -133,16 +164,24 @@ export function AdminApp(): ReactElement {
     );
   }
 
-  return shell(true, go, logout, screenForRoute(route, client, go, onFailure, logout));
+  return shell(true, route, go, logout, screenForRoute(route, client, go, onFailure, logout));
 }
 
 function shell(
   showNav: boolean,
+  route: AdminRoute,
   go: (route: AdminRoute) => void,
   logout: () => void,
   child: ReactElement,
 ): ReactElement {
-  return createElement(Shell, { showNav, onNavigate: go, onLogout: logout, children: child });
+  return createElement(Shell, {
+    showNav,
+    route,
+    host: readBrowserLocation().host,
+    onNavigate: go,
+    onLogout: logout,
+    children: child,
+  });
 }
 
 function screenForRoute(
@@ -156,7 +195,7 @@ function screenForRoute(
     case "home":
     case "login":
     case "unknown":
-      return createElement(HomeView, { onNavigate: go });
+      return createElement(HomeScreen, { client, onFailure, onNavigate: go });
     case "password":
       return createElement(PasswordScreen, {
         client,
@@ -442,6 +481,7 @@ function ApiKeyApprovalScreen(props: {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -474,6 +514,15 @@ function ApiKeyApprovalScreen(props: {
     message,
     pending,
     revealedKey,
+    origin: readBrowserLocation().origin,
+    copied,
+    onCopy: (key) => {
+      void (async () => {
+        const ok = await writeClipboard(key);
+        setCopied(ok);
+        if (!ok) setMessage("浏览器没有允许复制，请手动选中密钥复制");
+      })();
+    },
     onConfirm: () => {
       setPending(true);
       setMessage(null);
@@ -539,6 +588,17 @@ function SiteApprovalScreen(props: {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<"approve" | "reject" | null>(null);
+  const [pointer, setPointer] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -553,6 +613,18 @@ function SiteApprovalScreen(props: {
         if (!cancelled) setMessage(props.onFailure(reason));
       }
     };
+    const loadPointer = async (): Promise<void> => {
+      try {
+        const sites = await props.client.listSites();
+        if (!cancelled) setPointer(sites.pointer);
+      } catch (reason: unknown) {
+        if (!cancelled) {
+          props.onFailure(reason);
+          setPointer(null);
+        }
+      }
+    };
+    void loadPointer();
     void load();
     return () => {
       cancelled = true;
@@ -568,6 +640,8 @@ function SiteApprovalScreen(props: {
 
   return createElement(SiteApprovalView, {
     activation,
+    currentPointer: pointer,
+    now,
     message,
     pending,
     outcome,
@@ -578,6 +652,7 @@ function SiteApprovalScreen(props: {
         try {
           await props.client.decideSite(props.id, decision);
           setOutcome(decision);
+          if (decision === "approve") setPointer(activation.release_id);
         } catch (reason: unknown) {
           setMessage(props.onFailure(reason));
         } finally {
@@ -586,4 +661,155 @@ function SiteApprovalScreen(props: {
       })();
     },
   });
+}
+
+function HomeScreen(props: {
+  client: AdminClient;
+  onFailure: (reason: unknown) => string;
+  onNavigate: (route: AdminRoute) => void;
+}): ReactElement {
+  const { client, onFailure } = props;
+  const [data, setData] = useState<OverviewData>(LOADING_OVERVIEW);
+  const [armedKey, setArmedKey] = useState<string | null>(null);
+  const [armedGrant, setArmedGrant] = useState<string | null>(null);
+  const [keyPending, setKeyPending] = useState(false);
+  const [grantPending, setGrantPending] = useState(false);
+  const [keyMessage, setKeyMessage] = useState<string | null>(null);
+  const [grantMessage, setGrantMessage] = useState<string | null>(null);
+  const alive = useRef(true);
+
+  const patch = useCallback((change: Partial<OverviewData>) => {
+    if (alive.current) setData((current) => ({ ...current, ...change }));
+  }, []);
+
+  const loadKeys = useCallback(async (): Promise<void> => {
+    try {
+      patch({ apiKeys: { state: "ready", value: await client.listApiKeys() } });
+    } catch (reason: unknown) {
+      patch({ apiKeys: { state: "error", message: onFailure(reason) } });
+    }
+  }, [client, onFailure, patch]);
+
+  const loadGrants = useCallback(async (): Promise<void> => {
+    try {
+      patch({ grants: { state: "ready", value: await client.listOauthGrants() } });
+    } catch (reason: unknown) {
+      patch({ grants: { state: "error", message: onFailure(reason) } });
+    }
+  }, [client, onFailure, patch]);
+
+  useEffect(() => {
+    alive.current = true;
+    const loadSources = async (): Promise<void> => {
+      let rows: SourceRow[];
+      try {
+        rows = (await client.listSources()).map((source) => ({
+          id: source.id,
+          status: { state: "loading" },
+        }));
+      } catch (reason: unknown) {
+        patch({ sources: { state: "error", message: onFailure(reason) } });
+        return;
+      }
+      patch({ sources: { state: "ready", value: rows } });
+      await runLimited(rows, STATUS_CONCURRENCY, async (row) => {
+        let status: SourceRow["status"];
+        try {
+          status = { state: "ready", value: await client.sourceStatus(row.id) };
+        } catch (reason: unknown) {
+          status = { state: "error", message: onFailure(reason) };
+        }
+        if (!alive.current) return;
+        setData((current) =>
+          current.sources.state === "ready"
+            ? {
+                ...current,
+                sources: {
+                  state: "ready",
+                  value: current.sources.value.map((entry) =>
+                    entry.id === row.id ? { ...entry, status } : entry,
+                  ),
+                },
+              }
+            : current,
+        );
+      });
+    };
+    const loadPublic = async (): Promise<void> => {
+      try {
+        patch({
+          publicCounts: { state: "ready", value: countPublic(await client.listPublicPages()) },
+        });
+      } catch (reason: unknown) {
+        patch({ publicCounts: { state: "error", message: failureMessage(reason) } });
+      }
+    };
+    const loadSites = async (): Promise<void> => {
+      try {
+        patch({ sites: { state: "ready", value: await client.listSites() } });
+      } catch (reason: unknown) {
+        patch({ sites: { state: "error", message: onFailure(reason) } });
+      }
+    };
+    void Promise.all([loadSources(), loadPublic(), loadKeys(), loadSites(), loadGrants()]);
+    return () => {
+      alive.current = false;
+    };
+  }, [client, onFailure, patch, loadKeys, loadGrants]);
+
+  return createElement(HomeView, {
+    data,
+    greeting: greetingFor(new Date().getHours()),
+    armedKey,
+    armedGrant,
+    keyPending,
+    grantPending,
+    keyMessage,
+    grantMessage,
+    onNavigate: props.onNavigate,
+    onArmKey: (id) => {
+      setKeyMessage(null);
+      setArmedKey(id);
+    },
+    onArmGrant: (id) => {
+      setGrantMessage(null);
+      setArmedGrant(id);
+    },
+    onRevokeKey: (id) => {
+      setKeyPending(true);
+      setKeyMessage(null);
+      void (async () => {
+        let reload = true;
+        try {
+          await client.revokeApiKey(id);
+        } catch (reason: unknown) {
+          setKeyMessage(onFailure(reason));
+          reload = isCode(reason, "conflict") || isCode(reason, "not_found");
+        }
+        setArmedKey(null);
+        setKeyPending(false);
+        if (reload) await loadKeys();
+      })();
+    },
+    onRevokeGrant: (id) => {
+      setGrantPending(true);
+      setGrantMessage(null);
+      void (async () => {
+        let reload = true;
+        try {
+          await client.revokeOauthGrant(id);
+        } catch (reason: unknown) {
+          setGrantMessage(onFailure(reason));
+          reload = isCode(reason, "not_found");
+        }
+        setArmedGrant(null);
+        setGrantPending(false);
+        if (reload) await loadGrants();
+      })();
+    },
+  });
+}
+
+function isCode(reason: unknown, code: string): boolean {
+  return reason instanceof AdminRequestError && reason.code === code;
 }

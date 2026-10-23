@@ -68,6 +68,8 @@ export type {
   VersionView,
 } from "./pages.ts";
 
+export { FILE_MEDIA_TYPES, isFileMediaType, MAX_FILE_BYTES } from "./files.ts";
+
 export {
   sourcesAdd,
   sourcesDelete,

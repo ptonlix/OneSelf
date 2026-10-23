@@ -11,6 +11,8 @@ const ADMIN_PAGES = new Set([
   "device",
   "api-keys/new",
   "site-activations/new",
+  // GET /admin/oauth-grants answers JSON only for Accept: application/json; a browser gets the app.
+  "oauth-grants",
 ]);
 
 export function wantsJson(request: Request): boolean {
@@ -93,6 +95,8 @@ function adminContentType(relative: string): string {
       return "text/javascript; charset=utf-8";
     case ".svg":
       return "image/svg+xml";
+    case ".woff2":
+      return "font/woff2";
     case ".map":
       return "application/json; charset=utf-8";
     default:

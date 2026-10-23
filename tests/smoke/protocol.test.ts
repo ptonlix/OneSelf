@@ -5,14 +5,23 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync } from "node:zlib";
 import { expect, it } from "vitest";
 
-import { operations } from "../../packages/operations/src/index.js";
+import {
+  FILE_MEDIA_TYPES,
+  MAX_FILE_BYTES,
+  MAX_SITE_ARCHIVE_BYTES,
+  MAX_SITE_ARCHIVE_FILES,
+} from "../../packages/domain/src/index.js";
+import { errorCodes, operations, publicEndpoints } from "../../packages/operations/src/index.js";
 import {
   addSource,
   boot,
+  issueAccessToken,
+  issueApiKey,
   jsonHeaders,
   markdown,
   mcpCall,
   mcpToolNames,
+  mcpTools,
   ORIGIN,
   owner,
   PNG_BYTES,
@@ -85,7 +94,283 @@ it("serves OpenAPI from the configured origin", async () => {
   expect(document.openapi).toBe("3.1.0");
   expect(document.servers).toEqual([{ url: ORIGIN }]);
   const ids = operationIds(document.paths);
-  expect(ids).toEqual(operations.map((operation) => operation.name).sort());
+  expect(ids).toEqual(
+    [...operations, ...publicEndpoints].map((operation) => operation.name).sort(),
+  );
+  await server.close();
+});
+
+it("describes credentials, public endpoints, and upload limits in discovery", async () => {
+  const server = await boot();
+  const discovery = await readJson(await server.request("/.well-known/pcp"));
+  expect(discovery.protocol).toBe("pcp");
+  expect(discovery.version).toBe("1");
+  expect(discovery.auth).toEqual({
+    headers: [
+      { credential: "api_key", header: "Authorization", value: "ApiKey <key>" },
+      { credential: "api_key", header: "X-Api-Key", value: "<key>" },
+      { credential: "oauth", header: "Authorization", value: "Bearer <access_token>" },
+    ],
+  });
+  expect(discovery.public).toEqual({
+    credentials: "omit",
+    endpoints: publicEndpoints.map(({ name, method, path }) => ({ name, method, path })),
+  });
+  expect(discovery.uploads).toEqual({
+    file_upload: {
+      field: "file",
+      mcp_arguments: ["data_base64", "media_type"],
+      media_types: [...FILE_MEDIA_TYPES],
+      max_bytes: MAX_FILE_BYTES,
+    },
+    put_site: {
+      field: "archive",
+      mcp_arguments: ["archive_base64"],
+      media_types: ["application/zip"],
+      max_bytes: MAX_SITE_ARCHIVE_BYTES,
+      max_files: MAX_SITE_ARCHIVE_FILES,
+    },
+  });
+
+  // Every listed public endpoint is routed and answers without a credential.
+  for (const endpoint of publicEndpoints) {
+    const path = endpoint.path.replace(/\{\w+\}/g, "missing");
+    const response = await server.request(path, {
+      method: endpoint.method,
+      ...(endpoint.method === "POST"
+        ? { headers: jsonHeaders(), body: JSON.stringify({ q: "anything" }) }
+        : {}),
+    });
+    if (path.includes("missing")) {
+      expect(response.status, endpoint.name).toBe(404);
+      expect((await readJson(response)).error, endpoint.name).toBe("not_found");
+    } else {
+      expect(response.status, endpoint.name).toBe(200);
+    }
+  }
+  await server.close();
+});
+
+it("generates OpenAPI parameters from the MCP input schemas", async () => {
+  const server = await boot();
+  const document = await readJson(await server.request("/openapi.json"));
+  const byId = openApiOperations(document.paths);
+  const tools = await mcpTools(server);
+  expect(tools.map((tool) => tool.name).sort()).toEqual(
+    operations
+      .filter((operation) => !operation.httpOnly)
+      .map((operation) => operation.name)
+      .sort(),
+  );
+  for (const tool of tools) {
+    const operation = byId.get(tool.name);
+    expect(operation, tool.name).toBeDefined();
+    if (operation === undefined) {
+      continue;
+    }
+    const mcpProperties = tool.inputSchema?.properties ?? {};
+    const mcpRequired = [...(tool.inputSchema?.required ?? [])].sort();
+    const upload = operation["x-oneself-upload"] as
+      { field: string; mcp_arguments: string[] } | undefined;
+    if (upload !== undefined) {
+      // Multipart over HTTP, base64 arguments over MCP; the mapping is published.
+      expect(Object.keys(mcpProperties).sort(), tool.name).toEqual(
+        [...upload.mcp_arguments].sort(),
+      );
+      const multipart = bodySchema(operation, "multipart/form-data");
+      expect(Object.keys(multipart.properties), tool.name).toEqual([upload.field]);
+      expect(multipart.required, tool.name).toEqual([upload.field]);
+      continue;
+    }
+    const http: Record<string, unknown> = {};
+    const httpRequired: string[] = [];
+    for (const parameter of (operation.parameters ?? []) as {
+      name: string;
+      required: boolean;
+      schema: unknown;
+    }[]) {
+      http[parameter.name] = parameter.schema;
+      if (parameter.required) {
+        httpRequired.push(parameter.name);
+      }
+    }
+    const json = bodySchema(operation, "application/json");
+    Object.assign(http, json.properties);
+    httpRequired.push(...json.required);
+    expect(http, tool.name).toEqual(mcpProperties);
+    expect(httpRequired.sort(), tool.name).toEqual(mcpRequired);
+  }
+  await server.close();
+});
+
+it("declares OpenAPI security for every operation", async () => {
+  const server = await boot();
+  const document = await readJson(await server.request("/openapi.json"));
+  const components = document.components as { securitySchemes: Record<string, unknown> };
+  expect(components.securitySchemes).toMatchObject({
+    apiKeyHeader: { type: "apiKey", in: "header", name: "X-Api-Key" },
+    oauthBearer: { type: "http", scheme: "bearer" },
+    ownerSession: { type: "apiKey", in: "cookie", name: "oneself_session" },
+  });
+  // A raw apiKey scheme on Authorization would make clients send the bare key, which the
+  // runtime rejects; the `ApiKey <key>` form is described, not declared.
+  expect(Object.keys(components.securitySchemes).sort()).toEqual(
+    ["apiKeyHeader", "oauthBearer", "ownerSession"].sort(),
+  );
+  expect(JSON.stringify(components.securitySchemes)).toContain("Authorization: ApiKey <key>");
+  const byId = openApiOperations(document.paths);
+  for (const operation of operations) {
+    const security = byId.get(operation.name)?.security;
+    if (operation.httpOnly) {
+      expect(security, operation.name).toEqual([{ ownerSession: [] }]);
+    } else {
+      expect(security, operation.name).toEqual([
+        { apiKeyHeader: [] },
+        { oauthBearer: [] },
+        { ownerSession: [] },
+      ]);
+    }
+  }
+  for (const endpoint of publicEndpoints) {
+    const item = byId.get(endpoint.name);
+    expect(item?.security, endpoint.name).toEqual([]);
+    expect(item?.["x-oneself-credentials"], endpoint.name).toBe("omit");
+  }
+  await server.close();
+});
+
+it("accepts every credential exactly as OpenAPI and discovery describe it", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const key = (await issueApiKey(server, cookie, { label: "scheme" })).key;
+  const token = await issueAccessToken(server, cookie);
+  const secrets: Record<string, string> = {
+    api_key: key,
+    oauth: token,
+    owner: cookie.slice("oneself_session=".length),
+  };
+  const whoami = async (headers: Record<string, string>): Promise<Response> =>
+    server.request("/pcp/v1/whoami", { headers });
+
+  // Headers built only from each declared security scheme, as a generated client would.
+  const document = await readJson(await server.request("/openapi.json"));
+  const schemes = (document.components as { securitySchemes: Record<string, SecurityScheme> })
+    .securitySchemes;
+  for (const [name, scheme] of Object.entries(schemes)) {
+    const kind = name === "oauthBearer" ? "oauth" : name === "ownerSession" ? "owner" : "api_key";
+    const secret = secrets[kind] ?? "";
+    let headers: Record<string, string>;
+    if (scheme.type === "http") {
+      expect(scheme.scheme, name).toBe("bearer");
+      headers = { authorization: `Bearer ${secret}` };
+    } else if (scheme.in === "cookie") {
+      headers = { cookie: `${String(scheme.name)}=${secret}` };
+    } else {
+      expect(scheme.in, name).toBe("header");
+      headers = { [String(scheme.name)]: secret };
+    }
+    const response = await whoami(headers);
+    expect(response.status, name).toBe(200);
+    expect((await readJson(response)).credential, name).toBe(kind);
+  }
+
+  // Every header form discovery lists, with its placeholder filled in.
+  const discovery = await readJson(await server.request("/.well-known/pcp"));
+  const listed = (
+    discovery.auth as { headers: { credential: string; header: string; value: string }[] }
+  ).headers;
+  for (const entry of listed) {
+    const value = entry.value.replace(/<[^>]+>/, secrets[entry.credential] ?? "");
+    const response = await whoami({ [entry.header]: value });
+    expect(response.status, entry.value).toBe(200);
+    expect((await readJson(response)).credential, entry.value).toBe(entry.credential);
+  }
+  await server.close();
+});
+
+it("declares upload part types that match what the server accepts", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const byId = openApiOperations((await readJson(await server.request("/openapi.json"))).paths);
+  const declared = (name: string): { field: Record<string, unknown>; encoding: string } => {
+    const body = byId.get(name)?.requestBody as {
+      content: Record<
+        string,
+        {
+          schema: { properties: Record<string, Record<string, unknown>> };
+          encoding: Record<string, { contentType: string }>;
+        }
+      >;
+    };
+    const multipart = body.content["multipart/form-data"];
+    const [fieldName, field] = Object.entries(multipart?.schema.properties ?? {})[0] ?? ["", {}];
+    return { field, encoding: multipart?.encoding[fieldName]?.contentType ?? "" };
+  };
+  const mediaTypes = (field: Record<string, unknown>): string[] =>
+    typeof field.contentMediaType === "string"
+      ? [field.contentMediaType]
+      : ((field.anyOf ?? []) as { contentMediaType: string }[]).map(
+          (item) => item.contentMediaType,
+        );
+
+  const file = declared("file_upload");
+  expect(file.field).toMatchObject({ type: "string", format: "binary" });
+  expect(mediaTypes(file.field)).toEqual([...FILE_MEDIA_TYPES]);
+  expect(file.encoding.split(", ")).toEqual([...FILE_MEDIA_TYPES]);
+  expect(JSON.stringify(file.field)).not.toContain("octet-stream");
+  for (const type of mediaTypes(file.field)) {
+    const form = new FormData();
+    form.set("file", new File([PNG_BYTES], "f", { type }));
+    const response = await server.request("/pcp/v1/files", {
+      method: "POST",
+      headers: { cookie },
+      body: form,
+    });
+    expect(response.status, type).toBe(200);
+  }
+  const rejected = new FormData();
+  rejected.set("file", new File([PNG_BYTES], "f", { type: "application/octet-stream" }));
+  const refused = await server.request("/pcp/v1/files", {
+    method: "POST",
+    headers: { cookie },
+    body: rejected,
+  });
+  expect(refused.status).toBe(400);
+
+  const site = declared("put_site");
+  expect(site.field).toMatchObject({
+    type: "string",
+    format: "binary",
+    contentMediaType: "application/zip",
+  });
+  expect(site.encoding).toBe("application/zip");
+  await server.close();
+});
+
+it("lists every error code of a shared status in one OpenAPI response", async () => {
+  const server = await boot();
+  const byId = openApiOperations((await readJson(await server.request("/openapi.json"))).paths);
+  const responses = byId.get("put_page")?.responses as Record<
+    string,
+    {
+      description: string;
+      content: Record<string, { schema: { properties: Record<string, { enum: string[] }> } }>;
+    }
+  >;
+  const forbidden = responses["403"];
+  expect(forbidden?.description).toContain("forbidden");
+  expect(forbidden?.description).toContain("password_change_required");
+  expect(forbidden?.content["application/json"]?.schema.properties.error?.enum.sort()).toEqual([
+    "forbidden",
+    "password_change_required",
+  ]);
+  for (const errorCode of errorCodes) {
+    expect(
+      responses[String(errorCode.status)]?.content["application/json"]?.schema.properties.error
+        ?.enum,
+      errorCode.error,
+    ).toContain(errorCode.error);
+  }
   await server.close();
 });
 
@@ -359,6 +644,39 @@ function forwarded(connecting: string, forwardedFor: string): Headers {
     "cf-connecting-ip": connecting,
     "x-forwarded-for": forwardedFor,
   });
+}
+
+type OpenApiOperation = Record<string, unknown> & { parameters?: unknown; security?: unknown };
+
+type SecurityScheme = { type: string; scheme?: string; in?: string; name?: string };
+
+function openApiOperations(paths: unknown): Map<string, OpenApiOperation> {
+  const result = new Map<string, OpenApiOperation>();
+  for (const item of Object.values((paths ?? {}) as Record<string, Record<string, unknown>>)) {
+    for (const operation of Object.values(item)) {
+      const id = (operation as { operationId?: unknown }).operationId;
+      if (typeof id === "string") {
+        result.set(id, operation as OpenApiOperation);
+      }
+    }
+  }
+  return result;
+}
+
+function bodySchema(
+  operation: OpenApiOperation,
+  mediaType: string,
+): { properties: Record<string, unknown>; required: string[] } {
+  const body = operation.requestBody as
+    | {
+        content?: Record<
+          string,
+          { schema?: { properties?: Record<string, unknown>; required?: string[] } }
+        >;
+      }
+    | undefined;
+  const schema = body?.content?.[mediaType]?.schema;
+  return { properties: schema?.properties ?? {}, required: schema?.required ?? [] };
 }
 
 function operationIds(paths: unknown): string[] {

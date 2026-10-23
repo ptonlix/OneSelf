@@ -1,15 +1,21 @@
 import type {
   ApiKeyRequest,
+  ApiKeySummary,
   CreateApiKeyBody,
   DeviceApprovalBody,
   LoginResult,
+  OauthGrantView,
   PasswordResult,
   PendingApproval,
+  PublicPageSummary,
   RevealedApiKey,
   SiteActivation,
   SiteDecision,
+  SiteList,
+  SiteRelease,
   SourceDirectory,
   SourceGrant,
+  SourceStatus,
   Whoami,
 } from "./types";
 
@@ -33,9 +39,11 @@ export class ParseError extends Error {
 }
 
 export interface HttpRequest {
-  method: "GET" | "POST";
+  method: "GET" | "POST" | "DELETE";
   path: string;
   json?: unknown;
+  /** Anonymous requests send no cookie, exactly like a visitor of the public site. */
+  anonymous?: true;
 }
 
 export interface HttpResponse {
@@ -50,7 +58,7 @@ export function browserTransport(fetchImpl: typeof fetch = globalThis.fetch): Ht
     const headers = new Headers({ accept: "application/json" });
     const init: RequestInit = {
       method: request.method,
-      credentials: "include",
+      credentials: request.anonymous === true ? "omit" : "include",
       headers,
     };
     if (request.json !== undefined) {
@@ -75,6 +83,13 @@ export interface AdminClient {
   getSiteActivation(id: string): Promise<SiteActivation>;
   decideSite(id: string, decision: SiteDecision): Promise<void>;
   approveDevice(body: DeviceApprovalBody): Promise<void>;
+  listApiKeys(): Promise<ApiKeySummary[]>;
+  revokeApiKey(id: string): Promise<void>;
+  sourceStatus(id: string): Promise<SourceStatus>;
+  listSites(): Promise<SiteList>;
+  listPublicPages(): Promise<PublicPageSummary[]>;
+  listOauthGrants(): Promise<OauthGrantView[]>;
+  revokeOauthGrant(id: string): Promise<void>;
 }
 
 export function createAdminClient(transport: HttpTransport): AdminClient {
@@ -154,6 +169,42 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
       if (isRecord(response) && "key" in response) {
         throw new ParseError("设备码批准不应返回密钥");
       }
+    },
+    async listApiKeys() {
+      return parseApiKeyList(await send(transport, { method: "GET", path: "/pcp/v1/api-keys" }));
+    },
+    async revokeApiKey(id) {
+      const response = await send(transport, {
+        method: "DELETE",
+        path: `/pcp/v1/api-keys/${encodeURIComponent(id)}`,
+      });
+      rejectKeyField(response, "作废响应不能包含密钥");
+    },
+    async sourceStatus(id) {
+      return parseSourceStatus(
+        await send(transport, { method: "GET", path: `/pcp/v1/sources/${encodeURIComponent(id)}` }),
+      );
+    },
+    async listSites() {
+      return parseSiteList(await send(transport, { method: "GET", path: "/pcp/v1/site" }));
+    },
+    async listPublicPages() {
+      return parsePublicPages(
+        await send(transport, { method: "GET", path: "/pcp/v1/public/pages", anonymous: true }),
+      );
+    },
+    async listOauthGrants() {
+      return parseOauthGrants(
+        await send(transport, { method: "GET", path: "/admin/oauth-grants" }),
+      );
+    },
+    async revokeOauthGrant(id) {
+      const response = await send(transport, {
+        method: "POST",
+        path: `/admin/oauth-grants/${encodeURIComponent(id)}/revoke`,
+        json: {},
+      });
+      rejectKeyField(response, "作废响应不能包含密钥");
     },
   };
 }
@@ -322,6 +373,139 @@ function parseGrants(value: unknown): SourceGrant[] {
     if (seen.has(item.id)) throw new ParseError("source 重复");
     seen.add(item.id);
     return { id: item.id, read: item.read, write: item.write, visibility: item.visibility };
+  });
+}
+
+function rejectKeyField(body: unknown, message: string): void {
+  if (isRecord(body) && "key" in body) throw new ParseError(message);
+}
+
+function nullableString(value: unknown): value is string | null {
+  return value === null || typeof value === "string";
+}
+
+function parseApiKeyList(body: unknown): ApiKeySummary[] {
+  if (!isRecord(body) || !Array.isArray(body.api_keys)) {
+    throw new ParseError("API Key 列表无法识别");
+  }
+  return body.api_keys.map((item: unknown) => {
+    if (isRecord(item) && ("key" in item || "key_hash" in item)) {
+      throw new ParseError("API Key 列表不能包含密钥");
+    }
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      item.id === "" ||
+      typeof item.label !== "string" ||
+      typeof item.unrestricted_data !== "boolean" ||
+      typeof item.site_write !== "boolean" ||
+      typeof item.created_at !== "string" ||
+      !nullableString(item.last_used_at) ||
+      !nullableString(item.revoked_at)
+    ) {
+      throw new ParseError("API Key 无法识别");
+    }
+    return {
+      id: item.id,
+      label: item.label,
+      unrestricted_data: item.unrestricted_data,
+      site_write: item.site_write,
+      sources: parseGrants(item.sources),
+      created_at: item.created_at,
+      last_used_at: item.last_used_at,
+      revoked_at: item.revoked_at,
+    };
+  });
+}
+
+function parseSourceStatus(body: unknown): SourceStatus {
+  rejectKeyField(body, "目录状态不能包含密钥");
+  if (
+    !isRecord(body) ||
+    typeof body.id !== "string" ||
+    typeof body.page_count !== "number" ||
+    !Number.isInteger(body.page_count) ||
+    body.page_count < 0 ||
+    !nullableString(body.latest_write_at)
+  ) {
+    throw new ParseError("目录状态无法识别");
+  }
+  return { id: body.id, page_count: body.page_count, latest_write_at: body.latest_write_at };
+}
+
+function parseSiteList(body: unknown): SiteList {
+  rejectKeyField(body, "站点列表不能包含密钥");
+  if (
+    !isRecord(body) ||
+    !isRecord(body.pointer) ||
+    typeof body.pointer.release_id !== "string" ||
+    !Array.isArray(body.releases)
+  ) {
+    throw new ParseError("站点列表无法识别");
+  }
+  const releases = body.releases.map((item: unknown): SiteRelease => {
+    if (!isRecord(item) || typeof item.id !== "string" || typeof item.created_at !== "string") {
+      throw new ParseError("release 无法识别");
+    }
+    return { id: item.id, created_at: item.created_at };
+  });
+  return { pointer: body.pointer.release_id, releases };
+}
+
+function parsePublicPages(body: unknown): PublicPageSummary[] {
+  if (!Array.isArray(body)) throw new ParseError("公开页列表无法识别");
+  return body.map((item: unknown) => {
+    rejectKeyField(item, "公开页列表不能包含密钥");
+    if (
+      !isRecord(item) ||
+      typeof item.source !== "string" ||
+      typeof item.slug !== "string" ||
+      typeof item.type !== "string" ||
+      typeof item.title !== "string"
+    ) {
+      throw new ParseError("公开页无法识别");
+    }
+    return { source: item.source, slug: item.slug, type: item.type, title: item.title };
+  });
+}
+
+const GRANT_FIELDS = [
+  "created_at",
+  "id",
+  "revoked_at",
+  "site_write",
+  "sources",
+] as const satisfies readonly (keyof OauthGrantView)[];
+const SECRET_FIELD = /token|refresh|hash/i;
+
+function parseOauthGrants(body: unknown): OauthGrantView[] {
+  if (!isRecord(body) || !Array.isArray(body.oauth_grants)) {
+    throw new ParseError("设备授权列表无法识别");
+  }
+  return body.oauth_grants.map((item: unknown) => {
+    if (!isRecord(item)) throw new ParseError("设备授权无法识别");
+    const fields = Object.keys(item);
+    if (fields.some((field) => field === "key" || SECRET_FIELD.test(field))) {
+      throw new ParseError("设备授权不能包含令牌");
+    }
+    if (
+      fields.length !== GRANT_FIELDS.length ||
+      [...fields].sort().some((field, index) => field !== GRANT_FIELDS[index]) ||
+      typeof item.id !== "string" ||
+      item.id === "" ||
+      typeof item.site_write !== "boolean" ||
+      typeof item.created_at !== "string" ||
+      !nullableString(item.revoked_at)
+    ) {
+      throw new ParseError("设备授权无法识别");
+    }
+    return {
+      id: item.id,
+      site_write: item.site_write,
+      sources: parseGrants(item.sources),
+      created_at: item.created_at,
+      revoked_at: item.revoked_at,
+    };
   });
 }
 

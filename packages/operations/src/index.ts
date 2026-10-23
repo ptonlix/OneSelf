@@ -3,6 +3,7 @@ export {
   errorCodes,
   generateTransports,
   operations,
+  publicEndpoints,
   type ErrorCode,
   type ErrorCodeDefinition,
   type ErrorStatus,
@@ -12,5 +13,7 @@ export {
   type Operation,
   type OperationErrorBody,
   type OperationName,
+  type PublicEndpoint,
+  type PublicEndpointName,
   type TransportProjection,
 } from "./registry.ts";

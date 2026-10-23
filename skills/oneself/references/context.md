@@ -4,7 +4,7 @@
 
 公开请求使用 `credentials: omit`。不得写入密钥或私有页。不得把密钥或 private 页写进源码或构建产物。
 
-发现文档给出 OpenAPI 和 MCP。两边操作名相同，按操作名调用，不要另造路径。参数以工具 schema 或 OpenAPI 为准。
+操作的方法、路径、参数、请求头和上传限制以入口 `SKILL.md` 要求先读的发现文档 `/.well-known/pcp` 为准：参数看它指向的 OpenAPI 或 MCP 工具的输入 schema，上传看它的 `uploads`。这里只写流程和容易出错的语义。按操作名调用，不要另造路径。
 
 ## 何时用
 
@@ -15,7 +15,7 @@
 
 ## 先看这些
 
-- 一页由 `source` 和 `slug` 标识。`source` 匹配 `^[a-z][a-z0-9-]{0,62}$`。`slug` 匹配 `^[a-z0-9][a-z0-9-]{0,79}$`，且不含 `/`。不预置名为 `public`、`private` 或 `agents` 的目录。公开与否只看这一页的 `visibility`。
+- 一页由 `source` 和 `slug` 标识，格式以参数 schema 为准；`slug` 不含 `/`。不预置名为 `public`、`private` 或 `agents` 的目录。公开与否只看这一页的 `visibility`。
 - 没有可写目录时停下来问所属人。不要调用 `sources_add`，除非这次凭据是所属人会话，或带全部数据权限的 API Key。软删除期内的同名会 `conflict`，不要改个近名再造。
 - 没有人要求公开时保持 `private`。frontmatter 省略 `visibility` 时保存为 `private`。其他值会被拒绝，不会被改成二者之一。改可见性，或把新页直接写成 `public`，都要有该 source 的改可见性权限。只有写权限不够。
 - `title` 只认 frontmatter，不认一级标题。`type` 是标签，不是新表。不要为一种新资料建表或发明围栏。
@@ -31,23 +31,23 @@
 - [ ] 调用 `whoami` 和 `sources_list`。确认能写哪个目录，以及该目录有没有改可见性权限。
 - [ ] 用 `search`、`list_pages` 或 `recall` 找已有页。`search` 只返回标题和最多 140 字片段，不返回全文。要改内容先 `get_page`，用返回的当前哈希。
 - [ ] 一段可以单独引用的资料做成一页。稳定字段放进 frontmatter，叙述放进正文，带日期的事件放进 `## Timeline`，会过期或不确定的陈述放进 `## Facts`。
-- [ ] 图片和 PDF 不进正文。HTTP 用 `file_upload` 的 multipart 字段 `file`；MCP 传 `data_base64` 和 `media_type`。只接受 JPEG、PNG、WebP、GIF 和 PDF，单文件最大 20 MiB。
+- [ ] 图片和 PDF 不进正文，用 `file_upload` 上传。字段名、允许的类型和单文件大小上限看发现文档 `uploads.file_upload`；超出的不要硬传，先告诉所属人。
 - [ ] 新页用 `put_page`，正文是完整 Markdown。已有页的小改用 `edit_page`。多页一起写用 `put_pages`，任一页不合法则全部不写。
 - [ ] 原件返回 `id` 和 `/media/{id}` 后，把 id 放进 frontmatter 的 `files`，再写入该页。上传成功还不等于挂上，更不等于公开。
 - [ ] 用返回的哈希再 `get_page` 核对。失败时不要改成不带哈希的覆盖，除非你就是要用当前正文替换刚写过的内容。
 
 `remember`、`forget`、`add_timeline_entry`、`add_tag`、`remove_tag`、`add_link`、`remove_link` 会回写 Markdown 或 frontmatter，再走和 `put_page` 相同的写入。它们不单独改表。能用这些操作完成的小改，就不要整页覆盖。
 
-## 容易调用错的参数
+## 参数的语义
 
-- `put_page`：`{source, slug, markdown, hash?}`。新页不带 `hash`。
-- `edit_page`：`{source, slug, hash, edits:[{search, replace}]}`。`hash` 必填。
-- `remember`：`{source, slug, entity, statement, confidence?, valid_until?, id?}`。
-- `forget`：`{source, slug, id}`。这是从该页的 `## Facts` 去掉这一条。
-- `add_timeline_entry`：`{source, slug, date, title, detail?}`。`date` 用 `YYYY-MM-DD`。
-- `add_link` / `remove_link`：`{from:{source, slug}, to:{source, slug}}`。页里仍然只写 `[[source/slug]]`。
-- `delete_page` / `restore_page`：`{source, slug}`。
-- `revert_version`：`{source, slug, hash}`。`hash` 来自 `get_versions`，每页最多 50 条历史。
+参数名和类型看 OpenAPI 或 MCP 输入 schema。schema 看不出的含义在这里：
+
+- `put_page`：新页不带 `hash`；带上当前哈希才是安全覆盖。
+- `edit_page`：`hash` 必填，是当前哈希。
+- `forget`：从该页的 `## Facts` 去掉这一条。
+- `add_timeline_entry`：`date` 用 `YYYY-MM-DD`。
+- `add_link` / `remove_link`：页里仍然只写 `[[source/slug]]`。
+- `revert_version`：`hash` 来自 `get_versions`，每页最多 50 条历史。
 
 `query` 没有匿名投影，只在已授权的上下文里按 source、type、tag 或时间过滤。不要用它代替公开站点的读取。
 

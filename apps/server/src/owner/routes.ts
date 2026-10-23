@@ -2,7 +2,7 @@ import type { Hono } from "hono";
 
 import { isRecord, parseGrants, rateLimited, readJson, sendError, sendJson } from "../app/json.ts";
 import { parseOperation } from "../app/schemas.ts";
-import type { Runtime } from "../app/runtime.ts";
+import type { OauthGrantView, Runtime } from "../app/runtime.ts";
 import { adminPage, wantsJson } from "./static.ts";
 
 export function mountOwner(app: Hono, runtime: Runtime): void {
@@ -136,6 +136,19 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
       return sendError(result.error, result.message);
     }
     return sendJson({});
+  });
+
+  app.get("/admin/oauth-grants", async (c) => {
+    if (!wantsJson(c.req.raw)) {
+      return adminPage(runtime, c);
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const result = await runtime.listOauthGrants(actor);
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    const body: { oauth_grants: readonly OauthGrantView[] } = result.value;
+    return sendJson(body);
   });
 
   app.post("/admin/oauth-grants/:id/revoke", async (c) => {

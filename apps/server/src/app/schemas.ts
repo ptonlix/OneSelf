@@ -1,3 +1,4 @@
+import type { PublicEndpointName } from "@oneself/operations";
 import { z } from "zod";
 
 const sourceName = z.string().regex(/^[a-z][a-z0-9-]{0,62}$/);
@@ -132,6 +133,15 @@ export const operationSchemas = {
 } as const;
 
 export type OperationSchemaName = keyof typeof operationSchemas;
+
+/** Inputs of the anonymous public endpoints. Public search takes the `search` body. */
+export const publicSchemas = {
+  public_sources: z.object({}),
+  public_pages: z.object({}),
+  public_page: z.object({ source: sourceName, slug }),
+  public_search: operationSchemas.search,
+  media: z.object({ id: z.string() }),
+} as const satisfies Record<PublicEndpointName, z.ZodObject>;
 
 export function parseOperation<Name extends OperationSchemaName>(
   name: Name,

@@ -14,7 +14,7 @@ const requiredSentences = [
   "两种 fence",
   "files",
   "[[source/slug]]",
-  "原始页面能展示的公开字段",
+  "内置页只是介绍",
   "真实路径",
   "保留路径",
   "credentials: omit",
@@ -62,11 +62,20 @@ describe("product skills", () => {
 
   it("keeps site rules in references/public-page.md", () => {
     for (const sentence of [
-      "原始页面能展示的公开字段",
-      "name",
-      "org",
-      "start",
-      "end",
+      "## 内置页只是介绍",
+      "## 读取公开资料",
+      "`public.endpoints`",
+      "`uploads.put_site`",
+      "get_site",
+      "put_site",
+      "preview_site",
+      "activate_site",
+      "不规定任何视觉规范",
+      "@oneself/public-client",
+      "packages/public-client/src/client.ts",
+      "必须在构建时把它打进产物",
+      "资源一律用相对路径",
+      'base: "./"',
       "真实路径",
       "blog/index.html",
       "保留路径",
@@ -85,6 +94,20 @@ describe("product skills", () => {
       "public-page-source.zip",
     ]) {
       expect(publicPage, sentence).toContain(sentence);
+    }
+    for (const forbidden of [
+      "brand.css",
+      "--teal",
+      "--orbit",
+      "data-field",
+      "data-type",
+      "npm install @oneself/public-client",
+      "esm.sh",
+      "unpkg",
+      "jsdelivr",
+      "原始页面能展示的公开字段",
+    ]) {
+      expect(publicPage, forbidden).not.toContain(forbidden);
     }
   });
 
@@ -132,6 +155,52 @@ describe("product skills", () => {
     expect(originRule.indexOf("~/.config/oneself/config.json")).toBeLessThan(
       originRule.indexOf("metadata.oneself_origin"),
     );
+  });
+
+  it("sends the agent to the discovery document for interface details", () => {
+    expect(entry).toContain("## 先读发现文档");
+    expect(entry).toContain("`GET {origin}/.well-known/pcp`");
+    expect(entry).toContain("`metadata.oneself_origin`");
+    expect(entry.indexOf("## 先读发现文档")).toBeLessThan(entry.indexOf("## 动手前"));
+    for (const field of ["`operations`", "`auth`", "`public`", "`uploads`", "`openapi`", "`mcp`"]) {
+      expect(entry, field).toContain(field);
+    }
+    for (const reference of [context, publicPage]) {
+      expect(reference).toContain("发现文档 `/.well-known/pcp` 为准");
+    }
+    expect(context).toContain("`uploads.file_upload`");
+  });
+
+  it("keeps the owner approval workflows in the Skill", () => {
+    expect(entry).toContain("## 连接并由所属人批准");
+    expect(entry).toContain("`verification_uri_complete`");
+    expect(entry).toContain("{origin}/admin/api-keys/new");
+    expect(entry).toContain("Agent 不能自己创建或作废密钥");
+    expect(entry).toContain("请求头按发现文档 `auth` 写");
+    expect(publicPage).toContain("Agent 不能调用 `POST /admin/site-activations/{id}/approve`");
+    expect(publicPage).toContain("## 批准");
+  });
+
+  it("does not hard-code what discovery and OpenAPI publish", () => {
+    const all = `${entry}\n${combined}`;
+    // Operation and public paths, credential headers, and upload limits come from the server.
+    expect(all).not.toMatch(/\/pcp\/v1\//);
+    for (const literal of [
+      "Authorization:",
+      "ApiKey <key>",
+      "Bearer <",
+      "X-Api-Key",
+      "20 MiB",
+      "200 个文件",
+      "multipart 字段 `file`",
+      "multipart 字段 `archive`",
+      "data_base64",
+      "archive_base64",
+      "^[a-z][a-z0-9-]{0,62}$",
+      "^[a-z0-9][a-z0-9-]{0,79}$",
+    ]) {
+      expect(all, literal).not.toContain(literal);
+    }
   });
 
   it("does not name Hono, Express, or Next.js", () => {

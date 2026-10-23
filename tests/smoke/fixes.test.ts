@@ -10,7 +10,21 @@ import type {
   PostgresStore,
 } from "../../packages/adapters/src/postgres-store.js";
 import { loadProjection } from "../../apps/server/src/app/postgres-state.js";
-import { boot, expectError, jsonHeaders, markdown, owner, putPage, readJson } from "./support.js";
+import type { OauthGrantView } from "../../apps/server/src/app/runtime.js";
+import {
+  addSource,
+  boot,
+  expectError,
+  issueAccessToken,
+  issueApiKey,
+  jsonHeaders,
+  login,
+  markdown,
+  mcpToolNames,
+  owner,
+  putPage,
+  readJson,
+} from "./support.js";
 
 it("serves admin HTML for browser navigation and JSON only for an explicit Accept", async () => {
   const admin = mkdtempSync(path.join(tmpdir(), "oneself-admin-"));
@@ -20,7 +34,11 @@ it("serves admin HTML for browser navigation and JSON only for an explicit Accep
     '<!doctype html><title>ADMIN-DIST</title><script src="/admin/assets/app.js"></script>',
   );
   writeFileSync(path.join(admin, "assets", "app.js"), "console.log('admin')");
+  writeFileSync(path.join(admin, "assets", "x.woff2"), new Uint8Array([0x77, 0x4f, 0x46, 0x32]));
   const server = await boot({ adminDistDir: admin });
+  const font = await server.request("/admin/assets/x.woff2");
+  expect(font.status).toBe(200);
+  expect(font.headers.get("content-type")).toBe("font/woff2");
   for (const pathName of [
     "/admin/",
     "/admin/login",
@@ -209,6 +227,104 @@ it("lets the owner revoke one oauth grant", async () => {
   });
   expect(refresh.status).toBe(400);
   await server.close();
+});
+
+it("lists oauth grants to the owner without any token material", async () => {
+  const admin = mkdtempSync(path.join(tmpdir(), "oneself-admin-"));
+  writeFileSync(path.join(admin, "index.html"), "<!doctype html><title>ADMIN-DIST</title>");
+  const server = await boot({ adminDistDir: admin });
+  const cookie = await owner(server);
+  await addSource(server, cookie, "notes");
+  const sources = [{ id: "notes", read: true, write: false, visibility: true }];
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const approved = await server.request("/admin/device", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: JSON.stringify({ user_code: device.user_code, site_write: true, sources }),
+  });
+  expect(approved.status).toBe(200);
+  const token = await readJson(
+    await server.request(
+      "/oauth/token",
+      tokenRequest({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: String(device.device_code),
+      }),
+    ),
+  );
+  const accessToken = String(token.access_token);
+  const refreshToken = String(token.refresh_token);
+  expect(accessToken.length).toBeGreaterThan(0);
+
+  const listGrants = (headers: Record<string, string>): Promise<Response> =>
+    server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", ...headers },
+    });
+  const listed = await listGrants({ cookie });
+  expect(listed.status).toBe(200);
+  const text = await listed.text();
+  expect(text).not.toContain(accessToken);
+  expect(text).not.toContain(refreshToken);
+  expect(text).not.toMatch(/token|refresh|hash/i);
+  expect(text).not.toMatch(/[0-9a-f]{64}/i);
+  const body = JSON.parse(text) as { oauth_grants: OauthGrantView[] };
+  expect(Object.keys(body)).toEqual(["oauth_grants"]);
+  expect(body.oauth_grants).toHaveLength(1);
+  const grant = body.oauth_grants[0];
+  const fields: readonly (keyof OauthGrantView)[] = [
+    "created_at",
+    "id",
+    "revoked_at",
+    "site_write",
+    "sources",
+  ];
+  expect(Object.keys(grant ?? {}).sort()).toEqual(fields);
+  expect(grant?.site_write).toBe(true);
+  expect(grant?.sources).toEqual(sources);
+  expect(grant?.revoked_at).toBeNull();
+  expect(grant?.id).toBe(server.runtime.oauthGrants()[0]?.id);
+
+  const revoked = await server.request(`/admin/oauth-grants/${String(grant?.id)}/revoke`, {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: "{}",
+  });
+  expect(revoked.status).toBe(200);
+  const after = (await readJson(await listGrants({ cookie }))) as {
+    oauth_grants: { id: string; revoked_at: string | null }[];
+  };
+  expect(after.oauth_grants).toHaveLength(1);
+  expect(after.oauth_grants[0]?.id).toBe(grant?.id);
+  expect(typeof after.oauth_grants[0]?.revoked_at).toBe("string");
+
+  await expectError(await listGrants({}), 401, "unauthorized");
+  const key = await issueApiKey(server, cookie, { label: "agent", unrestricted_data: true });
+  await expectError(await listGrants({ authorization: `ApiKey ${key.key}` }), 403, "forbidden");
+  const bearer = await issueAccessToken(server, cookie, { sources });
+  await expectError(await listGrants({ authorization: `Bearer ${bearer}` }), 403, "forbidden");
+
+  const page = await server.request("/admin/oauth-grants", { headers: { accept: "text/html" } });
+  expect(page.status).toBe(200);
+  expect(page.headers.get("content-type")).toContain("text/html");
+  expect(await page.text()).toContain("ADMIN-DIST");
+
+  expect(await (await server.request("/openapi.json")).text()).not.toContain("oauth-grants");
+  expect((await mcpToolNames(server)).join(" ")).not.toMatch(/oauth.?grant/i);
+  await server.close();
+
+  const fresh = await boot();
+  const gated = await login(fresh);
+  const blocked = await fresh.request("/admin/oauth-grants", {
+    headers: { accept: "application/json", cookie: gated },
+  });
+  await expectError(blocked, 403, "password_change_required");
+  await fresh.close();
 });
 
 it("keeps the issued refresh when a used device code is submitted again", async () => {

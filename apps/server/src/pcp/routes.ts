@@ -12,7 +12,8 @@ import {
 } from "../app/json.ts";
 import { parseOperation } from "../app/schemas.ts";
 import type { Actor, Runtime } from "../app/runtime.ts";
-import { discoveryDocument, oauthMetadata, openApiDocument } from "./discovery.ts";
+import { discoveryDocument, oauthMetadata, uploads } from "./discovery.ts";
+import { openApiDocument } from "./openapi.ts";
 
 export function mountPcp(app: Hono, runtime: Runtime): void {
   app.get("/.well-known/pcp", () => sendJson(discoveryDocument(runtime.origin)));
@@ -226,9 +227,9 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
         return rateLimited();
       }
       const parsed = await c.req.parseBody();
-      const file = parsed.file;
+      const file = parsed[uploads.file_upload.field];
       if (!(file instanceof File)) {
-        return sendError("invalid", "file is required");
+        return sendError("invalid", `${uploads.file_upload.field} is required`);
       }
       const bytes = new Uint8Array(await file.arrayBuffer());
       return resultOf(await runtime.uploadFile(actor, bytes, file.type));
@@ -338,9 +339,9 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
         return rateLimited();
       }
       const parsed = await c.req.parseBody();
-      const archive = parsed.archive;
+      const archive = parsed[uploads.put_site.field];
       if (!(archive instanceof File)) {
-        return sendError("invalid", "archive is required");
+        return sendError("invalid", `${uploads.put_site.field} is required`);
       }
       return resultOf(await runtime.putSite(actor, new Uint8Array(await archive.arrayBuffer())));
     }),

@@ -1,10 +1,10 @@
 ---
 name: oneself
-description: 管理 OneSelf 的个人上下文，把文字写成页并挂上原件；同时定制唯一的个人公开宣传页。写、改、删或挂接文件前读 references/context.md。定制、上传、预览或申请上线前读 references/public-page.md。
+description: 管理 OneSelf 的个人上下文，把文字写成页并挂上原件；同时定制唯一的个人公开宣传页。先读本站发现文档 /.well-known/pcp 和它指向的 OpenAPI 取接口细节。写、改、删或挂接文件前读 references/context.md。定制、上传、预览或申请上线前读 references/public-page.md。
 compatibility: OneSelf PCP。
 metadata:
   author: oneself
-  version: "2"
+  version: "4"
 ---
 
 # oneself
@@ -14,6 +14,21 @@ metadata:
 - 把简历、经历、笔记、对话、照片或证件整理进个人上下文，或查找、修改、删除、恢复已有的页和原件。
 - 改公开宣传页的版式，增加真实地址，预览，或申请上线。
 
+## 先读发现文档
+
+这份 Skill 只写流程：怎样连接并由所属人批准、怎样整理资料、怎样定制和上线展示页。接口细节一律以本站的 PCP 发现文档和它指向的 OpenAPI 为准，不要凭记忆拼路径、请求头或参数。
+
+按下面「连接配置」的顺序取到 origin 后（随站点下发的副本里就是 `metadata.oneself_origin`），第一次调用前先匿名 `GET {origin}/.well-known/pcp`。它给出：
+
+- `operations`：每个操作的 `name`、`method`、`path`。按操作名找到方法和路径再调用，不要另造路径。
+- `auth`：带凭据时用哪个请求头、值怎么写。
+- `public`：匿名公开接口和公开媒体的清单，以及公开请求的 `credentials` 取值。
+- `uploads`：原件和站点包的 multipart 字段名、MCP 参数名、允许的类型和大小、文件数上限。
+- `openapi`：OpenAPI 文档。每个操作的路径参数、查询参数、请求体和认证方式都在里面。
+- `mcp`：MCP 端点（Streamable HTTP）。工具名就是操作名，参数以工具的输入 schema 为准，与 OpenAPI 一致。
+- `oauth`：OAuth 授权服务器元数据，里面有设备码和换 token 的端点。
+- `skills`：这份 Skill 的地址。
+
 ## 动手前
 
 写、改、删或挂接文件之前，必须先读 `references/context.md`。定制、上传、预览或申请上线公开页之前，必须先读 `references/public-page.md`。
@@ -22,6 +37,15 @@ metadata:
 
 - `{oneself_origin}/skills/oneself/references/context.md`
 - `{oneself_origin}/skills/oneself/references/public-page.md`
+
+## 连接并由所属人批准
+
+没有可用凭据时，二选一，两种都要所属人在管理端确认：
+
+- OAuth 设备码：从发现文档的 `oauth` 元数据取设备码端点并申请，把返回的 `verification_uri_complete`（在 `/admin/device` 下）和 `user_code` 交给所属人批准；按返回的间隔轮询换 token 的端点，拿到 `refresh_token` 后按下文保存。
+- API Key：请所属人在 `{origin}/admin/api-keys/new` 发起并批准，原文只显示一次，由所属人交给你。Agent 不能自己创建或作废密钥。
+
+请求头按发现文档 `auth` 写。权限相同时两种方式结果一致。调用 `whoami` 确认拿到的目录权限和 `site:write`。
 
 ## 连接配置
 

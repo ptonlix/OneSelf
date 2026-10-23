@@ -3,12 +3,14 @@ import { expect, it } from "vitest";
 import type { ServerHandle } from "../../apps/server/src/index.js";
 import { readZip, writeStoredZip } from "../../apps/server/src/app/zip.js";
 import {
+  addSource,
   boot,
   expectError,
   issueApiKey,
   jsonHeaders,
   ORIGIN,
   owner,
+  putPage,
   readJson,
   uploadArchive,
 } from "./support.js";
@@ -114,6 +116,33 @@ it("rejects reserved site paths, has no release delete route, and forbids agent 
   );
   expect(approved.status).toBe(200);
   expect(await (await server.request("/")).text()).toContain("RELEASE-MARKER");
+  await server.close();
+});
+
+it("serves the same static home at / before and after a public profile exists", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const before = await server.request("/");
+  expect(before.status).toBe(200);
+  const beforeText = await before.text();
+  expect(beforeText).toContain("One self. One context. Every AI.");
+  await addSource(server, cookie, "me");
+  const written = await putPage(
+    server,
+    cookie,
+    "me",
+    "profile",
+    "---\ntype: profile\ntitle: Visible Profile Title\nvisibility: public\n---\n\nhello\n",
+  );
+  expect(written.status, await written.clone().text()).toBe(200);
+  const listed = await readJson(await server.request("/pcp/v1/public/pages"));
+  expect(JSON.stringify(listed)).toContain("Visible Profile Title");
+  const after = await server.request("/");
+  expect(after.status).toBe(200);
+  expect(after.headers.get("cache-control")).toBe("no-store");
+  const afterText = await after.text();
+  expect(afterText).toBe(beforeText);
+  expect(afterText).not.toContain("Visible Profile Title");
   await server.close();
 });
 

@@ -126,7 +126,7 @@ flowchart LR
 | 包管理 | pnpm | 只用这一套。工作区用来放服务端、管理端、原始页面和公开客户端。不提交 npm 或 Yarn 的锁文件 |
 | 服务端 | Hono | 只提供 API、MCP 和静态文件。公开站点不是服务端模板，所以不用 Next.js。不使用 Express 或 Nest |
 | 管理端 | Vite + React | 所属人用的界面。构建后由同一个 Node 进程提供。不把管理端做成服务端渲染应用 |
-| 原始页面 | Vite + React | 随应用发布的一份完整落地页。不拆成首页和简历页，也不做客户端路由。不定制时指针指向它的构建结果。定制产物只要能按路径提供即可，不要求继续使用 React |
+| 原始页面 | Vite，无框架 TypeScript | 随应用发布的固定首页，写死在 `index.html`，不读取、不展示资料，资源用相对路径（`base: "./"`）。不拆成首页和简历页，也不做客户端路由。不定制时指针指向它的构建结果。个人展示页由 Agent 按公开资料生成、所属人批准上线；定制产物只要能按路径提供即可 |
 | 公开数据客户端 | 工作区里的小 TypeScript 包 | 站点脚本用它请求匿名公开 PCP。不让每个页面各写一套请求 |
 | 领域代码 | 纯 TypeScript | 不依赖 Hono、React 或数据库驱动。规则可以用单元测试直接跑 |
 | 操作注册表 | 一份 TypeScript 定义 | 资料和站点操作的 OpenAPI 路由与 MCP 工具都从它生成。密钥管理标记为 `http-only` |
@@ -415,13 +415,13 @@ GET  /.well-known/agent-skills/index.json
 
 | 方法 | 路径 | 作用 |
 | --- | --- | --- |
-| GET | `/.well-known/pcp` | 绝对地址形式的协议版本、操作清单、OpenAPI、MCP、OAuth 和产品 Skill |
+| GET | `/.well-known/pcp` | 绝对地址形式的协议版本、操作清单、OpenAPI、MCP、OAuth 和产品 Skill；另有认证头、公开接口和上传限制 |
 | GET | `/.well-known/agent-skills/index.json` | 安装索引。只有 `oneself`，`type` 为 `archive`，`Cache-Control` 为 `no-store` |
 | GET | `/.well-known/oauth-authorization-server` | 生产只广告设备码 |
 | POST | `/oauth/device/auth` | 申请设备码。验证页是 `/admin/device` |
 | POST | `/oauth/token` | 换访问令牌或刷新 |
 | POST | `/mcp` | Streamable HTTP。认证头与 PCP 相同 |
-| GET | `/openapi.json` | 由注册表生成 |
+| GET | `/openapi.json` | 由注册表和 MCP 同一份输入 schema 生成，含参数、请求体和认证方式 |
 | POST | `/admin/login` | 所属人登录 |
 | POST | `/admin/password` | 修改密码。未改密前其他管理操作和 PCP 都拒绝 |
 | POST | `/admin/logout` | 结束会话 |
@@ -442,7 +442,7 @@ OAuth access token 15 分钟。refresh token 轮换，只存哈希。被轮换�
 
 ## 7. 站点发布
 
-公开站点只有一份落地页。原始页面在 `/` 展示 PRD 第 8 节的公开资料，不另设 `/resume`。没有公开页时渲染空状态。Vite 构建不启用 SPA 回退。
+公开站点只有一份落地页。没有定制 release 时，`/` 是内置首页（PRD 第 8 节），不读取、不展示资料，有没有公开页都一样，不另设 `/resume`。个人展示页由 Agent 生成、所属人批准上线。Vite 构建不启用 SPA 回退。
 
 一次 release 是一棵静态文件树。`/` 返回 `index.html`，`/blog` 只有在存在 `blog/index.html` 时才返回它。找不到文件就返回 404。
 
@@ -467,7 +467,7 @@ site_pointers 改指向这一行
 / 开始返回新文件。release 里有的其他路径一并生效
 ```
 
-应用识别到请求路径属于线上站点时，只查指针和 `site_files`，或在指针为 `public-page` 时读镜像里的 dist。这个处理函数不能查询 `pages`。资料由浏览器里的公开客户端另一次请求取得。
+应用识别到请求路径属于线上站点时，只查指针和 `site_files`，或在指针为 `public-page` 时读镜像里的 dist。这个处理函数不能查询 `pages`。展示页的资料由浏览器里的公开客户端另一次请求取得；内置首页不读资料。
 
 预览路径不使用线上路径，匿名可访问。所属人同意前线上路径保持不变。回到旧版或 `public-page` 时重新走 `activate_site` 和批准。没有回滚路由。第一版不提供删除 release 的接口。
 
@@ -532,15 +532,32 @@ site_pointers 改指向这一行
   "oauth": "https://主机/.well-known/oauth-authorization-server",
   "skills": {
     "oneself": "https://主机/skills/oneself/SKILL.md"
+  },
+  "auth": {
+    "headers": [
+      { "credential": "api_key", "header": "Authorization", "value": "ApiKey <key>" },
+      { "credential": "api_key", "header": "X-Api-Key", "value": "<key>" },
+      { "credential": "oauth", "header": "Authorization", "value": "Bearer <access_token>" }
+    ]
+  },
+  "public": {
+    "credentials": "omit",
+    "endpoints": [{ "name": "public_sources", "method": "GET", "path": "/pcp/v1/public/sources" }]
+  },
+  "uploads": {
+    "file_upload": { "field": "file", "mcp_arguments": ["data_base64", "media_type"], "media_types": ["image/jpeg"], "max_bytes": 20971520 },
+    "put_site": { "field": "archive", "mcp_arguments": ["archive_base64"], "media_types": ["application/zip"], "max_bytes": 20971520, "max_files": 200 }
   }
 }
 ```
 
-`operations` 来自注册表，不含三个密钥管理操作。`GET /pcp/v1/skills/oneself` 与 `GET /skills/oneself/SKILL.md` 是同一份字节。请求的 `Host` 不改写这些地址。产品 Skill 只有 `oneself`。`context-management` 和 `public-page` 不是产品名字。
+`operations` 来自注册表，不含三个密钥管理操作。`auth` 是运行时接受的凭据头。`public` 列出第 6 节的匿名接口（`public_sources`、`public_pages`、`public_page`、`public_search`、`media`），名字和路径登记在 `packages/operations` 的 `publicEndpoints`；它们不是 PCP 操作，不进 MCP。`uploads` 写明两种上传在 HTTP 的 multipart 字段、在 MCP 的参数，以及领域常量里的类型和上限。这些字段都是追加的，协议版本仍是 `1`。
+
+`/openapi.json` 与 MCP 同源：每个操作的路径参数、查询参数（GET）和 JSON 请求体，都由 MCP 工具使用的同一份 zod 输入 schema 生成，冒烟测试逐个比对两边，漂移即失败。两种上传在 HTTP 是 multipart，字段和上限取自 `uploads`，并以 `x-oneself-upload` 标出对应的 MCP 参数。`components.securitySchemes` 给出 `ApiKey`、`X-Api-Key`、Bearer 和所属人会话 Cookie；密钥管理只认所属人会话，公开接口 `security: []` 并标 `x-oneself-credentials: omit`。`GET /pcp/v1/skills/oneself` 与 `GET /skills/oneself/SKILL.md` 是同一份字节。请求的 `Host` 不改写这些地址。产品 Skill 只有 `oneself`。`context-management` 和 `public-page` 不是产品名字。
 
 安装命令是 `npx skills add https://站点`。安装器读 `GET /.well-known/agent-skills/index.json`。索引只有一条 `oneself`，`type` 为 `archive`，`url` 是 `{origin}/skills/oneself.tar.gz`，`digest` 是这次压缩包字节的 SHA-256。压缩包和索引由应用生成，不放进站点 zip。
 
-入口只写连接配置，以及动手前读哪一份 reference。写页规则在 `references/context.md`：先查已有页，文字写成 Markdown，原件挂到页上，再读取、写入、修改、删除或恢复。格式仍是 frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。公开页规则在 `references/public-page.md`：说明内置页能展示哪些公开资料，如何从源码 zip 改版式、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
+入口只写连接配置、先读发现文档、连接并由所属人批准，以及动手前读哪一份 reference。接口细节（路径、请求头、参数、公开接口、上传限制）不写进 Skill，由发现文档和 OpenAPI 给出。写页规则在 `references/context.md`：先查已有页，文字写成 Markdown，原件挂到页上，再读取、写入、修改、删除或恢复。格式仍是 frontmatter、`visibility`、PRD 6.2 的 fence、`files` 数组和 `[[source/slug]]`。公开页规则在 `references/public-page.md`：说明内置页只是介绍、哪些资料是公开的、怎样读取公开资料，如何从源码 zip 生成展示页、增加真实路径、构建、避开保留路径，以及必须把激活批准地址交给所属人。
 
 Skill 不写死后端框架。它只写操作名和公开客户端的用法。
 

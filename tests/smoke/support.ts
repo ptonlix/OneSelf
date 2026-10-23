@@ -226,7 +226,12 @@ export async function uploadArchive(
   });
 }
 
-export async function mcpToolNames(server: ServerHandle): Promise<string[]> {
+export type McpToolListing = {
+  name: string;
+  inputSchema?: { properties?: Record<string, unknown>; required?: string[] };
+};
+
+export async function mcpTools(server: ServerHandle): Promise<McpToolListing[]> {
   const headers = {
     "content-type": "application/json",
     accept: "application/json, text/event-stream",
@@ -251,8 +256,12 @@ export async function mcpToolNames(server: ServerHandle): Promise<string[]> {
     headers,
     body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
   });
-  const body = (await listed.json()) as { result?: { tools?: { name: string }[] } };
-  return (body.result?.tools ?? []).map((tool) => tool.name);
+  const body = (await listed.json()) as { result?: { tools?: McpToolListing[] } };
+  return body.result?.tools ?? [];
+}
+
+export async function mcpToolNames(server: ServerHandle): Promise<string[]> {
+  return (await mcpTools(server)).map((tool) => tool.name);
 }
 
 export async function mcpCall(

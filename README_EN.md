@@ -167,10 +167,10 @@ For the Mermaid system overview, code boundaries, tables, and key flows, see [do
 
 | Path                                   | Who                    | Purpose                                                                                                                             |
 | -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `/.well-known/pcp`                     | Agents                 | Discovery: protocol version, operation list, OpenAPI, MCP, OAuth, skills                                                            |
+| `/.well-known/pcp`                     | Agents                 | Discovery: protocol version, operation list, auth headers, public endpoints, upload limits, OpenAPI, MCP, OAuth, skills             |
 | `/.well-known/agent-skills/index.json` | Installers             | Archive index for the single product skill `oneself`                                                                                |
 | `/skills/oneself/SKILL.md`             | Agents                 | The only product skill. Read the context reference before writing, and the public-page reference before customizing the public page |
-| `/openapi.json`                        | Agents, scripts        | OpenAPI generated from the operation registry                                                                                       |
+| `/openapi.json`                        | Agents, scripts        | OpenAPI generated from the operation registry and the same input schemas as MCP, with parameters, bodies, and security              |
 | `POST /mcp`                            | MCP clients            | Streamable HTTP; same auth headers as PCP                                                                                           |
 | `/pcp/v1/*`                            | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations                                                         |
 | `/pcp/v1/public/*`                     | Anyone                 | Only `visibility: public`, non-deleted pages                                                                                        |
