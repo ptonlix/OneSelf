@@ -9,7 +9,11 @@ const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 describe("adapter entry", () => {
   it("does not export the in-memory object store from the production entry", async () => {
     const entry: object = await import("./index.ts");
-    expect(Object.keys(entry).sort()).toEqual(["openPostgres", "openS3ObjectStore"]);
+    expect(Object.keys(entry).sort()).toEqual([
+      "migrateDatabase",
+      "openPostgres",
+      "openS3ObjectStore",
+    ]);
     expect(entry).not.toHaveProperty("memoryObjectStore");
 
     const testing: object = await import("./testing.ts");
