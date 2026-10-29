@@ -11,3 +11,6 @@ allowBuilds:
 
 overrides:
   "@esbuild-kit/core-utils>esbuild": 0.25.4
+  # MCP SDK still resolves Zod 4.1.12 and body-parser 2.3.0. Both have high advisories.
+  zod: 4.6.7
+  body-parser: 2.4.0
