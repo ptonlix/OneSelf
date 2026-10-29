@@ -116,12 +116,13 @@ export const TRUNCATE_SQL = `truncate table ${DATA_TABLES.join(", ")} restart id
 /**
  * Identity dumps do not always advance the sequence the next insert expects.
  * `is_called` is false only when the table is empty, so the next id is 1.
+ * Names are schema-qualified because pg_restore clears search_path.
  */
 export const SETVAL_SQL = `
 select setval(
-  'page_versions_id_seq',
-  (select coalesce(max(id), 1) from page_versions),
-  (select exists(select 1 from page_versions))
+  'public.page_versions_id_seq',
+  (select coalesce(max(id), 1) from public.page_versions),
+  (select exists(select 1 from public.page_versions))
 )
 `.trim();
 
@@ -150,7 +151,7 @@ export function restoreTransactionSql(replace: boolean): {
 } {
   return {
     header: replace ? `BEGIN;\n${TRUNCATE_SQL};\n` : "BEGIN;\n",
-    footer: `\n${SETVAL_SQL};\nCOMMIT;\n`,
+    footer: `\nselect pg_catalog.set_config('search_path', 'public', false);\n${SETVAL_SQL};\nCOMMIT;\n`,
   };
 }
 

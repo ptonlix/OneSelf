@@ -368,6 +368,10 @@ it("refuses a symlink listing line and does not echo bundle bytes", async () => 
   expect(replacing.footer).toContain(SETVAL_SQL);
   expect(replacing.footer.endsWith("COMMIT;\n")).toBe(true);
   expect(restoreTransactionSql(false).header).toBe("BEGIN;\n");
+  expect(restoreTransactionSql(false).footer).toContain(
+    "set_config('search_path', 'public', false)",
+  );
+  expect(SETVAL_SQL).toContain("public.page_versions");
   expect(pgRestoreSqlArgs("/tmp/oneself.dump")).toEqual([
     "--data-only",
     "--disable-triggers",
