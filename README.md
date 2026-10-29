@@ -132,7 +132,7 @@ pnpm dev
 | `OBJECT_STORAGE_*`                                                | S3 兼容对象存储的端点、区域、桶和密钥。Compose 中由 `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` 提供 |
 | `COMPOSE_PROFILES`                                                | 公网入口：`cloudflared`（默认）、`caddy` 或 `tailscale`，同一时间只启用一个                        |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`、`ACME_EMAIL` / `TAILSCALE_AUTHKEY` | 分别给 cloudflared、Caddy、Tailscale 使用                                                          |
-| `ONESELF_IMAGE`                                                   | 应用镜像。安装用 `docker.io/ptonlix/oneself:latest`。自己从源码构建时改成 `oneself:local`                  |
+| `ONESELF_IMAGE`                                                   | 应用镜像。安装用 `docker.io/ptonlix/oneself:latest`。自己从源码构建时改成 `oneself:local`          |
 | `HOST` / `PORT`                                                   | 监听地址和端口，默认 `127.0.0.1:3000`；容器内设为 `0.0.0.0`                                        |
 
 ## 🧱 架构

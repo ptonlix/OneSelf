@@ -132,7 +132,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
 | `COMPOSE_PROFILES`                                                | Public ingress: `cloudflared` (default), `caddy`, or `tailscale`; only one at a time                                                                 |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`, `ACME_EMAIL` / `TAILSCALE_AUTHKEY` | For cloudflared, Caddy, and Tailscale respectively                                                                                                   |
-| `ONESELF_IMAGE`                                                   | App image. Installs use `docker.io/ptonlix/oneself:latest`. Use `oneself:local` only when building from source                                      |
+| `ONESELF_IMAGE`                                                   | App image. Installs use `docker.io/ptonlix/oneself:latest`. Use `oneself:local` only when building from source                                       |
 | `HOST` / `PORT`                                                   | Listen address and port, default `127.0.0.1:3000`; `0.0.0.0` inside the container                                                                    |
 
 ## 🧱 Architecture
