@@ -1,6 +1,6 @@
 # 本地依赖。应用在宿主机用 pnpm 跑，不进这个文件。
 # docker compose -f compose.dev.yaml up -d
-# PostgreSQL 和 RustFS 9000 只绑回环。不发布控制台 9001。
+# PostgreSQL 和 RustFS 9000、9001 只绑回环。9001 是控制台，不是 S3 API。
 # 下面的访问密钥只给本机。不要拿去当生产配置，也不要挂旧的 MinIO 卷。
 name: oneself-dev
 
@@ -37,6 +37,7 @@ services:
       RUSTFS_SECRET_KEY: oneselfsecret
     ports:
       - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
     volumes:
       - rustfs_data:/data
     depends_on:
