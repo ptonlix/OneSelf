@@ -126,6 +126,21 @@ select setval(
 `.trim();
 
 /**
+ * PostgreSQL 18 will not write SQL to stdout unless --file=- is set.
+ * The archive must stay a seekable file argument, not stdin.
+ */
+export function pgRestoreSqlArgs(archive: string): readonly string[] {
+  return [
+    "--data-only",
+    "--disable-triggers",
+    "--no-owner",
+    "--no-privileges",
+    "--file=-",
+    archive,
+  ];
+}
+
+/**
  * Header and footer around pg_restore SQL.
  * One transaction so a failed load rolls the wipe back. Truncate only when replacing.
  */

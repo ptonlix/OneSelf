@@ -27,6 +27,7 @@ import {
   packBundle,
   parseDatabaseUrl,
   parseTransferArgs,
+  pgRestoreSqlArgs,
   redactSecrets,
   restoreTransactionSql,
   sha256Bytes,
@@ -160,13 +161,6 @@ async function assertPgDump(secrets: readonly string[]): Promise<void> {
   }
 }
 
-const PG_RESTORE_SQL_ARGS = [
-  "--data-only",
-  "--disable-triggers",
-  "--no-owner",
-  "--no-privileges",
-] as const;
-
 async function writeRestoreScript(
   restoreSqlPath: string,
   scriptPath: string,
@@ -188,7 +182,7 @@ async function restoreOnHost(
   try {
     const sqlPath = path.join(scratch, "restore.sql");
     const scriptPath = path.join(scratch, "script.sql");
-    await runCommand("pg_restore", [...PG_RESTORE_SQL_ARGS, "--file=-", file], {
+    await runCommand("pg_restore", pgRestoreSqlArgs(file), {
       env,
       stdoutPath: sqlPath,
       secrets,
@@ -232,8 +226,7 @@ async function restoreInCompose(
           "root",
           "postgres",
           "pg_restore",
-          ...PG_RESTORE_SQL_ARGS,
-          remote,
+          ...pgRestoreSqlArgs(remote),
         ],
         { stdoutPath: sqlPath, secrets },
       );

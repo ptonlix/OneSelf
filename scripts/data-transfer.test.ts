@@ -30,6 +30,7 @@ import {
   parseTransferArgs,
   reconcile,
   redactSecrets,
+  pgRestoreSqlArgs,
   restoreTransactionSql,
   sameMigrations,
   sha256Bytes,
@@ -367,6 +368,14 @@ it("refuses a symlink listing line and does not echo bundle bytes", async () => 
   expect(replacing.footer).toContain(SETVAL_SQL);
   expect(replacing.footer.endsWith("COMMIT;\n")).toBe(true);
   expect(restoreTransactionSql(false).header).toBe("BEGIN;\n");
+  expect(pgRestoreSqlArgs("/tmp/oneself.dump")).toEqual([
+    "--data-only",
+    "--disable-triggers",
+    "--no-owner",
+    "--no-privileges",
+    "--file=-",
+    "/tmp/oneself.dump",
+  ]);
 
   const directory = await mkdtemp(path.join(tmpdir(), "oneself-export-"));
   const root = path.join(directory, "members");
