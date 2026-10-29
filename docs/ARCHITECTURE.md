@@ -436,7 +436,7 @@ OAuth access token 15 分钟。refresh token 轮换，只存哈希。被轮换�
 
 所属人 Cookie 名 `oneself_session`，`Path=/`、`HttpOnly`、`SameSite=Lax`，HTTPS 时加 `Secure`。管理端因此可以调用 `/pcp/v1`。站点脚本必须 `credentials: omit`。站点响应不 `Set-Cookie`。管理端的写请求还要核对 `Origin` 与本站一致。
 
-第一次启动时，若 `owners` 为空，用 `OWNER_LOGIN` 和 `OWNER_PASSWORD` 创建所属人，密码只存 Argon2id 哈希，并标记必须改密。之后启动不读取这两个变量来登录，也不在账号已存在时用它们重置密码。若设置了 `OWNER_RESET_PASSWORD`，启动时替换哈希、重新要求改密，并打一条不含密码的日志。没有所属人且没有初始密码变量时，应用拒绝启动。启动时不生成 API Key。
+进程在监听前用镜像里的 `packages/db/migrations` 补齐未执行的迁移。失败则退出，不监听。第一次启动时，若 `owners` 为空，用 `OWNER_LOGIN` 和 `OWNER_PASSWORD` 创建所属人，密码只存 Argon2id 哈希，并标记必须改密。之后启动不读取这两个变量来登录，也不在账号已存在时用它们重置密码。若设置了 `OWNER_RESET_PASSWORD`，启动时替换哈希、重新要求改密，并打一条不含密码的日志。没有所属人且没有初始密码变量时，应用拒绝启动。启动时不生成 API Key。
 
 ---
 

@@ -1,12 +1,18 @@
-import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 
 import { assertDirectStart, listenUrls, resolveListenHost } from "./index.ts";
 
 describe("listen host", () => {
+  it("keeps packaged migrations beside the server root", () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+    expect(existsSync(path.join(root, "packages/db/migrations/meta/_journal.json"))).toBe(true);
+  });
+
   it("defaults to loopback and uses HOST when set", () => {
     expect(resolveListenHost(undefined)).toBe("127.0.0.1");
     expect(resolveListenHost("")).toBe("127.0.0.1");

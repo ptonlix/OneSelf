@@ -62,31 +62,21 @@ OneSelf 是开源、自托管的**个人上下文管理**系统。你的简历�
 
 ## 🚀 快速开始
 
-### 🐳 方式一：Docker Compose 自托管
+### 🐳 方式一：Docker Compose
 
-前提：机器已安装 Docker 与 Docker Compose v2。默认入口是 Cloudflare Tunnel，需要一个 Tunnel 令牌；也可以改用 Caddy（自有域名）或 Tailscale（只在 tailnet 内可访问），见 [部署](#-部署)。
+需要 Docker 与 Docker Compose v2。默认入口是 Cloudflare Tunnel；换 Caddy 或 Tailscale 见 [部署](#-部署)。
 
 ```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，至少填写：
-
-- `PUBLIC_ORIGIN`：唯一对外地址，例如 `https://自己的域名`
-- `OWNER_PASSWORD`：所属人账号的初始口令（首次登录后强制修改）
-- `POSTGRES_PASSWORD`、`RUSTFS_ACCESS_KEY`、`RUSTFS_SECRET_KEY`
-- 所选入口需要的变量（默认 `TUNNEL_TOKEN`）
-
-在本机构建镜像并启动：
+填 `PUBLIC_ORIGIN`、`OWNER_PASSWORD`、`POSTGRES_PASSWORD`、`RUSTFS_ACCESS_KEY`、`RUSTFS_SECRET_KEY` 和入口变量。应用镜像是 `docker.io/ptonlix/oneself:latest`。
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
-> [!IMPORTANT]
-> 应用启动时**不会**自动执行数据库迁移。迁移文件在 [`packages/db/migrations`](packages/db/migrations)，仓库提供 `pnpm db:migrate`（drizzle-kit，读取 `.env` 里的 `DATABASE_URL`）。生产 Compose 的 PostgreSQL 不映射宿主机端口，首次启动前请自行安排一次迁移。
-
-启动后打开 `PUBLIC_ORIGIN` 看公开主页，打开 `PUBLIC_ORIGIN/admin` 登录并改密，然后把 `PUBLIC_ORIGIN/.well-known/pcp` 交给要接入的 AI Agent。
+启动时会先补齐数据库迁移，失败则不监听。打开 `PUBLIC_ORIGIN`，到 `/admin` 改密，把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent。
 
 ### 💻 方式二：本地开发
 
@@ -116,12 +106,13 @@ OWNER_LOGIN=owner
 OWNER_PASSWORD=<自己设一个初始口令>
 ```
 
-先迁移，再启动应用。`pnpm dev` 会先构建管理端和内置公开页，再读取 `.env` 启动服务。应用要 Node.js 24，仓库根的 `.node-version` 已写明版本，fnm、nvm、asdf、volta 会自动切换：
+`pnpm dev` 会先构建管理端和内置公开页，再启动服务；进程在监听前补齐迁移。应用要 Node.js 24，仓库根的 `.node-version` 已写明版本，fnm、nvm、asdf、volta 会自动切换：
 
 ```bash
-pnpm db:migrate
 pnpm dev
 ```
+
+`pnpm db:migrate` 只在不启动应用时用，例如导入前把空库迁好，避免进程先创建所属人。
 
 打开 <http://127.0.0.1:3000> 看原始页面，打开 <http://127.0.0.1:3000/admin> 登录。
 
@@ -141,7 +132,7 @@ pnpm dev
 | `OBJECT_STORAGE_*`                                                | S3 兼容对象存储的端点、区域、桶和密钥。Compose 中由 `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` 提供 |
 | `COMPOSE_PROFILES`                                                | 公网入口：`cloudflared`（默认）、`caddy` 或 `tailscale`，同一时间只启用一个                        |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`、`ACME_EMAIL` / `TAILSCALE_AUTHKEY` | 分别给 cloudflared、Caddy、Tailscale 使用                                                          |
-| `ONESELF_IMAGE`                                                   | 应用镜像。本机默认 `oneself:local` 并现场构建。正式安装用 `docker.io/用户名/oneself:latest`        |
+| `ONESELF_IMAGE`                                                   | 应用镜像。安装用 `docker.io/ptonlix/oneself:latest`。自己从源码构建时改成 `oneself:local`                  |
 | `HOST` / `PORT`                                                   | 监听地址和端口，默认 `127.0.0.1:3000`；容器内设为 `0.0.0.0`                                        |
 
 ## 🧱 架构
@@ -264,9 +255,13 @@ pnpm check            # Prettier、ESLint、tsc、Vitest、dependency-cruiser、
 pnpm test             # 单元测试和进程内接口测试（不需要启动 Compose）
 pnpm test:smoke       # 闭环冒烟：复用已启动的 compose.dev.yaml 服务，用单独的库和桶
 pnpm boundaries       # 只检查包之间的依赖方向
-pnpm db:migrate       # 对 .env 里的 DATABASE_URL 执行迁移
+pnpm db:migrate       # 不启动应用，只对 .env 里的 DATABASE_URL 执行迁移
+pnpm data:export -- --out oneself-export --stopped
+pnpm data:import -- --from oneself-export.tar.gz --stopped
 pnpm dev              # 构建管理端和内置公开页，再启动应用
 ```
+
+`data:export` / `data:import` 把 PostgreSQL 的 `public` 数据和 RustFS 里 `pages/`、`files/`、`sites/` 打成一个 `tar.gz`，再灌进已迁移到同一版本的空库和空桶。`--out oneself-export` 写出 `oneself-export.tar.gz`，拷这个文件到新机器即可。先停掉应用再加 `--stopped`。包里有密码哈希和密钥哈希，不要提交。不包含会话、设备码、`PUBLIC_ORIGIN` 或对象存储密钥。生产库不映射端口时加 `--via compose`；本机没有 PostgreSQL 18 的 `pg_dump` 时，对开发依赖加 `--via compose --compose compose.dev.yaml`。目标不是空的时，导入要显式加 `--replace`。
 
 `pnpm test:smoke` 不启动也不停止任何容器，需要先用 `docker compose -f compose.dev.yaml up -d` 起好开发服务。它在同一个 PostgreSQL 里建并重置单独的 `oneself_smoke` 库，在同一个 RustFS 里建并清空单独的 `oneself-smoke` 桶，不碰开发数据，跑完保留这两份。不读 `.env` 里的 `DATABASE_URL` 和 `OBJECT_STORAGE_*`；需要时用 `SMOKE_POSTGRES_ADMIN_URL`（默认 `postgres://oneself:oneself@127.0.0.1:5432/postgres`）、`SMOKE_DATABASE`、`SMOKE_OBJECT_STORAGE_ENDPOINT`、`SMOKE_OBJECT_STORAGE_BUCKET`、`SMOKE_OBJECT_STORAGE_ACCESS_KEY_ID`、`SMOKE_OBJECT_STORAGE_SECRET_ACCESS_KEY`、`SMOKE_OBJECT_STORAGE_REGION` 覆盖。库名和桶名必须含 `smoke` 且不能是 `oneself`，否则直接报错。
 
@@ -277,7 +272,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 <details>
 <summary><strong>Docker Compose 部署与公网入口详解</strong></summary>
 
-`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像由仓库根目录的 `Dockerfile` 构建，打进管理端、原始页面、原始页面源码 zip 和 `skills/`，监听 `3000`。正式安装把 `ONESELF_IMAGE` 设为 `docker.io/<Docker Hub 用户名>/oneself:latest`。推送 `v1.2.3` 这样的正式标签后，发布工作流会把 `oneself:1.2.3` 推到 Docker Hub，并同时移动 `latest`。预发布只推版本号，不移动 `latest`。更新时执行 `docker compose pull && docker compose up -d`。仓库变量 `DOCKERHUB_USERNAME` 和 secret `DOCKERHUB_TOKEN` 必须先配好。同一标签包含 `linux/amd64` 和 `linux/arm64`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进这个镜像。
+`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像是 `docker.io/ptonlix/oneself`，监听 `3000`。推送 `v1.2.3` 这样的正式标签后，发布工作流会推送 `oneself:1.2.3` 并移动 `latest`。预发布只推版本号。更新用 `docker compose pull && docker compose up -d`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进镜像。
 
 公网入口是互斥的 Compose profile，由 `.env` 的 `COMPOSE_PROFILES` 选择，换入口不需要改应用镜像：
 

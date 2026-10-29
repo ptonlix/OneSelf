@@ -1,3 +1,4 @@
+export { migrateDatabase } from "./migrate.ts";
 export { openS3ObjectStore, type S3ObjectStoreConfig } from "./s3-object-store.ts";
 export {
   openPostgres,

@@ -7,7 +7,7 @@ import {
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { openPostgres, openS3ObjectStore } from "@oneself/adapters";
+import { migrateDatabase, openPostgres, openS3ObjectStore } from "@oneself/adapters";
 import { memoryObjectStore } from "@oneself/adapters/testing";
 import { Hono } from "hono";
 
@@ -196,6 +196,7 @@ async function listen(): Promise<void> {
   if (databaseUrl === undefined) {
     throw new Error("DATABASE_URL is required");
   }
+  await migrateDatabase(databaseUrl, path.join(root, "packages", "db", "migrations"));
   const postgres = openPostgres(databaseUrl);
   const publicOrigin = env("PUBLIC_ORIGIN");
   const ownerLogin = env("OWNER_LOGIN");

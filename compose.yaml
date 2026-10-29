@@ -6,7 +6,7 @@
 # 页面、登录、设备码和普通 MCP 调用应在该时限内结束。
 # 没有隧道令牌或 auth key 时，入口容器可以失败，应用和数据库仍然留在。
 # 应用镜像由 ONESELF_IMAGE 决定。未设置时是 oneself:local，并按下面的 Dockerfile 构建。
-# 正式安装在 .env 里写成 docker.io/你的用户名/oneself:latest。更新时 pull 再 up，不用改版本号。
+# .env.example 里的安装镜像是 docker.io/ptonlix/oneself:latest。更新时 pull 再 up，不用改版本号。
 name: oneself
 
 services:

@@ -8,6 +8,7 @@ export default defineConfig({
       "packages/**/*.test.ts",
       "tests/acceptance/**/*.test.ts",
       "tests/smoke/**/*.test.ts",
+      "scripts/**/*.test.ts",
     ],
     exclude: ["**/node_modules/**", "**/dist/**", "tests/smoke/closed-loop.test.ts"],
     passWithNoTests: true,

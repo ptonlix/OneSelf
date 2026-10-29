@@ -62,31 +62,21 @@ OneSelf is open-source, self-hosted **personal context management**. Your résum
 
 ## 🚀 Quick start
 
-### 🐳 Option 1: Self-host with Docker Compose
+### 🐳 Option 1: Docker Compose
 
-Requirements: Docker and Docker Compose v2. The default ingress is a Cloudflare Tunnel and needs a tunnel token; you can switch to Caddy (your own domain) or Tailscale (tailnet-only access), see [Deployment](#-deployment).
+Requires Docker and Docker Compose v2. The default ingress is a Cloudflare Tunnel; for Caddy or Tailscale see [Deployment](#-deployment).
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set at least:
-
-- `PUBLIC_ORIGIN`: the single public origin, e.g. `https://your-domain`
-- `OWNER_PASSWORD`: the initial password for your account (must be changed on first login)
-- `POSTGRES_PASSWORD`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`
-- the variables your ingress needs (`TUNNEL_TOKEN` by default)
-
-Build the image locally and start:
+Set `PUBLIC_ORIGIN`, `OWNER_PASSWORD`, `POSTGRES_PASSWORD`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, and the ingress variable. The app image is `docker.io/ptonlix/oneself:latest`.
 
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
-> [!IMPORTANT]
-> The app does **not** run database migrations on startup. Migrations live in [`packages/db/migrations`](packages/db/migrations), and `pnpm db:migrate` applies them with drizzle-kit using `DATABASE_URL` from `.env`. Production Compose does not publish the PostgreSQL port to the host, so plan a migration run before first start.
-
-Then open `PUBLIC_ORIGIN` for the public homepage, sign in and change your password at `PUBLIC_ORIGIN/admin`, and give `PUBLIC_ORIGIN/.well-known/pcp` to any AI agent you want to connect.
+On startup the app applies pending database migrations and does not listen if that fails. Open `PUBLIC_ORIGIN`, change the password at `/admin`, and give `PUBLIC_ORIGIN/.well-known/pcp` to the agent.
 
 ### 💻 Option 2: Local development
 
@@ -116,12 +106,13 @@ OWNER_LOGIN=owner
 OWNER_PASSWORD=<choose an initial password>
 ```
 
-Run migrations, then start the app. `pnpm dev` builds the admin UI and the built-in public page, then starts the server with `.env`. The app requires Node.js 24; the root `.node-version` pins it, so fnm, nvm, asdf, and volta switch automatically:
+`pnpm dev` builds the admin UI and the built-in public page, then starts the server; the process applies pending migrations before it listens. The app requires Node.js 24; the root `.node-version` pins it, so fnm, nvm, asdf, and volta switch automatically:
 
 ```bash
-pnpm db:migrate
 pnpm dev
 ```
+
+`pnpm db:migrate` applies migrations without starting the app. Use it before an import so the process does not create the owner first.
 
 Open <http://127.0.0.1:3000> for the original page and <http://127.0.0.1:3000/admin> to sign in.
 
@@ -141,7 +132,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
 | `COMPOSE_PROFILES`                                                | Public ingress: `cloudflared` (default), `caddy`, or `tailscale`; only one at a time                                                                 |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`, `ACME_EMAIL` / `TAILSCALE_AUTHKEY` | For cloudflared, Caddy, and Tailscale respectively                                                                                                   |
-| `ONESELF_IMAGE`                                                   | App image. Local default is `oneself:local`, built from the Dockerfile. A production install uses `docker.io/username/oneself:latest`                |
+| `ONESELF_IMAGE`                                                   | App image. Installs use `docker.io/ptonlix/oneself:latest`. Use `oneself:local` only when building from source                                      |
 | `HOST` / `PORT`                                                   | Listen address and port, default `127.0.0.1:3000`; `0.0.0.0` inside the container                                                                    |
 
 ## 🧱 Architecture
@@ -264,9 +255,13 @@ pnpm check            # Prettier, ESLint, tsc, Vitest, dependency-cruiser, Knip,
 pnpm test             # Unit and in-process API tests (no Compose needed)
 pnpm test:smoke       # Closed-loop smoke test on the running compose.dev.yaml services, separate DB and bucket
 pnpm boundaries       # Package dependency direction only
-pnpm db:migrate       # Apply migrations to DATABASE_URL from .env
+pnpm db:migrate       # Apply migrations to DATABASE_URL from .env without starting the app
+pnpm data:export -- --out oneself-export --stopped
+pnpm data:import -- --from oneself-export.tar.gz --stopped
 pnpm dev              # Build the admin UI and built-in public page, then start the app
 ```
+
+`data:export` / `data:import` pack the PostgreSQL `public` data and the RustFS `pages/`, `files/`, and `sites/` prefixes into a `tar.gz`, then load that archive into an empty database and bucket migrated to the same revision. `--out oneself-export` writes `oneself-export.tar.gz`; copy that file to the new machine. Stop the app and pass `--stopped`. The bundle contains password hashes and key hashes; do not commit it. Sessions, device codes, `PUBLIC_ORIGIN`, and object-storage credentials are not included. Add `--via compose` when the production database port is not published. Without a PostgreSQL 18 `pg_dump` on the host, use `--via compose --compose compose.dev.yaml` for the dev dependencies. Import into a non-empty target only with `--replace`.
 
 `pnpm test:smoke` starts and stops no containers; bring the dev services up first with `docker compose -f compose.dev.yaml up -d`. It creates and resets a separate `oneself_smoke` database in the same PostgreSQL and creates and empties a separate `oneself-smoke` bucket in the same RustFS, never touching dev data, and leaves both in place afterwards. It does not read `DATABASE_URL` or `OBJECT_STORAGE_*` from `.env`; override with `SMOKE_POSTGRES_ADMIN_URL` (default `postgres://oneself:oneself@127.0.0.1:5432/postgres`), `SMOKE_DATABASE`, `SMOKE_OBJECT_STORAGE_ENDPOINT`, `SMOKE_OBJECT_STORAGE_BUCKET`, `SMOKE_OBJECT_STORAGE_ACCESS_KEY_ID`, `SMOKE_OBJECT_STORAGE_SECRET_ACCESS_KEY`, and `SMOKE_OBJECT_STORAGE_REGION`. A database or bucket name without `smoke`, or named `oneself`, is refused.
 
@@ -277,7 +272,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 <details>
 <summary><strong>Docker Compose and public ingress in detail</strong></summary>
 
-`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is built from the root `Dockerfile`, bundles the admin UI, the original page, its source zip, and `skills/`, and listens on `3000`. A production install sets `ONESELF_IMAGE` to `docker.io/<Docker Hub username>/oneself:latest`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version and does not move `latest`. Update with `docker compose pull && docker compose up -d`. Set the `DOCKERHUB_USERNAME` variable and `DOCKERHUB_TOKEN` secret first. The same tag includes `linux/amd64` and `linux/arm64`. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image.
+`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is `docker.io/ptonlix/oneself` and listens on `3000`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version. Update with `docker compose pull && docker compose up -d`. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image.
 
 The public ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env`; switching ingress does not change the app image:
 

@@ -2,7 +2,8 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["packages/db/src/drizzle.config.ts", "openspec/**"],
   "ignoreIssues": {
-    "apps/admin/src/stars.ts": ["types"]
+    "apps/admin/src/stars.ts": ["types"],
+    "scripts/transfer-cli.ts": ["unlisted"]
   },
   "ignoreWorkspaces": ["apps/server"]
 }

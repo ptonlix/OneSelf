@@ -1,10 +1,8 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import postgres from "postgres";
 
+import { migrateDatabase } from "./migrate.ts";
 import { openPostgres, type PostgresHandle, type PostgresStore } from "./postgres-store.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -261,31 +259,7 @@ function objectKey(source: string, slug: string, hash: string): string {
   return `pages/${source}/${slug}/${hash}.md`;
 }
 
-async function applyMigrations(databaseUrl: string): Promise<void> {
-  const sql = postgres(databaseUrl);
+function applyMigrations(databaseUrl: string): Promise<void> {
   const directory = fileURLToPath(new URL("../../db/migrations/", import.meta.url));
-  const files = readdirSync(directory)
-    .filter((file) => file.endsWith(".sql"))
-    .sort();
-  try {
-    for (const file of files) {
-      const text = readFileSync(join(directory, file), "utf8");
-      for (const statement of text.split("--> statement-breakpoint")) {
-        const sqlText = statement.trim();
-        if (sqlText === "") {
-          continue;
-        }
-        try {
-          await sql.unsafe(sqlText);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "";
-          if (!/already exists/i.test(message)) {
-            throw error;
-          }
-        }
-      }
-    }
-  } finally {
-    await sql.end();
-  }
+  return migrateDatabase(databaseUrl, directory);
 }
