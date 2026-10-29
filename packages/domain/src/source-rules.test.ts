@@ -10,6 +10,7 @@ import {
   resolveSlugs,
   runHourlyMaintenance,
   SOFT_DELETE_RETENTION_MS,
+  sourceFlags,
   sourcesAdd,
   sourcesDelete,
   sourcesList,
@@ -35,8 +36,15 @@ const restricted: Credential = {
 };
 const oauth: Credential = {
   kind: "oauth",
+  unrestrictedData: false,
   siteWrite: true,
   sources: [{ id: "health", read: true, write: true, visibility: true }],
+};
+const unrestrictedOauth: Credential = {
+  kind: "oauth",
+  unrestrictedData: true,
+  siteWrite: false,
+  sources: [],
 };
 
 function markdown(title: string, body: string, visibility = "public"): string {
@@ -106,11 +114,37 @@ function world(): DomainState {
 }
 
 describe("source delete and restore", () => {
+  it("lets unrestricted OAuth add a directory and keeps a restricted grant from doing so", () => {
+    const added = sourcesAdd(emptyDomainState(), unrestrictedOauth, { id: "notes" });
+    expect(added.ok).toBe(true);
+    if (!added.ok) {
+      return;
+    }
+    expect(added.value.state.sources).toEqual([{ id: "notes", deletedAt: null }]);
+    expect(sourceFlags(unrestrictedOauth, "notes")).toEqual({
+      read: true,
+      write: true,
+      visibility: true,
+    });
+
+    const state = world();
+    const denied = sourcesAdd(state, oauth, { id: "finance" });
+    expect(denied).toMatchObject({ ok: false, error: "forbidden" });
+    expect(state.sources.some((source) => source.id === "finance")).toBe(false);
+    expect(sourceFlags(oauth, "finance")).toEqual({
+      read: false,
+      write: false,
+      visibility: false,
+    });
+  });
+
   it("forbids an API key or OAuth grant from deleting a directory", () => {
     const state = world();
-    for (const credential of [agent, oauth]) {
+    for (const credential of [agent, oauth, unrestrictedOauth]) {
       const deleted = sourcesDelete(state, credential, { id: "health", now: NOW });
       expect(deleted).toMatchObject({ ok: false, error: "forbidden" });
+      const restored = sourcesRestore(state, credential, { id: "health", now: NOW });
+      expect(restored).toMatchObject({ ok: false, error: "forbidden" });
     }
     expect(readPublicPage(state, "health", "note").ok).toBe(true);
     expect(sourcesList(state, owner).ok).toBe(true);

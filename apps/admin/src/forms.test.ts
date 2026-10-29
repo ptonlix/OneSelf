@@ -41,18 +41,41 @@ describe("approval payloads", () => {
     ]);
   });
 
-  it("does not give a device approval unrestricted data", () => {
+  it("sends an empty source list when a device approval has unrestricted data", () => {
     const body = deviceApprovalBody({
       userCode: " WDJB-MJHT ",
+      unrestrictedData: true,
+      siteWrite: true,
+      drafts: toggleDraft(drafts, "notes", "read", true),
+    });
+    expect(body).toEqual({
+      user_code: "WDJB-MJHT",
+      unrestricted_data: true,
+      site_write: true,
+      sources: [],
+    });
+    expect([...Object.keys(body)].sort()).toEqual([
+      "site_write",
+      "sources",
+      "unrestricted_data",
+      "user_code",
+    ]);
+    expect(body).not.toHaveProperty("key");
+  });
+
+  it("stores only the checked sources when a device approval is restricted", () => {
+    const body = deviceApprovalBody({
+      userCode: " WDJB-MJHT ",
+      unrestrictedData: false,
       siteWrite: true,
       drafts,
     });
     expect(body).toEqual({
       user_code: "WDJB-MJHT",
+      unrestricted_data: false,
       site_write: true,
       sources: [{ id: "work", read: true, write: false, visibility: true }],
     });
-    expect(Object.keys(body)).not.toContain("unrestricted_data");
     expect(body).not.toHaveProperty("key");
   });
 

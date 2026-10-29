@@ -329,6 +329,7 @@ function DeviceScreen(props: {
   onFailure: (reason: unknown) => string;
 }): ReactElement {
   const [userCode, setUserCode] = useState(props.userCode);
+  const [unrestrictedData, setUnrestrictedData] = useState(false);
   const [siteWrite, setSiteWrite] = useState(false);
   const [drafts, setDrafts] = useState<SourceDraft[]>([]);
   const [directoriesReady, setDirectoriesReady] = useState(false);
@@ -360,6 +361,7 @@ function DeviceScreen(props: {
 
   return createElement(DeviceApprovalView, {
     userCode,
+    unrestrictedData,
     siteWrite,
     drafts,
     message,
@@ -367,12 +369,13 @@ function DeviceScreen(props: {
     done,
     directoriesReady,
     onUserCode: setUserCode,
+    onUnrestricted: setUnrestrictedData,
     onSiteWrite: setSiteWrite,
     onToggle: (id, flag, value) => {
       setDrafts((current) => toggleDraft(current, id, flag, value));
     },
     onSubmit: () => {
-      const body = deviceApprovalBody({ userCode, siteWrite, drafts });
+      const body = deviceApprovalBody({ userCode, unrestrictedData, siteWrite, drafts });
       if (!directoriesReady) {
         setMessage("目录还没有载入");
         return;

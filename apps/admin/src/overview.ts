@@ -479,7 +479,11 @@ function grantPanel(props: OverviewProps): ReactElement {
                 h(
                   "div",
                   { className: "row chips" },
-                  ...grantChips({ sources: grant.sources, siteWrite: grant.site_write }),
+                  ...grantChips({
+                    sources: grant.sources,
+                    siteWrite: grant.site_write,
+                    unrestrictedData: grant.unrestricted_data,
+                  }),
                 ),
                 grant.revoked_at === null
                   ? revokeControls({

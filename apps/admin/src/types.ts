@@ -61,6 +61,7 @@ export interface CreateApiKeyBody {
 
 export interface DeviceApprovalBody {
   user_code: string;
+  unrestricted_data: boolean;
   site_write: boolean;
   sources: SourceGrant[];
 }
@@ -114,6 +115,7 @@ export interface PublicPageSummary {
 export interface OauthGrantView {
   id: string;
   site_write: boolean;
+  unrestricted_data: boolean;
   sources: SourceGrant[];
   created_at: string;
   revoked_at: string | null;

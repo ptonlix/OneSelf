@@ -136,7 +136,12 @@ it("revokes a reused refresh token after the grant is reloaded", async () => {
       await server.request("/admin/device", {
         method: "POST",
         headers: jsonHeaders({ cookie }),
-        body: JSON.stringify({ user_code: device.user_code, site_write: false, sources: [] }),
+        body: JSON.stringify({
+          user_code: device.user_code,
+          unrestricted_data: false,
+          site_write: false,
+          sources: [],
+        }),
       })
     ).status,
   ).toBe(200);
@@ -195,7 +200,12 @@ it("lets the owner revoke one oauth grant", async () => {
       await server.request("/admin/device", {
         method: "POST",
         headers: jsonHeaders({ cookie }),
-        body: JSON.stringify({ user_code: device.user_code, site_write: false, sources: [] }),
+        body: JSON.stringify({
+          user_code: device.user_code,
+          unrestricted_data: false,
+          site_write: false,
+          sources: [],
+        }),
       })
     ).status,
   ).toBe(200);
@@ -246,7 +256,12 @@ it("lists oauth grants to the owner without any token material", async () => {
   const approved = await server.request("/admin/device", {
     method: "POST",
     headers: jsonHeaders({ cookie }),
-    body: JSON.stringify({ user_code: device.user_code, site_write: true, sources }),
+    body: JSON.stringify({
+      user_code: device.user_code,
+      unrestricted_data: false,
+      site_write: true,
+      sources,
+    }),
   });
   expect(approved.status).toBe(200);
   const token = await readJson(
@@ -283,9 +298,11 @@ it("lists oauth grants to the owner without any token material", async () => {
     "revoked_at",
     "site_write",
     "sources",
+    "unrestricted_data",
   ];
   expect(Object.keys(grant ?? {}).sort()).toEqual(fields);
   expect(grant?.site_write).toBe(true);
+  expect(grant?.unrestricted_data).toBe(false);
   expect(grant?.sources).toEqual(sources);
   expect(grant?.revoked_at).toBeNull();
   expect(grant?.id).toBe(server.runtime.oauthGrants()[0]?.id);
@@ -438,6 +455,54 @@ it("reloads rotated refresh reuse through loadProjection", async () => {
   await reloaded.close();
 });
 
+it("reloads unrestricted device data and keeps an older grant restricted", async () => {
+  const backing = grantBacking([
+    {
+      id: "grant_old",
+      site_write: false,
+      unrestricted_data: false,
+      sources: [{ id: "notes", read: true, write: false, visibility: false }],
+      created_at: new Date("2026-01-01T00:00:00.000Z"),
+    },
+  ]);
+  const postgres = { store: backing.store, close: () => Promise.resolve() };
+  const server = await boot({ postgres });
+  const older = server.runtime.oauthGrants().find((grant) => grant.id === "grant_old");
+  expect(older?.unrestrictedData).toBe(false);
+  expect(older?.sources).toEqual([{ id: "notes", read: true, write: false, visibility: false }]);
+
+  const cookie = await owner(server);
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const approved = await server.request("/admin/device", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: JSON.stringify({
+      user_code: device.user_code,
+      unrestricted_data: true,
+      site_write: false,
+      sources: [{ id: "notes", read: true, write: true, visibility: true }],
+    }),
+  });
+  expect(approved.status, await approved.clone().text()).toBe(200);
+  await server.close();
+
+  const reloaded = await boot({ postgres });
+  const grants = reloaded.runtime.oauthGrants();
+  expect(grants.find((grant) => grant.id === "grant_old")).toMatchObject({
+    unrestrictedData: false,
+    sources: [{ id: "notes", read: true, write: false, visibility: false }],
+  });
+  const created = grants.find((grant) => grant.id !== "grant_old");
+  expect(created).toMatchObject({ unrestrictedData: true, sources: [] });
+  await reloaded.close();
+});
+
 function tokenRequest(params: Record<string, string>): RequestInit {
   return {
     method: "POST",
@@ -463,7 +528,12 @@ async function deviceRefresh(server: Awaited<ReturnType<typeof boot>>): Promise<
       await server.request("/admin/device", {
         method: "POST",
         headers: jsonHeaders({ cookie }),
-        body: JSON.stringify({ user_code: device.user_code, site_write: false, sources: [] }),
+        body: JSON.stringify({
+          user_code: device.user_code,
+          unrestricted_data: false,
+          site_write: false,
+          sources: [],
+        }),
       })
     ).status,
   ).toBe(200);
@@ -479,7 +549,15 @@ async function deviceRefresh(server: Awaited<ReturnType<typeof boot>>): Promise<
   return { deviceCode: String(device.device_code), refresh: String(token.refresh_token) };
 }
 
-function grantBacking(): {
+function grantBacking(
+  seed: {
+    id: string;
+    site_write: boolean;
+    unrestricted_data: boolean;
+    sources: OauthGrantInsert["sources"];
+    created_at: Date;
+  }[] = [],
+): {
   store: PostgresStore;
   writes: Array<{
     rotated_refresh_hashes?: unknown;
@@ -489,13 +567,24 @@ function grantBacking(): {
   const grants: Array<{
     id: string;
     site_write: boolean;
+    unrestricted_data?: boolean;
     sources: OauthGrantInsert["sources"];
     refresh_token_hash: string | null;
     rotated_refresh_hashes: unknown;
     refresh_token_payload: unknown;
     revoked_at: Date | null;
     created_at: Date;
-  }> = [];
+  }> = seed.map((row) => ({
+    id: row.id,
+    site_write: row.site_write,
+    unrestricted_data: row.unrestricted_data,
+    sources: row.sources,
+    refresh_token_hash: null,
+    rotated_refresh_hashes: [],
+    refresh_token_payload: null,
+    revoked_at: null,
+    created_at: row.created_at,
+  }));
   const writes: Array<{
     rotated_refresh_hashes?: unknown;
     refresh_token_payload?: unknown;
@@ -514,6 +603,7 @@ function grantBacking(): {
           grants.push({
             id: row.id,
             site_write: row.site_write,
+            unrestricted_data: row.unrestricted_data ?? false,
             sources: row.sources,
             refresh_token_hash: row.refresh_token_hash ?? null,
             rotated_refresh_hashes: row.rotated_refresh_hashes ?? [],

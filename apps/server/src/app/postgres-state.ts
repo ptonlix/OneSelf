@@ -61,6 +61,7 @@ export type AccessTokenRecord = {
 export type OauthGrantRecord = {
   id: string;
   siteWrite: boolean;
+  unrestrictedData: boolean;
   sources: SourceGrant[];
   refreshTokenHash: string | null;
   rotatedRefreshHashes: string[];
@@ -247,6 +248,7 @@ export async function loadProjection(
     grants: grantRows.map((grant) => ({
       id: grant.id,
       siteWrite: grant.site_write,
+      unrestrictedData: grant.unrestricted_data,
       sources: copyGrants(grant.sources),
       refreshTokenHash: grant.refresh_token_hash,
       rotatedRefreshHashes: stringList(grant.rotated_refresh_hashes),
@@ -510,6 +512,7 @@ export function oauthGrantInsert(record: OauthGrantRecord): OauthGrantInsert {
   return {
     id: record.id,
     site_write: record.siteWrite,
+    unrestricted_data: record.unrestrictedData,
     sources: copyGrants(record.sources),
     refresh_token_hash: record.refreshTokenHash,
     rotated_refresh_hashes: record.rotatedRefreshHashes,

@@ -385,6 +385,13 @@ const schemaMd = {
     columns: [
       text("id", true, true),
       { name: "site_write", sqlType: "boolean", notNull: true, primaryKey: false },
+      {
+        name: "unrestricted_data",
+        sqlType: "boolean",
+        notNull: true,
+        primaryKey: false,
+        defaultValue: false,
+      },
       { name: "sources", sqlType: "jsonb", notNull: true, primaryKey: false },
       text("refresh_token_hash", false),
       { name: "rotated_refresh_hashes", sqlType: "jsonb", notNull: true, primaryKey: false },
@@ -502,7 +509,11 @@ it("matches the schema.md tables and does not split business tables by material 
 
 it("appends one initial migration whose columns match schema.md", () => {
   const sqlFiles = readdirSync(migrationsDirectory).filter((file) => file.endsWith(".sql"));
-  expect(sqlFiles).toEqual(["0000_initial.sql", "0001_oauth_refresh_reuse.sql"]);
+  expect(sqlFiles).toEqual([
+    "0000_initial.sql",
+    "0001_oauth_refresh_reuse.sql",
+    "0002_oauth_unrestricted_data.sql",
+  ]);
 
   const journal = JSON.parse(
     readFileSync(join(migrationsDirectory, "meta/_journal.json"), "utf8"),
@@ -511,6 +522,7 @@ it("appends one initial migration whose columns match schema.md", () => {
   expect(journal.entries.map((entry) => entry.tag)).toEqual([
     "0000_initial",
     "0001_oauth_refresh_reuse",
+    "0002_oauth_unrestricted_data",
   ]);
 
   const sqlText = readFileSync(join(migrationsDirectory, "0000_initial.sql"), "utf8");
@@ -530,6 +542,17 @@ it("appends one initial migration whose columns match schema.md", () => {
   );
   expect(reuse).toContain('ADD COLUMN "rotated_refresh_hashes" jsonb');
   expect(reuse).toContain('ADD COLUMN "refresh_token_payload" jsonb');
+  const siteWrite = altered.findIndex((column) => column.name === "site_write");
+  altered.splice(siteWrite + 1, 0, {
+    name: "unrestricted_data",
+    sqlType: "boolean",
+    notNull: true,
+  });
+  const unrestricted = readFileSync(
+    join(migrationsDirectory, "0002_oauth_unrestricted_data.sql"),
+    "utf8",
+  );
+  expect(unrestricted).toContain('ADD COLUMN "unrestricted_data" boolean DEFAULT false NOT NULL');
 
   for (const [name, spec] of Object.entries(schemaMd)) {
     expect(

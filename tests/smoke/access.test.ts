@@ -65,6 +65,7 @@ it("shows an API key once and does not let OAuth manage keys", async () => {
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      unrestricted_data: false,
       site_write: false,
       sources: [],
     }),
@@ -132,6 +133,7 @@ it("returns the owner whoami result", async () => {
     credential: "owner",
     admin: true,
     site_write: true,
+    unrestricted_data: true,
     sources: [{ id: "notes", read: true, write: true, visibility: true }],
   });
   await server.close();
@@ -254,5 +256,151 @@ it("leaves another key and an OAuth grant working after one key is revoked", asy
   );
   expect(byKey.markdown).toContain("secret");
   expect(byOauth.markdown).toContain("secret");
+  await server.close();
+});
+
+it("does not approve a device when unrestricted_data is missing", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const missing = await server.request("/admin/device", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: JSON.stringify({ user_code: device.user_code, site_write: false, sources: [] }),
+  });
+  await expectError(missing, 400, "invalid");
+  expect(server.runtime.oauthGrants()).toEqual([]);
+  const pending = await server.request("/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+      device_code: String(device.device_code),
+    }),
+  });
+  expect(pending.status).not.toBe(200);
+  expect(await pending.text()).not.toContain("access_token");
+  await server.close();
+});
+
+it("lets an unrestricted device grant add a directory and shows that on whoami", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const ignored = [{ id: "notes", read: true, write: false, visibility: true }];
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const approved = await server.request("/admin/device", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: JSON.stringify({
+      user_code: device.user_code,
+      unrestricted_data: true,
+      site_write: false,
+      sources: ignored,
+    }),
+  });
+  expect(approved.status, await approved.clone().text()).toBe(200);
+  expect(await approved.text()).not.toContain("osk_");
+  expect(server.runtime.oauthGrants()).toMatchObject([
+    { unrestrictedData: true, siteWrite: false, sources: [] },
+  ]);
+
+  const token = await readJson(
+    await server.request("/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: String(device.device_code),
+      }),
+    }),
+  );
+  const bearer = String(token.access_token);
+  const headers = { authorization: `Bearer ${bearer}` };
+  expect(await readJson(await server.request("/pcp/v1/whoami", { headers }))).toMatchObject({
+    credential: "oauth",
+    admin: false,
+    unrestricted_data: true,
+    site_write: false,
+    sources: [],
+  });
+
+  const added = await server.request("/pcp/v1/sources", {
+    method: "POST",
+    headers: jsonHeaders(headers),
+    body: JSON.stringify({ id: "notes" }),
+  });
+  expect(added.status, await added.clone().text()).toBe(200);
+  expect(await readJson(await server.request("/pcp/v1/whoami", { headers }))).toMatchObject({
+    unrestricted_data: true,
+    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+  });
+  const listed = await readJson(await server.request("/pcp/v1/sources", { headers }));
+  expect(listed.sources).toEqual([{ id: "notes" }]);
+
+  const deleted = await server.request("/pcp/v1/sources/notes", {
+    method: "DELETE",
+    headers,
+  });
+  await expectError(deleted, 403, "forbidden");
+  expect((await server.request("/pcp/v1/sources/notes", { headers: { cookie } })).status).toBe(200);
+
+  const grants = await server.request("/admin/oauth-grants", {
+    headers: { accept: "application/json", cookie },
+  });
+  const grantText = await grants.text();
+  expect(grantText).not.toContain(bearer);
+  expect(grantText).not.toContain(String(token.refresh_token));
+  expect(grantText).not.toMatch(/token|refresh|hash/i);
+  const grantBody = JSON.parse(grantText) as {
+    oauth_grants: { unrestricted_data: boolean; sources: unknown[] }[];
+  };
+  expect(grantBody.oauth_grants).toEqual([
+    expect.objectContaining({ unrestricted_data: true, sources: [] }),
+  ]);
+
+  const restricted = await issueAccessToken(server, cookie, {
+    unrestricted_data: false,
+    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+  });
+  const denied = await server.request("/pcp/v1/sources", {
+    method: "POST",
+    headers: jsonHeaders({ authorization: `Bearer ${restricted}` }),
+    body: JSON.stringify({ id: "finance" }),
+  });
+  await expectError(denied, 403, "forbidden");
+  expect((await server.request("/pcp/v1/sources/finance", { headers: { cookie } })).status).toBe(
+    404,
+  );
+  const restrictedWho = await readJson(
+    await server.request("/pcp/v1/whoami", {
+      headers: { authorization: `Bearer ${restricted}` },
+    }),
+  );
+  expect(restrictedWho.unrestricted_data).toBe(false);
+
+  const key = await issueApiKey(server, cookie, { label: "all", unrestricted_data: true });
+  expect(
+    await readJson(
+      await server.request("/pcp/v1/whoami", {
+        headers: { authorization: `ApiKey ${key.key}` },
+      }),
+    ),
+  ).toMatchObject({
+    credential: "api_key",
+    unrestricted_data: true,
+    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+  });
   await server.close();
 });

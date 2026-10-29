@@ -55,6 +55,7 @@ describe("product skills", () => {
       "[[source/slug]]",
       "credentials: omit",
       "不得写入密钥或私有页",
+      "带全部数据权限的 API Key / 设备码授权",
     ]) {
       expect(context, sentence).toContain(sentence);
     }

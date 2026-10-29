@@ -120,6 +120,7 @@ export const operationSchemas = {
   password: z.object({ password: z.string().min(1) }),
   device_approval: z.object({
     user_code: z.string().min(1),
+    unrestricted_data: z.boolean(),
     site_write: z.boolean(),
     sources: z.array(grant),
   }),

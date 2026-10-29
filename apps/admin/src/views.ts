@@ -462,8 +462,16 @@ function segBox(
 function summaryRows(
   drafts: readonly SourceDraft[],
   siteWrite: boolean,
+  unrestrictedData: boolean,
   extra: readonly (readonly [string, string])[] = [],
 ): ReactElement {
+  const tail: (readonly [string, string])[] = [
+    ["site:write", siteWrite ? "允许" : "不允许"],
+    ...extra,
+  ];
+  if (unrestrictedData) {
+    return kv([["全部数据权限", "是"], ...tail]);
+  }
   const pick = (flag: GrantFlag): string => {
     const ids = drafts.filter((draft) => draft[flag]).map((draft) => draft.id);
     return ids.length === 0 ? "无" : ids.join("、");
@@ -472,8 +480,7 @@ function summaryRows(
     ["可读", pick("read")],
     ["可写", pick("write")],
     ["改可见性", pick("visibility")],
-    ["site:write", siteWrite ? "允许" : "不允许"],
-    ...extra,
+    ...tail,
   ]);
 }
 
@@ -481,6 +488,7 @@ const DEVICE_REVOKE_HINT = "之后可在概览的「已批准设备」里单独�
 
 export function DeviceApprovalView(props: {
   userCode: string;
+  unrestrictedData: boolean;
   siteWrite: boolean;
   drafts: readonly SourceDraft[];
   message: string | null;
@@ -488,6 +496,7 @@ export function DeviceApprovalView(props: {
   done: boolean;
   directoriesReady: boolean;
   onUserCode: (value: string) => void;
+  onUnrestricted: (value: boolean) => void;
   onSiteWrite: (value: boolean) => void;
   onToggle: (id: string, flag: GrantFlag, value: boolean) => void;
   onSubmit: () => void;
@@ -521,7 +530,7 @@ export function DeviceApprovalView(props: {
     pageHead(
       "OAuth 2.1 · Device authorization",
       "批准设备码",
-      "只保存这一页勾选的 source 三档和可选的 site:write。不创建 API Key，也没有全部数据权限。",
+      "可以勾选全部数据权限，或只保存这一页勾选的 source 三档，以及可选的 site:write。不创建 API Key。",
     ),
     message(props.message),
     h(
@@ -553,9 +562,15 @@ export function DeviceApprovalView(props: {
           ),
           h("p", { className: "body-s" }, "核对它和 Agent 终端里显示的用户码一致。"),
         ),
-        sourceGrid(
-          props.drafts,
-          props.onToggle,
+        h(
+          "section",
+          { className: "card card-b" },
+          toggle({
+            checked: props.unrestrictedData,
+            title: "全部数据权限",
+            detail: "包含以后新建的目录。打开后，下方目录不会写入批准。",
+            onChange: props.onUnrestricted,
+          }),
           toggle({
             checked: props.siteWrite,
             title: ["允许 ", h("code", { key: "c" }, "site:write")],
@@ -563,12 +578,21 @@ export function DeviceApprovalView(props: {
             onChange: props.onSiteWrite,
           }),
         ),
+        props.unrestrictedData
+          ? h(
+              "section",
+              { className: "card card-b" },
+              h("p", { className: "body-s" }, "已选择全部数据权限，目录列表不会写入批准。"),
+            )
+          : sourceGrid(props.drafts, props.onToggle),
       ),
       h(
         "aside",
         { className: "card card-b summary" },
         h("div", { className: "kicker" }, "授权摘要"),
-        summaryRows(props.drafts, props.siteWrite, [["令牌", "access 15 分钟 · refresh 轮换"]]),
+        summaryRows(props.drafts, props.siteWrite, props.unrestrictedData, [
+          ["令牌", "access 15 分钟 · refresh 轮换"],
+        ]),
         ReadGrantNotice(),
         h(
           "button",

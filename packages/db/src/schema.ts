@@ -368,6 +368,7 @@ export const oauth_grants = pgTable(
   {
     id: text("id").primaryKey(),
     site_write: boolean("site_write").notNull(),
+    unrestricted_data: boolean("unrestricted_data").notNull().default(false),
     sources: sourceGrants("sources").notNull(),
     refresh_token_hash: text("refresh_token_hash"),
     rotated_refresh_hashes: jsonb("rotated_refresh_hashes").notNull().default([]),

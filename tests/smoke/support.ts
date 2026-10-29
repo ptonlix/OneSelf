@@ -148,7 +148,11 @@ export async function issueApiKey(
 export async function issueAccessToken(
   server: ServerHandle,
   cookie: string,
-  input: { site_write?: boolean; sources?: SourceGrantInput[] } = {},
+  input: {
+    site_write?: boolean;
+    unrestricted_data?: boolean;
+    sources?: SourceGrantInput[];
+  } = {},
 ): Promise<string> {
   const device = await readJson(
     await server.request("/oauth/device/auth", {
@@ -162,6 +166,7 @@ export async function issueAccessToken(
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      unrestricted_data: input.unrestricted_data ?? false,
       site_write: input.site_write ?? false,
       sources: input.sources ?? [],
     }),

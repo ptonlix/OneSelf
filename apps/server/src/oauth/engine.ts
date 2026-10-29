@@ -15,6 +15,7 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 export type PersistedGrant = {
   id: string;
   siteWrite: boolean;
+  unrestrictedData: boolean;
   sources: SourceGrant[];
   refreshTokenHash: string | null;
   rotatedRefreshHashes: string[];
@@ -73,7 +74,7 @@ export type OauthEngine = {
   handle(request: Request, path: "/device/auth" | "/token"): Promise<Response>;
   approveDevice(
     userCode: string,
-    input: { siteWrite: boolean; sources: SourceGrant[] },
+    input: { siteWrite: boolean; unrestrictedData: boolean; sources: SourceGrant[] },
   ): Promise<"ok" | "not_found" | "expired" | "used">;
   issueAuthCode(input: {
     challenge: string;
@@ -233,6 +234,7 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
       const record: PersistedGrant = {
         id,
         siteWrite: input.siteWrite,
+        unrestrictedData: input.unrestrictedData,
         sources: input.sources.map((source) => ({ ...source })),
         refreshTokenHash: null,
         rotatedRefreshHashes: [],
@@ -260,6 +262,7 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
       const record: PersistedGrant = {
         id,
         siteWrite: input.siteWrite,
+        unrestrictedData: false,
         sources: input.sources.map((source) => ({ ...source })),
         refreshTokenHash: null,
         rotatedRefreshHashes: [],

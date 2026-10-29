@@ -475,6 +475,7 @@ const GRANT_FIELDS = [
   "revoked_at",
   "site_write",
   "sources",
+  "unrestricted_data",
 ] as const satisfies readonly (keyof OauthGrantView)[];
 const SECRET_FIELD = /token|refresh|hash/i;
 
@@ -494,6 +495,7 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
       typeof item.id !== "string" ||
       item.id === "" ||
       typeof item.site_write !== "boolean" ||
+      typeof item.unrestricted_data !== "boolean" ||
       typeof item.created_at !== "string" ||
       !nullableString(item.revoked_at)
     ) {
@@ -502,6 +504,7 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
     return {
       id: item.id,
       site_write: item.site_write,
+      unrestricted_data: item.unrestricted_data,
       sources: parseGrants(item.sources),
       created_at: item.created_at,
       revoked_at: item.revoked_at,

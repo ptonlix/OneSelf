@@ -16,7 +16,7 @@
 ## 先看这些
 
 - 一页由 `source` 和 `slug` 标识，格式以参数 schema 为准；`slug` 不含 `/`。不预置名为 `public`、`private` 或 `agents` 的目录。公开与否只看这一页的 `visibility`。
-- 没有可写目录时停下来问所属人。不要调用 `sources_add`，除非这次凭据是所属人会话，或带全部数据权限的 API Key。软删除期内的同名会 `conflict`，不要改个近名再造。
+- 没有可写目录时停下来问所属人。不要调用 `sources_add`，除非这次凭据是所属人会话，或带全部数据权限的 API Key / 设备码授权。软删除期内的同名会 `conflict`，不要改个近名再造。
 - 没有人要求公开时保持 `private`。frontmatter 省略 `visibility` 时保存为 `private`。其他值会被拒绝，不会被改成二者之一。改可见性，或把新页直接写成 `public`，都要有该 source 的改可见性权限。只有写权限不够。
 - `title` 只认 frontmatter，不认一级标题。`type` 是标签，不是新表。不要为一种新资料建表或发明围栏。
 - 图片和 PDF 是原件，不写进 Markdown，也不要描述成「已经上传」。先 `file_upload`，再挂到页上。

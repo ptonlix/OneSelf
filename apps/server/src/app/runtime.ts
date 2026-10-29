@@ -119,13 +119,14 @@ export type Actor = {
 };
 
 /**
- * The owner-visible shape of one OAuth grant: exactly these five fields, never token hashes or
+ * The owner-visible shape of one OAuth grant: exactly these six fields, never token hashes or
  * refresh payloads. `GET /admin/oauth-grants` returns `{ oauth_grants: OauthGrantView[] }`; the
- * admin client parses the same five fields into its own `OauthGrantView`.
+ * admin client parses the same six fields into its own `OauthGrantView`.
  */
 export type OauthGrantView = {
   readonly id: string;
   readonly site_write: boolean;
+  readonly unrestricted_data: boolean;
   readonly sources: readonly {
     readonly id: string;
     readonly read: boolean;
@@ -1759,7 +1760,12 @@ export class Runtime {
 
   approveDevice(
     actor: Actor,
-    input: { userCode: string; siteWrite: boolean; sources: SourceGrant[] },
+    input: {
+      userCode: string;
+      unrestrictedData: boolean;
+      siteWrite: boolean;
+      sources: SourceGrant[];
+    },
   ): Promise<DomainResult<Record<string, never>>> {
     return this.exclusive(async () => {
       const allowed = this.#ownerActor(actor);
@@ -1768,7 +1774,8 @@ export class Runtime {
       }
       const approved = await this.#requireEngine().approveDevice(input.userCode, {
         siteWrite: input.siteWrite,
-        sources: input.sources,
+        unrestrictedData: input.unrestrictedData,
+        sources: input.unrestrictedData ? [] : input.sources,
       });
       if (approved === "not_found") {
         return fail("not_found", "device code not found");
@@ -1821,7 +1828,7 @@ export class Runtime {
       if (!allowed.ok) {
         return allowed;
       }
-      // Copy the five owner-visible fields one by one; token hashes and refresh payloads stay inside.
+      // Copy the six owner-visible fields one by one; token hashes and refresh payloads stay inside.
       const grants = [...this.#grants].sort((left, right) =>
         left.createdAt === right.createdAt
           ? left.id.localeCompare(right.id)
@@ -1831,6 +1838,7 @@ export class Runtime {
         oauth_grants: grants.map((grant): OauthGrantView => ({
           id: grant.id,
           site_write: grant.siteWrite,
+          unrestricted_data: grant.unrestrictedData,
           sources: grant.sources.map((source) => ({
             id: source.id,
             read: source.read,
@@ -2076,7 +2084,12 @@ export class Runtime {
       return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
     }
     return {
-      credential: { kind: "oauth", siteWrite: grant.siteWrite, sources: grant.sources },
+      credential: {
+        kind: "oauth",
+        unrestrictedData: grant.unrestrictedData,
+        siteWrite: grant.siteWrite,
+        sources: grant.sources,
+      },
       mustChangePassword: false,
       sessionId: null,
     };
@@ -2164,24 +2177,28 @@ export class Runtime {
   }
 
   #whoami(credential: Credential): Record<string, unknown> {
+    const liveSources = this.state.sources
+      .filter((source) => source.deletedAt === null)
+      .map((source) => ({ id: source.id, read: true, write: true, visibility: true }));
     if (credential.kind === "owner") {
       return {
         credential: "owner",
         admin: true,
         site_write: true,
-        sources: this.state.sources
-          .filter((source) => source.deletedAt === null)
-          .map((source) => ({ id: source.id, read: true, write: true, visibility: true })),
+        unrestricted_data: true,
+        sources: liveSources,
       };
     }
-    if (credential.kind === "api_key" && credential.unrestrictedData) {
+    if (
+      (credential.kind === "api_key" || credential.kind === "oauth") &&
+      credential.unrestrictedData
+    ) {
       return {
-        credential: "api_key",
+        credential: credential.kind,
         admin: false,
         site_write: credential.siteWrite,
-        sources: this.state.sources
-          .filter((source) => source.deletedAt === null)
-          .map((source) => ({ id: source.id, read: true, write: true, visibility: true })),
+        unrestricted_data: true,
+        sources: liveSources,
       };
     }
     if (credential.kind === "api_key" || credential.kind === "oauth") {
@@ -2189,10 +2206,17 @@ export class Runtime {
         credential: credential.kind,
         admin: false,
         site_write: credential.siteWrite,
+        unrestricted_data: false,
         sources: credential.sources.map((source) => ({ ...source })),
       };
     }
-    return { credential: "anonymous", admin: false, site_write: false, sources: [] };
+    return {
+      credential: "anonymous",
+      admin: false,
+      site_write: false,
+      unrestricted_data: false,
+      sources: [],
+    };
   }
 }
 
@@ -2214,7 +2238,7 @@ function searchableSources(
   if (credential.kind === "anonymous") {
     return [];
   }
-  if (credential.kind === "api_key" && credential.unrestrictedData) {
+  if (credential.unrestrictedData) {
     return undefined;
   }
   return credential.sources.filter((source) => source.read).map((source) => source.id);
@@ -2224,6 +2248,7 @@ function persistedGrant(grant: OauthGrantRecord): PersistedGrant {
   return {
     id: grant.id,
     siteWrite: grant.siteWrite,
+    unrestrictedData: grant.unrestrictedData,
     sources: grant.sources.map((source) => ({ ...source })),
     refreshTokenHash: grant.refreshTokenHash,
     rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
@@ -2237,6 +2262,7 @@ function grantRecord(grant: PersistedGrant): OauthGrantRecord {
   return {
     id: grant.id,
     siteWrite: grant.siteWrite,
+    unrestrictedData: grant.unrestrictedData,
     sources: grant.sources.map((source) => ({ ...source })),
     refreshTokenHash: grant.refreshTokenHash,
     rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
@@ -2289,11 +2315,8 @@ function canUpload(credential: Credential): boolean {
   if (credential.kind === "owner") {
     return true;
   }
-  if (credential.kind === "api_key" && credential.unrestrictedData) {
-    return true;
-  }
   if (credential.kind === "api_key" || credential.kind === "oauth") {
-    return credential.sources.some((source) => source.write);
+    return credential.unrestrictedData || credential.sources.some((source) => source.write);
   }
   return false;
 }
@@ -2315,7 +2338,7 @@ function sourceFlagsRead(credential: Credential, source: string): boolean {
   if (credential.kind === "anonymous") {
     return false;
   }
-  if (credential.kind === "api_key" && credential.unrestrictedData) {
+  if (credential.unrestrictedData) {
     return true;
   }
   return credential.sources.some((item) => item.id === source && item.read);

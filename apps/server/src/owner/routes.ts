@@ -115,11 +115,7 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
       return sendError("forbidden", "origin is not allowed");
     }
     const actor = await runtime.authenticate(c.req.raw);
-    const body = await readBody(c.req.raw);
-    if (!isRecord(body) || "unrestricted_data" in body) {
-      return sendError("invalid", "device approval is invalid");
-    }
-    const approved = parseOperation("device_approval", body);
+    const approved = parseOperation("device_approval", await readBody(c.req.raw));
     if (approved === null) {
       return sendError("invalid", "device approval is invalid");
     }
@@ -129,6 +125,7 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     }
     const result = await runtime.approveDevice(actor, {
       userCode: approved.user_code,
+      unrestrictedData: approved.unrestricted_data,
       siteWrite: approved.site_write,
       sources,
     });

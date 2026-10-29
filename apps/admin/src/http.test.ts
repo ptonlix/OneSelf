@@ -113,6 +113,7 @@ describe("admin http client", () => {
     const { transport, seen } = scripted([{ status: 200, body: { key: "osk_nope" } }]);
     const body = {
       user_code: "WDJB-MJHT",
+      unrestricted_data: false,
       site_write: false,
       sources: [{ id: "notes", read: true, write: false, visibility: false }],
     };
@@ -120,7 +121,7 @@ describe("admin http client", () => {
       ParseError,
     );
     expect(seen[0]).toEqual({ method: "POST", path: "/admin/device", json: body });
-    expect(JSON.stringify(seen[0]?.json)).not.toContain("unrestricted_data");
+    expect(JSON.stringify(seen[0]?.json)).not.toContain("osk_");
   });
 
   it("posts the site decision and nothing else", async () => {
@@ -210,6 +211,7 @@ const activeKey = {
 const grant = {
   id: "grant_1",
   site_write: false,
+  unrestricted_data: false,
   sources: [{ id: "notes", read: true, write: false, visibility: false }],
   created_at: "2026-10-01T00:00:00Z",
   revoked_at: null,

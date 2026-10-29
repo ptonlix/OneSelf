@@ -16,6 +16,7 @@ export type Credential =
     }
   | {
       readonly kind: "oauth";
+      readonly unrestrictedData: boolean;
       readonly siteWrite: boolean;
       readonly sources: readonly SourceGrant[];
     };
@@ -26,6 +27,12 @@ export type SourceFlags = {
   readonly visibility: boolean;
 };
 
+function hasUnrestrictedData(credential: Credential): boolean {
+  return (
+    (credential.kind === "api_key" || credential.kind === "oauth") && credential.unrestrictedData
+  );
+}
+
 export function sourceFlags(credential: Credential, source: string): SourceFlags {
   if (credential.kind === "owner") {
     return { read: true, write: true, visibility: true };
@@ -33,7 +40,7 @@ export function sourceFlags(credential: Credential, source: string): SourceFlags
   if (credential.kind === "anonymous") {
     return { read: false, write: false, visibility: false };
   }
-  if (credential.kind === "api_key" && credential.unrestrictedData) {
+  if (hasUnrestrictedData(credential)) {
     return { read: true, write: true, visibility: true };
   }
   const grant = credential.sources.find((item) => item.id === source);
@@ -52,10 +59,7 @@ export function canAddSource(credential: Credential): "ok" | "unauthorized" | "f
   if (credential.kind === "anonymous") {
     return "unauthorized";
   }
-  if (credential.kind === "owner") {
-    return "ok";
-  }
-  if (credential.kind === "api_key" && credential.unrestrictedData) {
+  if (credential.kind === "owner" || hasUnrestrictedData(credential)) {
     return "ok";
   }
   return "forbidden";

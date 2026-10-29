@@ -65,6 +65,7 @@ describe("approval pages", () => {
     const markup = html(
       createElement(DeviceApprovalView, {
         userCode: "WDJB-MJHT",
+        unrestrictedData: false,
         siteWrite: false,
         drafts,
         message: null,
@@ -72,6 +73,7 @@ describe("approval pages", () => {
         done: false,
         directoriesReady: true,
         onUserCode: () => undefined,
+        onUnrestricted: () => undefined,
         onSiteWrite: () => undefined,
         onToggle: () => undefined,
         onSubmit: () => undefined,
@@ -80,10 +82,14 @@ describe("approval pages", () => {
     expectNoticeBeforeConfirm(markup);
     expect(markup).not.toContain("osk_");
     expect(markup).toContain("不创建 API Key");
+    expect(markup).toContain("全部数据权限");
+    expect(markup).toContain("site:write");
+    expect(markup).toContain("notes 读");
 
     const done = html(
       createElement(DeviceApprovalView, {
         userCode: "WDJB-MJHT",
+        unrestrictedData: false,
         siteWrite: false,
         drafts,
         message: null,
@@ -91,6 +97,7 @@ describe("approval pages", () => {
         done: true,
         directoriesReady: true,
         onUserCode: () => undefined,
+        onUnrestricted: () => undefined,
         onSiteWrite: () => undefined,
         onToggle: () => undefined,
         onSubmit: () => undefined,
@@ -163,6 +170,7 @@ function deviceView(done: boolean): string {
   return html(
     createElement(DeviceApprovalView, {
       userCode: "WDJB-MJHT",
+      unrestrictedData: false,
       siteWrite: false,
       drafts,
       message: null,
@@ -170,6 +178,7 @@ function deviceView(done: boolean): string {
       done,
       directoriesReady: true,
       onUserCode: noop,
+      onUnrestricted: noop,
       onSiteWrite: noop,
       onToggle: noop,
       onSubmit: noop,
@@ -348,6 +357,33 @@ describe("site approval", () => {
 });
 
 describe("device approval hint", () => {
+  it("sends no source checks when unrestricted data is chosen", () => {
+    const markup = html(
+      createElement(DeviceApprovalView, {
+        userCode: "WDJB-MJHT",
+        unrestrictedData: true,
+        siteWrite: true,
+        drafts,
+        message: null,
+        pending: false,
+        done: false,
+        directoriesReady: true,
+        onUserCode: noop,
+        onUnrestricted: noop,
+        onSiteWrite: noop,
+        onToggle: noop,
+        onSubmit: noop,
+      }),
+    );
+    expect(markup).toContain("全部数据权限");
+    expect(markup).toContain("目录列表不会写入批准");
+    expect(markup).toContain("site:write");
+    expect(markup).toContain("不创建 API Key");
+    expect(markup).not.toContain("notes 读");
+    expect(markup).not.toContain("osk_");
+    expectNoticeBeforeConfirm(markup);
+  });
+
   it("says the grant can be revoked from the overview", () => {
     const hint = "之后可在概览的「已批准设备」里单独作废这条授权，下一次请求即失效";
     const markup = deviceView(false);
@@ -394,13 +430,15 @@ const overviewData: OverviewData = {
     {
       id: "grant_live_0001",
       site_write: true,
-      sources: [{ id: "notes", read: true, write: false, visibility: false }],
+      unrestricted_data: true,
+      sources: [],
       created_at: "2026-05-03T00:00:00Z",
       revoked_at: null,
     },
     {
       id: "grant_gone_0002",
       site_write: false,
+      unrestricted_data: false,
       sources: [{ id: "profile", read: true, write: false, visibility: false }],
       created_at: "2026-05-01T00:00:00Z",
       revoked_at: "2026-05-04T00:00:00Z",
@@ -527,6 +565,8 @@ describe("approved devices", () => {
     const panel = section(html(tree), "已批准设备");
     expect(panel).not.toMatch(/token|refresh|hash/i);
     expect(panel).toContain("site:write");
+    expect(textOf(row(tree, "grant_live_0001"))).toContain("全部数据");
+    expect(textOf(row(tree, "grant_gone_0002"))).not.toContain("全部数据");
     expect(buttons(row(tree, "grant_gone_0002"))).toHaveLength(0);
     expect(textOf(row(tree, "grant_gone_0002"))).toContain("revoked");
   });

@@ -283,7 +283,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 | `owners` | 唯一所属人。登录名、密码哈希、是否必须改密 |
 | `api_keys` | 已生效密钥的哈希、标签、权限、作废时间、最近使用时间 |
 | `api_key_requests` | 待批准的密钥请求、要求的权限和过期时间 |
-| `oauth_grants` | 授权范围、刷新令牌哈希、作废时间 |
+| `oauth_grants` | 授权范围、是否全部数据权限、刷新令牌哈希、作废时间 |
 
 写入一页：
 
@@ -379,7 +379,7 @@ GET  /.well-known/agent-skills/index.json
 | 方法 | 路径 | 操作 |
 | --- | --- | --- |
 | GET | `/pcp/v1/sources` | `sources_list`。不含软删除目录 |
-| POST | `/pcp/v1/sources` | `sources_add`。JSON `{id}`。软删除期内的同名返回 `conflict` |
+| POST | `/pcp/v1/sources` | `sources_add`。JSON `{id}`。只给所属人会话，或带全部数据权限的 API Key / 设备码授权。软删除期内的同名返回 `conflict` |
 | DELETE | `/pcp/v1/sources/{id}` | `sources_delete`。只有所属人会话 |
 | POST | `/pcp/v1/sources/{id}/restore` | `sources_restore`。只有所属人会话，30 天内 |
 | GET | `/pcp/v1/sources/{id}` | `sources_status`。软删除目录是 `not_found` |
@@ -387,7 +387,7 @@ GET  /.well-known/agent-skills/index.json
 | GET | `/pcp/v1/skills` | `list_skills` |
 | GET | `/pcp/v1/skills/{name}` | `get_skill`。`name` 为 `oneself`。其他名字是 `not_found` |
 
-`whoami` 返回 `{credential, admin, site_write, sources:[{id, read, write, visibility}]}`。只有所属人会话的 `admin` 为 true。
+`whoami` 返回 `{credential, admin, site_write, unrestricted_data, sources:[{id, read, write, visibility}]}`。只有所属人会话的 `admin` 为 true。所属人会话，以及带全部数据权限的 API Key 或设备码授权，`unrestricted_data` 为 true；其余为 false。无限制凭据的 `sources` 是当前未删除目录，三档都为真。
 
 站点：
 
@@ -428,7 +428,7 @@ GET  /.well-known/agent-skills/index.json
 | POST | `/admin/api-keys/{id}/approve` | 核对并生成密钥。原文只在这次 JSON 里 |
 | POST | `/admin/site-activations/{id}/approve` | JSON `{decision:"approve"\|"reject"}`。只有 `approve` 移动指针 |
 
-认证之后只经过 `authorize(credential, operation, source)`。所属人会话拥有全部操作。API Key 和 OAuth 按批准的 source 三档和 `site:write` 判断。两者都不能令 `admin` 为 true。
+认证之后只经过 `authorize(credential, operation, source)`。所属人会话拥有全部操作。API Key 和 OAuth 按批准的 source 三档、全部数据权限和 `site:write` 判断。两者都不能令 `admin` 为 true，也不能删除或恢复目录。
 
 无凭据调用写入、非公开检索、上线申请或管理路由返回 401 `unauthorized`。凭据有效但操作不在授权里返回 403 `forbidden`。资源读不到返回 404 `not_found`。哈希冲突返回 409 `conflict`。非法正文、围栏、slug 或 zip 返回 400 `invalid`。超过 20 MiB 或 200 个站点文件返回 413 `payload_too_large`。未改密返回 403 `password_change_required`。
 
@@ -505,7 +505,7 @@ site_pointers 改指向这一行
 ### 8.4 Agent 通过设备码取得授权
 
 1. Agent 读 `/.well-known/pcp` 和 Skill。
-2. 设备码页面只让所属人批准 source 三档和可选的 `site:write`，不创建 API Key。
+2. 设备码页面让所属人批准全部数据权限，或当时勾选的 source 三档，以及可选的 `site:write`。`POST /admin/device` 必须带 `unrestricted_data`；为真时忽略 `sources` 并存空数组。缺字段是 `invalid`，不批准。不创建 API Key。
 3. Agent 用 Bearer 令牌调用已批准的操作。申请上线只得到批准地址。
 4. 所属人撤销这一条授权后，refresh 立即失败。其他 Key 和其他授权仍可用。
 

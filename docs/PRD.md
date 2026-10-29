@@ -98,7 +98,7 @@ files: []
 - `type` 和 `source` 匹配 `^[a-z][a-z0-9-]{0,62}$`。`source` 的主键就是这个名字。
 - `slug` 匹配 `^[a-z0-9][a-z0-9-]{0,79}$`，不含 `/`。
 - 不固定的键放在 frontmatter。索引用 JSONB 查询这些键。
-- 不预置任何 source，也不预置名为 `public`、`private` 或 `agents` 的目录。只有所属人会话，或带「全部数据权限」的 API Key，可以 `sources_add`。
+- 不预置任何 source，也不预置名为 `public`、`private` 或 `agents` 的目录。只有所属人会话，或带「全部数据权限」的 API Key / 设备码授权，可以 `sources_add`。
 - 只有所属人会话可以 `sources_delete` 和 `sources_restore`。删除是软删除，保留 30 天。期内目录和因这次删除而隐藏的页都不可读，公开站不用重新激活。其他页里的 `[[source/slug]]` 不改写。已批准的权限不删，恢复后仍然有效。超过 30 天由每小时清理真删目录和其页投影；原件解除挂接，仍是私有的。之前已经单独软删除的页不因目录一起恢复。
 - `visibility` 只有 `public` 和 `private`。缺省 `private`。其他值拒绝写入，不悄悄改掉。同一业务目录里可以既有公开页，也有私有页。
 - 匿名公开 PCP 不看 source 名字，只返回 `visibility: public` 且未删除的页。
@@ -150,7 +150,7 @@ Agent 不能创建或修改这些表。新增有明确列的表必须改 schema�
 | `owners` | 唯一所属人。登录名、密码哈希、是否必须改密 |
 | `api_keys` | 已生效密钥的哈希、标签、权限和作废时间。不存原文 |
 | `api_key_requests` | 尚未生成密钥的批准请求、要求的权限和过期时间 |
-| `oauth_grants` | OAuth 授权、刷新令牌哈希、作废时间 |
+| `oauth_grants` | OAuth 授权、是否全部数据权限、刷新令牌哈希、作废时间 |
 
 不按资料种类建业务表。简历、经历、笔记、证件摘要都是 `pages` 行。
 
@@ -217,11 +217,11 @@ PCP（Personal Context Protocol）是上述资料和站点的一组操作。除�
 | 操作 | 作用 |
 |---|---|
 | `sources_list` | 列出调用方能读的业务目录 |
-| `sources_add` | 增加目录。只给所属人会话，或带全部数据权限的 API Key。名字仍在软删除期内则拒绝，不新建 |
+| `sources_add` | 增加目录。只给所属人会话，或带全部数据权限的 API Key / 设备码授权。名字仍在软删除期内则拒绝，不新建 |
 | `sources_delete` | 所属人会话软删除一个目录。其中的页立即不可读。不删权限，也不改其他页的 Markdown |
 | `sources_restore` | 所属人会话在 30 天内恢复该目录，以及因这次删除而隐藏的页 |
 | `sources_status` | 查一个未删除目录的未删除页数和最近写入 |
-| `whoami` | 返回凭据种类、每个 source 的读/写/改可见性，以及是否有 `site:write` |
+| `whoami` | 返回凭据种类、是否全部数据权限、每个 source 的读/写/改可见性，以及是否有 `site:write` |
 | `list_skills` / `get_skill` | 读两份 Skill。匿名的 `/skills/*.md` 是同一份字节 |
 
 站点只有一份。GBrain 没有这一组：
@@ -256,7 +256,7 @@ API Key 管理只出现在 HTTP，不注册成 MCP 工具：
 
 - 所属人会话拥有全部资料权限、`site:write`、密钥管理和同意上线。
 - API Key 保存批准页上的权限。可以勾选全部数据权限，以后新建的 source 也算在内；否则只包含当时勾选的 source。可以另勾 `site:write`。密钥不能同意上线，也不能管理密钥。
-- OAuth 保存设备码页上勾选的 source 三档和可选的 `site:write`。不能管理密钥，也不能同意上线。
+- OAuth 保存设备码页上的全部数据权限，或当时勾选的 source 三档，以及可选的 `site:write`。全部数据权限包含以后新建的 source。不能删除或恢复目录，不能管理密钥，也不能同意上线。已有授权没有这一项时保持原范围。
 - slug 里的凭据前缀只是约定，系统不强制，也不因此分目录。
 
 OAuth 2.1 只对生产启用设备码。授权码加 PKCE 只在测试配置开启，发现文档不公布它。不支持密码模式和 implicit。access token 15 分钟。refresh token 只存哈希，使用后轮换，旧的立即失效；旧令牌再次出现则整条授权作废。人可以单独撤销一条授权。验证地址是管理端的 `/admin/device`，必须先登录所属人账号。
