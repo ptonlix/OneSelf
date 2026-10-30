@@ -118,10 +118,10 @@ jobs:
           tag="${GITHUB_REF_NAME}"
           notes="${RUNNER_TEMP}/release-notes.txt"
           if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf 'OneSelf %s\n\n正式安装使用 %s:latest。\n这个版本同时也是 %s:%s。同一标签包含 linux/amd64 和 linux/arm64。\n更新时执行 docker compose pull && docker compose up -d。\n入口容器不在这个镜像里。\n' "${tag}" "${IMAGE}" "${IMAGE}" "${VERSION}" > "${notes}"
+            printf 'OneSelf %s\n\n正式安装：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/latest/download/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/latest/download/oneself.ps1 | iex"\n```\n\nUnix 默认安装到 $HOME/.local/share/oneself。Windows 默认安装到 %%LOCALAPPDATA%%\\oneself。执行时会打印这个路径。\n应用镜像是 %s:latest，这个版本同时也是 %s:%s。同一标签包含 linux/amd64 和 linux/arm64。\n安装脚本把镜像标签固定成这个版本。update 只拉取这个标签。换更新的正式版时再执行一次上面的安装命令，已有口令不会被覆盖。\n入口容器不在这个镜像里。Agent 用 npx skills add，不由安装脚本写入凭据。\n' "${tag}" "${GITHUB_REPOSITORY}" "${GITHUB_REPOSITORY}" "${IMAGE}" "${IMAGE}" "${VERSION}" > "${notes}"
             prerelease=()
           else
-            printf 'OneSelf %s\n\n这是预发布。应用镜像：%s:%s\nlatest 不会移动。\n' "${tag}" "${IMAGE}" "${VERSION}" > "${notes}"
+            printf 'OneSelf %s\n\n这是预发布。应用镜像：%s:%s\nlatest 不会移动。安装脚本：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/download/%s/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/download/%s/oneself.ps1 | iex"\n```\n' "${tag}" "${IMAGE}" "${VERSION}" "${GITHUB_REPOSITORY}" "${tag}" "${GITHUB_REPOSITORY}" "${tag}" > "${notes}"
             prerelease=(--prerelease)
           fi
           if gh release view "${tag}" >/dev/null 2>&1; then
@@ -129,3 +129,32 @@ jobs:
           else
             gh release create "${tag}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}" "${prerelease[@]}"
           fi
+          stage="${RUNNER_TEMP}/oneself-release"
+          rm -rf "${stage}"
+          mkdir -p "${stage}/deploy"
+          sed "s/^ONESELF_BUNDLED_REF=.*/ONESELF_BUNDLED_REF=${tag}/" deploy/oneself.sh > "${stage}/deploy/oneself.sh"
+          if ! grep -qx "ONESELF_BUNDLED_REF=${tag}" "${stage}/deploy/oneself.sh"; then
+            echo "failed to pin ONESELF_BUNDLED_REF=${tag}" >&2
+            exit 1
+          fi
+          sed "s/BundledRef = ''/BundledRef = '${tag}'/" deploy/oneself.ps1 > "${stage}/deploy/oneself.ps1"
+          if ! grep -q "BundledRef = '${tag}'" "${stage}/deploy/oneself.ps1"; then
+            echo "failed to pin BundledRef = '${tag}'" >&2
+            exit 1
+          fi
+          chmod 755 "${stage}/deploy/oneself.sh" "${stage}/deploy/oneself.ps1"
+          cp compose.yaml .env.example "${stage}/"
+          cp deploy/Caddyfile "${stage}/deploy/Caddyfile"
+          cp "${stage}/deploy/oneself.sh" "${RUNNER_TEMP}/oneself.sh"
+          cp "${stage}/deploy/oneself.ps1" "${RUNNER_TEMP}/oneself.ps1"
+          tar -C "${stage}" -czf "${RUNNER_TEMP}/oneself-compose.tar.gz" compose.yaml .env.example deploy/Caddyfile deploy/oneself.sh deploy/oneself.ps1
+          (
+            cd "${RUNNER_TEMP}"
+            sha256sum oneself.sh oneself.ps1 oneself-compose.tar.gz > SHA256SUMS
+          )
+          gh release upload "${tag}" \
+            "${RUNNER_TEMP}/oneself.sh" \
+            "${RUNNER_TEMP}/oneself.ps1" \
+            "${RUNNER_TEMP}/oneself-compose.tar.gz" \
+            "${RUNNER_TEMP}/SHA256SUMS" \
+            --clobber

@@ -172,6 +172,8 @@ Tailscale 容器使用 userspace networking，这样 Mac 上的 Docker 没有 `/
 
 没有隧道令牌或 auth key 时，入口容器可以失败，应用和数据库仍然留在。本机开发用 `compose.dev.yaml`，不要为了让入口先起来而把数据库端口映射出去。
 
+宿主安装脚本是 `deploy/oneself.sh`，Windows 对应 `deploy/oneself.ps1`。它们只调用 Compose：检查单一入口、写入 `.env`、停掉另外两个入口容器、`pull` 再 `up`。不安装入口程序，不映射数据库端口，也不从主机名推断 `PUBLIC_ORIGIN`。版本标签的 GitHub Release 附上这两份脚本和 compose 文件。这不是第二套部署，也不负责给 Agent 写凭据。
+
 ---
 
 ## 4. 代码边界
@@ -205,7 +207,9 @@ OneSelf/
 │       ├── context.md           写页规则。不插入 origin
 │       └── public-page.md       公开页规则。不插入 origin
 ├── deploy/
-│   └── Caddyfile                只反代，不放站点文件。cloudflared 和 Tailscale 不另建目录
+│   ├── Caddyfile                只反代，不放站点文件。cloudflared 和 Tailscale 不另建目录
+│   ├── oneself.sh               宿主安装脚本。只调用 Compose，不进应用镜像
+│   └── oneself.ps1              Windows 安装脚本。给 irm | iex，不进应用镜像
 ├── tests/
 │   └── smoke/                   冒烟。只打已经启动的进程
 ├── apps/
@@ -239,7 +243,7 @@ OneSelf/
 
 站点指针怎么变是纯规则，放在 `packages/domain/src/site-pointer.ts`：预览不改指针，批准才指向 `rel_…` 或 `public-page`，保留路径整包拒绝。事务由 `app/` 加 adapters 完成。`site-files/` 只按当前指针吐字节。
 
-仓库根的 `Dockerfile` 打进管理端 dist、原始页面 dist、源码 zip 和 `skills/`。不放进 `apps/server`。`compose.yaml` 留在仓库根。`deploy/` 只放 Caddyfile；cloudflared 和 Tailscale 只靠环境变量，不为对称再建目录，也不做 `apps/ingress`。仓库根的 `skills/` 是产品说明。`.agents/skills/` 是开发技能，不进镜像，两者不合并、不改名。
+仓库根的 `Dockerfile` 打进管理端 dist、原始页面 dist、源码 zip 和 `skills/`。不放进 `apps/server`。`compose.yaml` 留在仓库根。`deploy/` 放 Caddyfile 和两份宿主安装脚本；cloudflared 和 Tailscale 只靠环境变量，不为对称再建目录，也不做 `apps/ingress`。仓库根的 `skills/` 是产品说明。`.agents/skills/` 是开发技能，不进镜像，两者不合并、不改名。
 
 单元测试与被测源码放在一起，文件名 `*.test.ts`。领域规则在 `packages/domain`，不启动 HTTP 或数据库。注册表、表结构、适配器、公开客户端和原始页面的测试留在各自的包里。服务器的进程内契约测试留在 `apps/server`，用内存端口，不连生产端点；HTTP 和 MCP 各有一条，断言同一资料操作的结果一致，并断言 MCP 没有密钥管理工具。管理端页面不要求单元测试。
 

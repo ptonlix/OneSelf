@@ -30,6 +30,8 @@ coverage/
 .env.*
 !.env.example
 !.env.*.example
+.oneself-release
+/oneself/
 *.pem
 *.key
 credentials.json

@@ -66,6 +66,31 @@ OneSelf 是开源、自托管的**个人上下文管理**系统。你的简历�
 
 需要 Docker 与 Docker Compose v2。默认入口是 Cloudflare Tunnel；换 Caddy 或 Tailscale 见 [部署](#-部署)。
 
+默认安装到 `$HOME/.local/share/oneself`（设置了 `XDG_DATA_HOME` 时用 `$XDG_DATA_HOME/oneself`）。Windows 的 Git Bash 用 `%LOCALAPPDATA%\oneself`，也就是 `C:\Users\<用户名>\AppData\Local\oneself`。WSL 仍用 Linux 家目录，不放到 `/mnt/c`。执行时会先打印实际路径。不装进当前目录，也不装进源码树。然后询问对外源和入口，再执行 `docker compose pull && up -d`。不安装入口程序，不映射数据库端口，也不给 Agent 写凭据。换目录用 `ONESELF_DIR`，或 `sh -s -- --dir`。
+
+```bash
+curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
+```
+
+换目录：
+
+```bash
+ONESELF_DIR=/path/to/oneself curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
+curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh -s -- --dir /path/to/oneself
+```
+
+非交互确认用 `ONESELF_YES=1`。`--dir` 不改变 Compose 项目名 `oneself`，第二个目录会接到同一组卷。
+
+Windows 用 PowerShell，不经过 Git Bash。默认目录是 `%LOCALAPPDATA%\oneself`，执行时会先打印：
+
+```powershell
+powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
+```
+
+仓库里的同一份脚本是 [`deploy/oneself.sh`](deploy/oneself.sh) 和 [`deploy/oneself.ps1`](deploy/oneself.ps1)。从 Release 取到的脚本会把镜像固定到该版本；`update` 只拉取这个标签。换更新的正式版时，在该目录再执行一次上面的命令，已有口令不会被覆盖。`doctor` 只检查。Agent 仍用 `npx skills add https://站点 -a <agent> -s oneself`。
+
+也可以手动准备：
+
 ```bash
 cp .env.example .env
 ```
@@ -272,7 +297,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 <details>
 <summary><strong>Docker Compose 部署与公网入口详解</strong></summary>
 
-`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像是 `docker.io/ptonlix/oneself`，监听 `3000`。推送 `v1.2.3` 这样的正式标签后，发布工作流会推送 `oneself:1.2.3` 并移动 `latest`。预发布只推版本号。更新用 `docker compose pull && docker compose up -d`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进镜像。
+`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像是 `docker.io/ptonlix/oneself`，监听 `3000`。推送 `v1.2.3` 这样的正式标签后，发布工作流会推送 `oneself:1.2.3` 并移动 `latest`。预发布只推版本号。更新用 `docker compose pull && docker compose up -d`，或在安装目录执行 `./oneself.sh update`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进镜像。版本标签的 GitHub Release 会附上 `oneself.sh`、`oneself.ps1`、`oneself-compose.tar.gz` 和 `SHA256SUMS`。
 
 公网入口是互斥的 Compose profile，由 `.env` 的 `COMPOSE_PROFILES` 选择，换入口不需要改应用镜像：
 

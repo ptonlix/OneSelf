@@ -66,6 +66,31 @@ OneSelf is open-source, self-hosted **personal context management**. Your résum
 
 Requires Docker and Docker Compose v2. The default ingress is a Cloudflare Tunnel; for Caddy or Tailscale see [Deployment](#-deployment).
 
+The default install directory is `$HOME/.local/share/oneself` (`$XDG_DATA_HOME/oneself` when that variable is set). On Windows Git Bash it is `%LOCALAPPDATA%\oneself`, that is `C:\Users\<name>\AppData\Local\oneself`. WSL keeps the Linux home directory and does not use `/mnt/c`. The script prints the actual path before it does anything else. It does not install into the current directory or the source tree. It then asks for the public origin and ingress, and runs `docker compose pull && up -d`. It does not install an ingress program, publish database ports, or write agent credentials. Choose another directory with `ONESELF_DIR`, or with `sh -s -- --dir`.
+
+```bash
+curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
+```
+
+To choose a directory:
+
+```bash
+ONESELF_DIR=/path/to/oneself curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
+curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh -s -- --dir /path/to/oneself
+```
+
+`ONESELF_YES=1` is the same as `--yes`. `--dir` does not change the Compose project name `oneself`, so a second directory attaches to the same volumes.
+
+On Windows, use PowerShell rather than Git Bash. The default directory is `%LOCALAPPDATA%\oneself`, and the script prints it first:
+
+```powershell
+powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
+```
+
+The same scripts in the repo are [`deploy/oneself.sh`](deploy/oneself.sh) and [`deploy/oneself.ps1`](deploy/oneself.ps1). A script taken from a Release pins the image to that version; `update` only pulls that tag. To move to a newer stable release, run the command above again in the install directory. Existing passwords are left in place. `doctor` only checks. Agents still use `npx skills add https://your-origin -a <agent> -s oneself`.
+
+Or prepare it by hand:
+
 ```bash
 cp .env.example .env
 ```
@@ -272,7 +297,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 <details>
 <summary><strong>Docker Compose and public ingress in detail</strong></summary>
 
-`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is `docker.io/ptonlix/oneself` and listens on `3000`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version. Update with `docker compose pull && docker compose up -d`. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image.
+`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is `docker.io/ptonlix/oneself` and listens on `3000`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version. Update with `docker compose pull && docker compose up -d`, or run `./oneself.sh update` in the install directory. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image. A version-tag GitHub Release attaches `oneself.sh`, `oneself.ps1`, `oneself-compose.tar.gz`, and `SHA256SUMS`.
 
 The public ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env`; switching ingress does not change the app image:
 
