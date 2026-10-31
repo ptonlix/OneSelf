@@ -33,83 +33,56 @@
 
 每接入一个 AI，就要把自己的背景重新讲一遍；讲得越多，越分不清哪些可以公开、哪些只该给某一个 AI。
 
-OneSelf 是开源、自托管的**个人上下文管理**系统。你的简历、经历、笔记、照片和证件扫描件，汇成一份关于你的上下文：文字整理成页面，图片和 PDF 作为原件挂在页面上。任何 AI Agent 都通过同一套 PCP 操作（HTTP 与 MCP 通用）读取、写回和维护它；哪个 Agent 能看哪些目录、能不能修改、能不能公开，都由你批准，也能随时收回。你的公开主页同样只是这份上下文的一个出口：只展示你标为公开的内容，换版也要你点头。
+OneSelf 是开源、自托管的**个人上下文管理**系统。简历、经历、笔记、照片和证件扫描件汇成一份关于你的上下文：文字整理成页面，图片和 PDF 作为原件挂在页面上。任何 AI Agent 都通过同一套 PCP 操作（HTTP 与 MCP）读取、写回和维护它；哪个 Agent 能看哪些目录、能不能修改、能不能公开，都由你批准，也能随时收回。公开主页只展示你标为公开的内容。
 
-- **效率**：一份上下文，所有 AI 共用。Agent 读发现文档和 Skill 就能自助接入，还能帮你整理资料、写回新内容，不用每次重新介绍自己。
-- **隐私**：默认私有，按目录授权，每次授权都要你批准，随时可以作废；整套服务跑在你自己的机器上。
+- **效率**：一份上下文，所有 AI 共用；Agent 读发现文档和 Skill 即可自助接入。
+- **隐私**：默认私有，按目录授权，整套服务跑在你自己的机器上。
 
-> 一句话：One self. One context. Every AI. 你决定哪些上下文、给哪个 AI、给多少、何时收回。
+> One self. One context. Every AI. 你决定哪些上下文、给哪个 AI、给多少、何时收回。
 
 ## ✨ 特性
 
-**OneSelf 是 Agent-first 的个人上下文管理：Agent 负责读取、整理和维护，你负责划定边界：给谁、给多少、何时收回。**
+**Agent-first：Agent 负责读取、整理和维护；你划定边界——给谁、给多少、何时收回。**
 
 **🗂️ 管理**
 
-- **一份上下文，汇集所有资料**：经历、笔记、证件摘要写成页面，照片和 PDF 作为原件上传并挂到页面上；新增一种资料不用改数据库，事实、时间线、标签和页面之间的链接都会建立索引，可以按关键词、条件或事实检索。
-- **改动可追溯、可回退**：增量编辑必须带上当前版本，不会悄悄覆盖别人刚做的修改；每页保留最近 50 个版本，页面和目录删除后 30 天内都能恢复。
+- **一份上下文，汇集所有资料**：经历、笔记、证件摘要写成页面，照片和 PDF 作为原件上传并挂到页面上；事实、时间线、标签和页面链接可检索。
+- **改动可追溯、可回退**：增量编辑带版本校验；每页保留最近 50 个版本，删除后 30 天内可恢复。
 
 **🔐 隐私**
 
-- **默认私有，公开由你决定**：权限按目录分读、写、改可见性三档；没有权限时，私有页和不存在的页看起来一模一样。公开主页只展示你标为公开的内容，Agent 可以帮你改版，但新版本要你批准才上线。
-- **每次授权你批准，随时可以收回**：Agent 无论用 API Key 还是 OAuth 设备码接入，都要在你的批准页确认，密钥只显示一次；任何一把 Key、任何一条授权都能单独作废，下一次请求即失效。Agent 不能给自己发密钥，也不能替你批准。
-- **上下文留在你自己的机器上**：一个 Node.js 进程加 PostgreSQL 和 RustFS，用 Docker Compose 部署；Agent 只走接口，碰不到数据库、对象存储和密钥。
+- **默认私有，公开由你决定**：按目录分读、写、改可见性；没有权限时，私有页和不存在的页看起来一样。公开主页改版需你批准才上线。
+- **每次授权你批准，随时可收回**：API Key 或 OAuth 设备码都要在批准页确认；密钥与授权可单独作废。Agent 不能给自己发密钥，也不能替你批准。
+- **数据留在你的机器上**：Node.js + PostgreSQL + RustFS，Docker Compose 部署；Agent 只走接口。
 
 **⚡ 效率**
 
-- **Agent-first，每个 AI 都能自助接入**：Agent 读 `/.well-known/pcp` 和产品 Skill `oneself` 就知道怎么用；同一张操作表同时提供 HTTP（OpenAPI）和 MCP，任何支持其中一种的 AI 都能接入，结果一致。
-- **AI 帮你维护，不用反复解释**：Agent 可以读取你上传的原件并整理成页面、记住或忘掉一条事实、补一条时间线、加标签和链接；下一次任何 AI 读到的，都是最新的你。
+- **自助接入**：读 `/.well-known/pcp` 和 Skill `oneself` 即可；HTTP（OpenAPI）与 MCP 同一张操作表。
+- **AI 帮你维护**：Agent 可整理原件成页面、记住或忘掉事实、补时间线与标签；下次任何 AI 读到的都是最新的你。
 
 ## 🚀 快速开始
 
 ### 🐳 方式一：Docker Compose
 
-需要 Docker 与 Docker Compose v2。默认入口是 Cloudflare Tunnel；换 Caddy 或 Tailscale 见 [部署](#-部署)。
-
-默认安装到 `$HOME/.local/share/oneself`（设置了 `XDG_DATA_HOME` 时用 `$XDG_DATA_HOME/oneself`）。Windows 的 Git Bash 用 `%LOCALAPPDATA%\oneself`，也就是 `C:\Users\<用户名>\AppData\Local\oneself`。WSL 仍用 Linux 家目录，不放到 `/mnt/c`。执行时会先打印实际路径。不装进当前目录，也不装进源码树。然后询问对外源和入口，再执行 `docker compose pull && up -d`。不安装入口程序，不映射数据库端口，也不给 Agent 写凭据。换目录用 `ONESELF_DIR`，或 `sh -s -- --dir`。
+需要 Docker 与 Docker Compose v2。
 
 ```bash
 curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
 ```
 
-换目录：
+按提示选对外源和入口，启动后打开打印的 `PUBLIC_ORIGIN`，到 `/admin` 改密，把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent。
 
-```bash
-ONESELF_DIR=/path/to/oneself curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
-curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh -s -- --dir /path/to/oneself
-```
-
-非交互确认用 `ONESELF_YES=1`。`--dir` 不改变 Compose 项目名 `oneself`，第二个目录会接到同一组卷。
-
-Windows 用 PowerShell，不经过 Git Bash。默认目录是 `%LOCALAPPDATA%\oneself`，执行时会先打印：
+Windows 用 PowerShell：
 
 ```powershell
 powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
 ```
 
-仓库里的同一份脚本是 [`deploy/oneself.sh`](deploy/oneself.sh) 和 [`deploy/oneself.ps1`](deploy/oneself.ps1)。从 Release 取到的脚本会把镜像固定到该版本；`update` 只拉取这个标签。换更新的正式版时，在该目录再执行一次上面的命令，已有口令不会被覆盖。`doctor` 只检查。Agent 仍用 `npx skills add https://站点 -a <agent> -s oneself`。
-
-也可以手动准备：
-
-```bash
-cp .env.example .env
-```
-
-填 `PUBLIC_ORIGIN`、`OWNER_PASSWORD`、`POSTGRES_PASSWORD`、`RUSTFS_ACCESS_KEY`、`RUSTFS_SECRET_KEY` 和入口变量。应用镜像是 `docker.io/ptonlix/oneself:latest`。
-
-```bash
-docker compose pull && docker compose up -d
-```
-
-启动时会先补齐数据库迁移，失败则不监听。打开 `PUBLIC_ORIGIN`，到 `/admin` 改密，把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent。
+默认装到用户数据目录（不进源码树）。换目录、入口（Cloudflare / Caddy / Tailscale）、更新与排查见 [部署](#-部署)；变量说明见 [配置](#-配置)。仓库内脚本：[deploy/oneself.sh](deploy/oneself.sh)、[deploy/oneself.ps1](deploy/oneself.ps1)。
 
 ### 💻 方式二：本地开发
 
-环境要求：
-
-- Node.js `>=24`
-- pnpm 12.9.1（通过 Corepack 启用）
-- Docker 与 Docker Compose v2
+需要 Node.js `>=24`、pnpm 12.9.1（Corepack）、Docker。
 
 ```bash
 corepack enable
@@ -118,7 +91,7 @@ pnpm install --frozen-lockfile
 docker compose -f compose.dev.yaml up -d
 ```
 
-`compose.dev.yaml` 只启动 PostgreSQL 和 RustFS，并且只绑定 `127.0.0.1`。在仓库根目录新建本地 `.env`（这些口令只给本机用，不要拿去当生产配置；本地不要设置 `PUBLIC_ORIGIN`，应用会使用 `http://127.0.0.1:3000`）：
+在仓库根新建 `.env`（这些口令只给本机；本地不要设 `PUBLIC_ORIGIN`，应用用 `http://127.0.0.1:3000`）：
 
 ```bash
 DATABASE_URL=postgres://oneself:oneself@127.0.0.1:5432/oneself
@@ -131,18 +104,11 @@ OWNER_LOGIN=owner
 OWNER_PASSWORD=<自己设一个初始口令>
 ```
 
-`pnpm dev` 会先构建管理端和内置公开页，再启动服务；进程在监听前补齐迁移。应用要 Node.js 24，仓库根的 `.node-version` 已写明版本，fnm、nvm、asdf、volta 会自动切换：
-
 ```bash
 pnpm dev
 ```
 
-`pnpm db:migrate` 只在不启动应用时用，例如导入前把空库迁好，避免进程先创建所属人。
-
-打开 <http://127.0.0.1:3000> 看原始页面，打开 <http://127.0.0.1:3000/admin> 登录。
-
-> [!TIP]
-> 应用直接启动时会检查 `DATABASE_URL`、`OBJECT_STORAGE_*` 以及 `apps/admin/dist`、`packages/public-page/dist` 是否存在，缺一项就拒绝启动。还没有所属人账号且没有设置 `OWNER_PASSWORD` 时也会拒绝启动。
+打开 <http://127.0.0.1:3000> 与 <http://127.0.0.1:3000/admin>。`compose.dev.yaml` 只起 PostgreSQL 和 RustFS（绑定 `127.0.0.1`）。更多命令见 [开发](#-开发)。
 
 ## 🔧 配置
 
@@ -166,10 +132,9 @@ pnpm dev
   <img src="docs/images/architecture.png" alt="OneSelf 架构：所属人在管理端批准授权、随时收回，并整理个人上下文；任意 AI Agent / 脚本用所属人批准的 API Key 或 OAuth 设备码接入 PCP（HTTP 与 MCP 同一套操作）；访客打开公开主页，只读取公开内容；个人上下文由页面和原件组成，按目录授权、默认私有、版本可回退，存放在自托管的 RustFS 与 PostgreSQL" width="100%" />
 </p>
 
-- **一个进程**：PCP、MCP、OAuth、管理端静态文件和已发布站点都由同一个 Hono 应用提供，不拆微服务，也没有 Redis 或队列。
-- **规则不在路由里**：HTTP 和 MCP 只做认证、解析和返回，同一组用例在 `apps/server/src/app`，业务规则在纯 TypeScript 的 `packages/domain`；对象存储、时钟和页面解析经 `ports` / `adapters` 接入，依赖方向由 dependency-cruiser 检查。
-- **原文与投影分离**：页面原文、原件和站点文件以对象存储为准；PostgreSQL 里的正文、标签、链接、事实和时间线都是投影。写一页时先写哈希对象，再在一个事务里更新投影并追加版本。
-- **站点不查资料表**：提供站点文件的处理函数只看站点指针，不查询 `pages`；页面上的资料由浏览器另行请求公开 PCP。
+- **一个进程**：PCP、MCP、OAuth、管理端和已发布站点都由同一个 Hono 应用提供。
+- **规则不在路由里**：HTTP / MCP 只做认证与返回；用例在 `apps/server/src/app`，业务规则在 `packages/domain`。
+- **原文与投影分离**：页面原文与原件以对象存储为准；PostgreSQL 中的正文、标签、链接、事实和时间线是投影。
 
 | 角色     | 能做什么                                                                                              | 不能做什么                             |
 | -------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------- |
@@ -177,7 +142,7 @@ pnpm dev
 | AI Agent | 用批准过的 API Key 或设备码令牌，在授权的目录和权限内调用同一组操作；有 `site:write` 时可申请主页上线 | 不能创建或管理密钥，不能批准授权或上线 |
 | 访客     | 打开当前上线的公开站点，读取公开内容和公开原件                                                        | 读不到任何 `private` 页                |
 
-Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#系统总览图)。
+Mermaid 版系统总览、代码边界、数据表和关键流程见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#系统总览图)。
 
 ## 🤖 Agent 入口
 
@@ -186,16 +151,16 @@ Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/AR
 | `/.well-known/pcp`                     | Agent          | 发现文档：协议版本、操作清单、认证头、公开接口、上传限制、OpenAPI、MCP、OAuth 和 Skill |
 | `/.well-known/agent-skills/index.json` | 安装器         | 产品 Skill `oneself` 的 archive 索引                                                   |
 | `/skills/oneself/SKILL.md`             | Agent          | 唯一产品 Skill。写页前读 context reference，改公开页前读 public-page reference         |
-| `/openapi.json`                        | Agent、脚本    | 由操作注册表和 MCP 同一份输入 schema 生成的 OpenAPI，含参数、请求体和认证方式          |
+| `/openapi.json`                        | Agent、脚本    | 由操作注册表和 MCP 同一份输入 schema 生成的 OpenAPI                                    |
 | `POST /mcp`                            | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                                                     |
 | `/pcp/v1/*`                            | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                                             |
 | `/pcp/v1/public/*`                     | 任何人         | 只返回 `visibility: public` 且未删除的页                                               |
 | `/media/{id}`                          | 视所属页而定   | 原件字节。所属页公开时匿名可读                                                         |
 | `/oauth/device/auth`、`/oauth/token`   | Agent          | 申请设备码、换取和刷新访问令牌                                                         |
 | `/admin`                               | 所属人         | 登录、改密、批准设备码、API Key 和站点上线                                             |
-| `/_preview/{releaseId}/`               | 任何人         | 未上线 release 的预览，不移动线上指针                                                  |
+| `/_preview/{releaseId}/`               | 任何人         | 未上线 release 的预览                                                                  |
 
-接入方式二选一：API Key（`Authorization: ApiKey <key>` 或 `X-Api-Key`），或 OAuth 2.1 设备码换来的访问令牌（`Authorization: Bearer <token>`）。两种方式都要所属人批准，权限相同时结果一致。错误体统一为 `{ "error", "message" }`。路径以 [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts) 为准。
+接入二选一：API Key（`Authorization: ApiKey <key>` 或 `X-Api-Key`），或 OAuth 2.1 设备码访问令牌（`Authorization: Bearer <token>`）。都要所属人批准。路径以 [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts) 为准。
 
 <details>
 <summary><strong>PCP 操作清单</strong></summary>
@@ -216,8 +181,8 @@ Mermaid 版系统总览图、代码边界、数据表和关键流程见 [docs/AR
 
 一份上下文由**页面**和**原件**组成，按目录（source）分组，例如 `profile`、`career`、`health`：
 
-- **页面**：由 `(source, slug)` 标识，`type`、`title`、`visibility` 等字段写在开头的 frontmatter 里，其他字段随意。需要有效期或置信度的陈述放进 `## Facts`，经历放进 `## Timeline`。
-- **原件**：照片、扫描件和文档（JPEG、PNG、WebP、GIF、PDF，单个最大 20 MiB）用 `file_upload` 上传，再在页面的 `files` 里引用；挂接的页面公开时，原件才能匿名访问。
+- **页面**：由 `(source, slug)` 标识；`type`、`title`、`visibility` 等写在 frontmatter 里。需要有效期或置信度的陈述放进 `## Facts`，经历放进 `## Timeline`。
+- **原件**：JPEG、PNG、WebP、GIF、PDF（单个最大 20 MiB）用 `file_upload` 上传，在页面的 `files` 里引用；挂接页公开时原件才可匿名访问。
 
 ```markdown
 ---
@@ -246,87 +211,80 @@ files: []
 - 2024-06-01 | 加入某公司 | 做后端
 ```
 
-页面里只认这两种结构块，解析失败时整次写入回滚。完整规则见 [skills/oneself/references/context.md](skills/oneself/references/context.md)。
+完整规则见 [skills/oneself/references/context.md](skills/oneself/references/context.md)。
 
 ## 📁 项目结构
 
 ```text
 OneSelf/
 ├── apps/
-│   ├── server/            # 唯一的 Node 进程：pcp/、mcp/、oauth/、owner/、site-files/，用例在 app/
-│   └── admin/             # 管理端（Vite + React），只调用 HTTP
+│   ├── server/            # 唯一的 Node 进程：pcp/、mcp/、oauth/、owner/、site-files/
+│   └── admin/             # 管理端（Vite + React）
 ├── packages/
-│   ├── domain/            # 纯业务规则：页、原件、检索、授权、站点指针
-│   ├── operations/        # 操作注册表：操作名、路径、http-only。零依赖
-│   ├── ports/             # 对象存储、时钟、页面解析的接口
-│   ├── adapters/          # S3、PostgreSQL 实现与测试用内存实现
-│   ├── db/                # Drizzle 表结构与 SQL 迁移
-│   ├── public-client/     # 匿名公开 PCP 客户端，定制站点也用它
-│   └── public-page/       # 随应用发布的内置公开页源码
-├── skills/oneself/        # 产品 Skill：SKILL.md 与 references/
-├── tests/                 # 接口冒烟（smoke）与 Skill 验收测试
-├── deploy/Caddyfile       # Caddy 入口，只做反向代理
-├── docs/                  # 产品需求与技术架构
-├── openspec/              # 行为规格与变更记录
-├── compose.yaml           # 生产：应用 + PostgreSQL + RustFS + 一个入口 profile
+│   ├── domain/            # 纯业务规则
+│   ├── operations/        # 操作注册表
+│   ├── ports/ / adapters/ # 对象存储、时钟、解析的接口与实现
+│   ├── db/                # Drizzle 与 SQL 迁移
+│   ├── public-client/     # 匿名公开 PCP 客户端
+│   └── public-page/       # 内置公开页源码
+├── skills/oneself/        # 产品 Skill
+├── tests/                 # 冒烟与 Skill 验收
+├── deploy/                # 安装脚本与 Caddyfile
+├── docs/                  # PRD 与架构
+├── compose.yaml           # 生产：应用 + PostgreSQL + RustFS + 入口
 ├── compose.dev.yaml       # 本地依赖：PostgreSQL + RustFS
-└── Dockerfile             # 应用镜像：管理端、原始页面、源码 zip 和 skills/
+└── Dockerfile
 ```
 
 ## 🧪 开发
 
 ```bash
-pnpm check            # Prettier、ESLint、tsc、Vitest、dependency-cruiser、Knip 依次执行
-pnpm test             # 单元测试和进程内接口测试（不需要启动 Compose）
-pnpm test:smoke       # 闭环冒烟：复用已启动的 compose.dev.yaml 服务，用单独的库和桶
-pnpm boundaries       # 只检查包之间的依赖方向
-pnpm db:migrate       # 不启动应用，只对 .env 里的 DATABASE_URL 执行迁移
+pnpm check            # Prettier、ESLint、tsc、Vitest、dependency-cruiser、Knip
+pnpm test             # 单元与进程内接口测试（不需要 Compose）
+pnpm test:smoke       # 闭环冒烟：复用已启动的 compose.dev.yaml
+pnpm boundaries       # 包依赖方向
+pnpm db:migrate       # 只迁移，不启动应用
 pnpm data:export -- --out oneself-export --stopped
 pnpm data:import -- --from oneself-export.tar.gz --stopped
 pnpm dev              # 构建管理端和内置公开页，再启动应用
 ```
 
-`data:export` / `data:import` 把 PostgreSQL 的 `public` 数据和 RustFS 里 `pages/`、`files/`、`sites/` 打成一个 `tar.gz`，再灌进已迁移到同一版本的空库和空桶。`--out oneself-export` 写出 `oneself-export.tar.gz`，拷这个文件到新机器即可。先停掉应用再加 `--stopped`。包里有密码哈希和密钥哈希，不要提交。不包含会话、设备码、`PUBLIC_ORIGIN` 或对象存储密钥。生产库不映射端口时加 `--via compose`；本机没有 PostgreSQL 18 的 `pg_dump` 时，对开发依赖加 `--via compose --compose compose.dev.yaml`。目标不是空的时，导入要显式加 `--replace`。
-
-`pnpm test:smoke` 不启动也不停止任何容器，需要先用 `docker compose -f compose.dev.yaml up -d` 起好开发服务。它在同一个 PostgreSQL 里建并重置单独的 `oneself_smoke` 库，在同一个 RustFS 里建并清空单独的 `oneself-smoke` 桶，不碰开发数据，跑完保留这两份。不读 `.env` 里的 `DATABASE_URL` 和 `OBJECT_STORAGE_*`；需要时用 `SMOKE_POSTGRES_ADMIN_URL`（默认 `postgres://oneself:oneself@127.0.0.1:5432/postgres`）、`SMOKE_DATABASE`、`SMOKE_OBJECT_STORAGE_ENDPOINT`、`SMOKE_OBJECT_STORAGE_BUCKET`、`SMOKE_OBJECT_STORAGE_ACCESS_KEY_ID`、`SMOKE_OBJECT_STORAGE_SECRET_ACCESS_KEY`、`SMOKE_OBJECT_STORAGE_REGION` 覆盖。库名和桶名必须含 `smoke` 且不能是 `oneself`，否则直接报错。
-
-`pnpm check` 是合并前的本地门禁。依赖只用 pnpm 安装。行为以 [docs/PRD.md](docs/PRD.md) 为准，路径、事务和部署以 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 为准。
+导出/导入与冒烟的细节（`--via compose`、独立 smoke 库与桶等）见脚本帮助或 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。`pnpm check` 是合并前门禁。行为以 [docs/PRD.md](docs/PRD.md) 为准。
 
 ## 🚢 部署
 
 <details>
-<summary><strong>Docker Compose 部署与公网入口详解</strong></summary>
+<summary><strong>Docker Compose 部署与公网入口</strong></summary>
 
-`compose.yaml` 包含应用、PostgreSQL 18 和单盘 RustFS（`rustfs/rustfs:1.0.1`），首次启动时用 aws-cli 创建对象桶。应用、数据库和对象存储都不映射宿主机端口，数据放在命名卷里。应用镜像是 `docker.io/ptonlix/oneself`，监听 `3000`。推送 `v1.2.3` 这样的正式标签后，发布工作流会推送 `oneself:1.2.3` 并移动 `latest`。预发布只推版本号。更新用 `docker compose pull && docker compose up -d`，或在安装目录执行 `./oneself.sh update`。构建不接收密钥或 `PUBLIC_ORIGIN`，入口程序也不进镜像。版本标签的 GitHub Release 会附上 `oneself.sh`、`oneself.ps1`、`oneself-compose.tar.gz` 和 `SHA256SUMS`。
+安装脚本默认目录：`$HOME/.local/share/oneself`（或 `$XDG_DATA_HOME/oneself`）；Windows 为 `%LOCALAPPDATA%\oneself`。可用 `ONESELF_DIR` 或 `sh -s -- --dir` 换目录；非交互加 `ONESELF_YES=1`。`--dir` 不改变 Compose 项目名 `oneself`。
 
-公网入口是互斥的 Compose profile，由 `.env` 的 `COMPOSE_PROFILES` 选择，换入口不需要改应用镜像：
+从 Release 取到的脚本会把镜像固定到该版本；在安装目录执行 `./oneself.sh update` 或再跑一次安装命令可更新，已有口令不会被覆盖。`doctor` 只检查。也可手动：`cp .env.example .env`，填好变量后 `docker compose pull && docker compose up -d`。
+
+`compose.yaml` 含应用、PostgreSQL 18 和 RustFS；应用与数据都不映射宿主机端口。镜像：`docker.io/ptonlix/oneself`。公网入口由 `.env` 的 `COMPOSE_PROFILES` 选择：
 
 | profile               | 谁能访问                  | 需要                                               |
 | --------------------- | ------------------------- | -------------------------------------------------- |
 | `cloudflared`（默认） | 公网，主机名在 Cloudflare | `TUNNEL_TOKEN`。不开放路由器端口                   |
-| `caddy`               | 公网，自己的域名          | `APP_DOMAIN`、`ACME_EMAIL`，80 和 443 能从公网到达 |
-| `tailscale`           | 只有同一 tailnet 里的设备 | `TAILSCALE_AUTHKEY`。只做 Serve，不开 Funnel       |
+| `caddy`               | 公网，自己的域名          | `APP_DOMAIN`、`ACME_EMAIL`，80/443 可达            |
+| `tailscale`           | 同一 tailnet              | `TAILSCALE_AUTHKEY`。只做 Serve，不开 Funnel       |
 
-三个入口都只把 HTTPS 转给应用，不保存站点文件。`PUBLIC_ORIGIN` 必须与所选入口的对外地址一致。没有隧道令牌或 auth key 时入口容器可以失败，应用和数据库仍会保留运行。
-
-使用 Cloudflare 时，不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。应用内置简单限流：每个 IP 每分钟登录和设备码 10 次，公开搜索和上传 30 次，客户端地址只取入口送来的头。
+`PUBLIC_ORIGIN` 须与所选入口一致。Cloudflare 不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。Agent 接入：`npx skills add https://站点 -a <agent> -s oneself`。
 
 </details>
 
 ## 📚 文档
 
-- [产品需求（PRD）](docs/PRD.md)：目标、非目标、数据组织、PCP 和验收标准
-- [技术架构](docs/ARCHITECTURE.md)：技术选型、代码边界、数据、路径和关键流程
+- [产品需求（PRD）](docs/PRD.md)
+- [技术架构](docs/ARCHITECTURE.md)
 - [Skill：oneself](skills/oneself/SKILL.md)
-- [OpenSpec 变更：oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
-- 运行中的实例：`/.well-known/pcp`、`/.well-known/agent-skills/index.json`、`/openapi.json`、`/skills/oneself/SKILL.md`
-- 安装：`npx skills add https://站点`
+- 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/oneself/SKILL.md`
+- 安装 Skill：`npx skills add https://站点`
 
 ## 🤝 贡献
 
 欢迎 Issue 和 Pull Request。
 
 1. 从当前 `main` 拉分支。
-2. 保持改动和 [docs/PRD.md](docs/PRD.md) 的范围一致；操作名、权限或错误码有变化时，先改文档和 [`packages/operations`](packages/operations/src/registry.ts)，再改代码。
+2. 改动与 [docs/PRD.md](docs/PRD.md) 范围一致；操作名、权限或错误码有变时，先改文档和 [`packages/operations`](packages/operations/src/registry.ts)。
 3. 提交前运行 `pnpm check`。
-4. 发起 Pull Request，说明行为变化和验证方式。
+4. 发起 PR，说明行为变化和验证方式。

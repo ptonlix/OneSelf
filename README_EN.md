@@ -318,7 +318,6 @@ Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/sk
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
 - [Skill: oneself](skills/oneself/SKILL.md)
-- [OpenSpec change: oneself-mvp](openspec/changes/oneself-mvp/proposal.md)
 - On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
 - Install: `npx skills add https://your-site`
 
