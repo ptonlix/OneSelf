@@ -88,6 +88,8 @@ async function ensureEnvFile(root: string, dryRun: boolean): Promise<string> {
   await copyFile(example, envPath);
   const { chmod } = await import("node:fs/promises");
   await chmod(envPath, 0o600);
+  // .env.example may still document a sample profile; force the interactive picker.
+  await writeEnvValue(envPath, "COMPOSE_PROFILES", "");
   return envPath;
 }
 
@@ -271,50 +273,52 @@ export async function runInstall(options: InstallOptions): Promise<void> {
   }
 
   let profile = existing.get("COMPOSE_PROFILES") ?? "";
-  if (!profileOk(profile)) {
-    if (options.yes) {
+  if (options.yes) {
+    if (!profileOk(profile)) {
       profile = process.env.COMPOSE_PROFILES ?? "cloudflared";
-      if (!profileOk(profile)) {
-        throw new Error("非交互需要合法的 COMPOSE_PROFILES");
-      }
-    } else {
-      const answer = await p.select({
-        message: "公网入口",
-        options: [
-          {
-            value: "cloudflared",
-            label: "Cloudflare Tunnel",
-            hint: "推荐 · 无需开放路由器端口",
-          },
-          {
-            value: "caddy",
-            label: "Caddy",
-            hint: "自有域名，公网需放行 80/443",
-          },
-          {
-            value: "tailscale",
-            label: "Tailscale",
-            hint: "仅同尾网设备（Serve，不开 Funnel）",
-          },
-        ],
-        initialValue: "cloudflared",
-      });
-      if (p.isCancel(answer)) {
-        p.cancel("已取消");
-        process.exit(1);
-      }
-      profile = answer;
     }
-    if (!options.dryRun) {
-      await writeEnvValue(envPath, "COMPOSE_PROFILES", profile);
+    if (!profileOk(profile)) {
+      throw new Error("非交互需要合法的 COMPOSE_PROFILES");
     }
+  } else {
+    // Always offer the three ingress choices interactively (do not skip just because
+    // .env.example defaulted COMPOSE_PROFILES=cloudflared).
+    const answer = await p.select({
+      message: "公网入口",
+      options: [
+        {
+          value: "cloudflared",
+          label: "Cloudflare Tunnel",
+          hint: "推荐 · 无需开放路由器端口",
+        },
+        {
+          value: "caddy",
+          label: "Caddy",
+          hint: "自有域名，公网需放行 80/443",
+        },
+        {
+          value: "tailscale",
+          label: "Tailscale",
+          hint: "仅同一网络设备可以访问",
+        },
+      ],
+      initialValue: profileOk(profile) ? profile : "cloudflared",
+    });
+    if (p.isCancel(answer)) {
+      p.cancel("已取消");
+      process.exit(1);
+    }
+    profile = answer;
+  }
+  if (!options.dryRun) {
+    await writeEnvValue(envPath, "COMPOSE_PROFILES", profile);
   }
 
   if (profile === "cloudflared") {
     const token = existing.get("TUNNEL_TOKEN") ?? "";
     if (!token && !options.yes) {
       const answer = await askPassword(
-        { message: "Cloudflare Tunnel 令牌（可留空，稍后补）" },
+        { message: "Cloudflare Tunnel 令牌（可选）" },
         false,
       );
       if (answer && !options.dryRun) {
@@ -354,7 +358,7 @@ export async function runInstall(options: InstallOptions): Promise<void> {
   } else if (profile === "tailscale") {
     const key = existing.get("TAILSCALE_AUTHKEY") ?? "";
     if (!key && !options.yes) {
-      const answer = await askPassword({ message: "Tailscale auth key（可留空，稍后补）" }, false);
+      const answer = await askPassword({ message: "Tailscale auth key（可选）" }, false);
       if (answer && !options.dryRun) {
         await writeEnvValue(envPath, "TAILSCALE_AUTHKEY", answer);
       }
