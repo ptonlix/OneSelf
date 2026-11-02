@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 const html = readFileSync(
@@ -147,5 +148,53 @@ describe("built-in home page", () => {
   it("keeps the inline logo gradient and mask ids unique", () => {
     const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("fills the site address from an inline head script as soon as each block is parsed", () => {
+    const head = html.slice(0, html.indexOf("</head>"));
+    const inline = [...head.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    expect(inline).toHaveLength(1);
+    const calls = [...html.matchAll(/<script>\s*oneselfFillOrigin\(\);\s*<\/script>/g)].map(
+      (match) => match.index,
+    );
+    expect(calls).toHaveLength(2);
+    // Each call follows the block it fills: the install command and its hint, then discovery.
+    const fallback = html.indexOf("data-origin-fallback");
+    const discovery = html.indexOf('data-origin-copy="{origin}/.well-known/pcp"');
+    expect(calls[0]).toBeGreaterThan(fallback);
+    expect(calls[0]).toBeLessThan(discovery);
+    expect(calls[1]).toBeGreaterThan(discovery);
+
+    const run = (protocol: string, origin: string) => {
+      const text = { attrs: { "data-origin": "/.well-known/pcp" }, textContent: "/x" as string };
+      const copy = {
+        attrs: { "data-origin-copy": "npx skills add {origin}" } as Record<string, string>,
+      };
+      const hint = { hidden: false };
+      const nodes: Record<string, unknown[]> = {
+        "[data-origin]": [text],
+        "[data-origin-copy]": [copy],
+        "[data-origin-fallback]": [hint],
+      };
+      const element = (node: { attrs: Record<string, string> }) =>
+        Object.assign(node, {
+          getAttribute: (name: string) => node.attrs[name] ?? null,
+          setAttribute: (name: string, value: string) => {
+            node.attrs[name] = value;
+          },
+        });
+      element(text);
+      element(copy);
+      const window: Record<string, unknown> = { location: { protocol, origin } };
+      const document = { querySelectorAll: (selector: string) => nodes[selector] ?? [] };
+      runInNewContext(inline[0] ?? "", { window, document });
+      (window.oneselfFillOrigin as () => void)();
+      return { text: text.textContent, copy: copy.attrs["data-copy"], hidden: hint.hidden };
+    };
+    expect(run("http:", "http://43.159.59.73:3001")).toEqual({
+      text: "http://43.159.59.73:3001/.well-known/pcp",
+      copy: "npx skills add http://43.159.59.73:3001",
+      hidden: true,
+    });
+    expect(run("file:", "null")).toEqual({ text: "/x", copy: undefined, hidden: false });
   });
 });

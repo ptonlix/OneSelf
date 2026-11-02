@@ -9,6 +9,30 @@
       content="OneSelf 是开源、自托管的个人上下文管理。安装 Skill，让你的 Agent 整理资料、连接授权、生成你的展示页。"
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Shows the site address the moment its element is parsed, without waiting for the module
+      // script: the calls after each marked block run this. Same rules as fillOrigin in main.ts
+      // (which runs again later); no real http(s) origin leaves the placeholder. Static, no request data.
+      window.oneselfFillOrigin = (function () {
+        var l = window.location;
+        var o = /^https?:$/.test(l.protocol) && l.origin && l.origin !== "null" ? l.origin : null;
+        return function () {
+          if (o === null) return;
+          document.querySelectorAll("[data-origin]").forEach(function (e) {
+            e.textContent = o + e.getAttribute("data-origin");
+          });
+          document.querySelectorAll("[data-origin-copy]").forEach(function (e) {
+            e.setAttribute(
+              "data-copy",
+              e.getAttribute("data-origin-copy").split("{origin}").join(o),
+            );
+          });
+          document.querySelectorAll("[data-origin-fallback]").forEach(function (e) {
+            e.hidden = true;
+          });
+        };
+      })();
+    </script>
   </head>
   <body>
     <header class="nav">
@@ -1256,6 +1280,9 @@
         <p class="body-s cmd-note" data-origin-fallback>
           <span class="ph">&lt;你的站点&gt;</span> 换成这个页面所在的地址。
         </p>
+        <script>
+          oneselfFillOrigin();
+        </script>
         <div class="skill-grid">
           <div class="glass">
             <span class="n on">01</span>
@@ -1370,6 +1397,9 @@
           </div>
         </div>
       </div>
+      <script>
+        oneselfFillOrigin();
+      </script>
     </section>
 
     <section class="s s-tight" id="define">

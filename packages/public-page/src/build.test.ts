@@ -48,6 +48,12 @@ describe("built-in home page build", () => {
     expect(resources.some((resource) => /^\.\/assets\/.+\.js$/.test(resource))).toBe(true);
     expect(resources.some((resource) => /^\.\/assets\/.+\.css$/.test(resource))).toBe(true);
     expect(html).not.toMatch(/(src|href)="\/assets\//);
+    // The text font is preloaded (CORS mode, like the @font-face fetch); Geist Mono is not.
+    const preloads = [...html.matchAll(/<link rel="preload"[^>]*>/g)].map((match) => match[0]);
+    expect(preloads).toHaveLength(1);
+    expect(preloads[0]).toMatch(/href="\.\/assets\/Geist-Variable-[\w-]{6,}\.woff2"/);
+    expect(preloads[0]).toContain('as="font"');
+    expect(preloads[0]).toContain("crossorigin");
     const fontUrls = [...css.matchAll(/url\(\s*["']?([^"')]+\.woff2)/g)].map(
       (match) => match[1] ?? "",
     );

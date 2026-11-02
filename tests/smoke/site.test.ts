@@ -1,3 +1,5 @@
+import { gunzipSync } from "node:zlib";
+
 import { expect, it } from "vitest";
 
 import type { ServerHandle } from "../../apps/server/src/index.js";
@@ -14,6 +16,58 @@ import {
   readJson,
   uploadArchive,
 } from "./support.js";
+
+it("compresses the home page and admin app itself and caches hashed assets and fonts", async () => {
+  const server = await boot();
+  const plain = await server.request("/");
+  const plainText = await plain.text();
+  expect(plain.headers.get("content-encoding")).toBeNull();
+  expect(plain.headers.get("vary")).toBe("accept-encoding");
+
+  const home = await server.request("/", { headers: { "accept-encoding": "gzip" } });
+  expect(home.status).toBe(200);
+  expect(home.headers.get("content-encoding")).toBe("gzip");
+  expect(home.headers.get("cache-control")).toBe("no-store");
+  const zipped = new Uint8Array(await home.arrayBuffer());
+  expect(zipped.byteLength).toBeLessThan(plainText.length / 3);
+  expect(new TextDecoder().decode(gunzipSync(zipped))).toBe(plainText);
+
+  const assets = [...plainText.matchAll(/(?:src|href)="\.\/(assets\/[^"]+)"/g)].map(
+    (match) => match[1] ?? "",
+  );
+  const css = assets.find((asset) => asset.endsWith(".css"));
+  const js = assets.find((asset) => asset.endsWith(".js"));
+  const font = assets.find((asset) => /Geist-Variable-.+\.woff2$/.test(asset));
+  expect([css, js, font].every((asset) => asset !== undefined)).toBe(true);
+  for (const asset of [css, js]) {
+    const response = await server.request(`/${String(asset)}`, {
+      headers: { "accept-encoding": "gzip, zstd" },
+    });
+    expect(response.status, asset).toBe(200);
+    expect(response.headers.get("content-encoding"), asset).toMatch(/^(zstd|gzip)$/);
+    expect(response.headers.get("cache-control"), asset).toBe(
+      "public, max-age=31536000, immutable",
+    );
+  }
+  const woff2 = await server.request(`/${String(font)}`, {
+    headers: { "accept-encoding": "gzip, zstd" },
+  });
+  expect(woff2.headers.get("content-type")).toBe("font/woff2");
+  expect(woff2.headers.get("content-encoding")).toBeNull();
+  expect(woff2.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+
+  const admin = await server.request("/admin", { headers: { "accept-encoding": "gzip" } });
+  expect(admin.status).toBe(200);
+  expect(admin.headers.get("cache-control")).toBe("no-store");
+  expect(admin.headers.get("vary")).toBe("accept-encoding");
+
+  // API responses are not compressed.
+  const discovery = await server.request("/.well-known/pcp", {
+    headers: { "accept-encoding": "gzip, zstd" },
+  });
+  expect(discovery.headers.get("content-encoding")).toBeNull();
+  await server.close();
+});
 
 it("rejects reserved site paths, has no release delete route, and forbids agent approval", async () => {
   const server = await boot();

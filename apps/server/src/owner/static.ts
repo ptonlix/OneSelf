@@ -2,6 +2,7 @@ import path from "node:path";
 
 import type { Context, Hono } from "hono";
 
+import { staticFileResponse } from "../app/compress.ts";
 import type { Runtime } from "../app/runtime.ts";
 
 const ADMIN_PAGES = new Set([
@@ -39,22 +40,24 @@ export function adminPage(runtime: Runtime, c: Context): Response {
   }
   const file = runtime.readAdmin(relative);
   if (file !== null) {
-    return new Response(new Uint8Array(file), {
-      status: 200,
-      headers: {
+    return staticFileResponse(
+      c.req.raw,
+      file,
+      new Headers({
         "content-type": adminContentType(relative),
         "cache-control":
           relative === "index.html" ? "no-store" : "public, max-age=31536000, immutable",
-      },
-    });
+      }),
+    );
   }
   if (isAdminSpa(relative)) {
     const index = runtime.readAdmin("index.html");
     if (index !== null) {
-      return new Response(new Uint8Array(index), {
-        status: 200,
-        headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" },
-      });
+      return staticFileResponse(
+        c.req.raw,
+        index,
+        new Headers({ "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }),
+      );
     }
   }
   return new Response("not found", { status: 404, headers: { "cache-control": "no-store" } });

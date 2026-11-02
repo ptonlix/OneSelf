@@ -2,19 +2,22 @@ import path from "node:path";
 
 import type { Hono } from "hono";
 
+import { staticFileResponse } from "../app/compress.ts";
 import { sendError } from "../app/json.ts";
 import type { Runtime } from "../app/runtime.ts";
 
 const RESERVED = new Set(["pcp", "oauth", ".well-known", "admin", "skills", "media", "_preview"]);
 
 export function mountSiteFiles(app: Hono, runtime: Runtime): void {
-  app.get("/_preview/:releaseId", (c) => servePreview(runtime, c.req.param("releaseId"), "/"));
+  app.get("/_preview/:releaseId", (c) =>
+    servePreview(runtime, c.req.raw, c.req.param("releaseId"), "/"),
+  );
   app.get("/_preview/:releaseId/*", (c) => {
     const releaseId = c.req.param("releaseId");
     const pathname = new URL(c.req.url).pathname;
     const prefix = `/_preview/${releaseId}`;
     const rest = pathname.slice(prefix.length);
-    return servePreview(runtime, releaseId, rest.length === 0 ? "/" : rest);
+    return servePreview(runtime, c.req.raw, releaseId, rest.length === 0 ? "/" : rest);
   });
 
   app.notFound(async (c) => {
@@ -26,7 +29,7 @@ export function mountSiteFiles(app: Hono, runtime: Runtime): void {
       return sendError("not_found", "not found");
     }
     const releaseId = await runtime.currentPointer();
-    return serveRelease(runtime, releaseId, pathname);
+    return serveRelease(runtime, c.req.raw, releaseId, pathname);
   });
 }
 
@@ -37,14 +40,16 @@ function isReserved(pathname: string): boolean {
 
 async function servePreview(
   runtime: Runtime,
+  request: Request,
   releaseId: string,
   pathname: string,
 ): Promise<Response> {
-  return serveRelease(runtime, releaseId, pathname);
+  return serveRelease(runtime, request, releaseId, pathname);
 }
 
 async function serveRelease(
   runtime: Runtime,
+  request: Request,
   releaseId: string,
   pathname: string,
 ): Promise<Response> {
@@ -60,7 +65,7 @@ async function serveRelease(
     if (bytes === null) {
       continue;
     }
-    return fileResponse(candidate, bytes);
+    return fileResponse(request, candidate, bytes);
   }
   return new Response("not found", { status: 404, headers: { "cache-control": "no-store" } });
 }
@@ -92,14 +97,25 @@ function candidates(relative: string): string[] {
   return [`${relative}/index.html`];
 }
 
-function fileResponse(relative: string, bytes: Uint8Array): Response {
+function fileResponse(request: Request, relative: string, bytes: Uint8Array): Response {
   const headers = new Headers({ "content-type": contentType(relative) });
   if (relative === "index.html" || relative.endsWith("/index.html")) {
     headers.set("cache-control", "no-store");
-  } else if (/[-.][A-Za-z0-9_]{8,}\.(?:js|css)$/.test(path.posix.basename(relative))) {
+  } else if (isHashedAsset(relative)) {
     headers.set("cache-control", "public, max-age=31536000, immutable");
   }
-  return new Response(new Uint8Array(bytes), { status: 200, headers });
+  return staticFileResponse(request, bytes, headers);
+}
+
+/**
+ * Content-hashed build output never changes under the same name, so it may be cached for a year.
+ * Vite names it `assets/<name>-<8-char base64url hash>.<ext>`; the hash itself may contain "-".
+ */
+function isHashedAsset(relative: string): boolean {
+  return (
+    /[-.][A-Za-z0-9_]{8,}\.(?:js|css|woff2)$/.test(path.posix.basename(relative)) ||
+    /(?:^|\/)assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css|woff2)$/.test(relative)
+  );
 }
 
 function contentType(relative: string): string {
