@@ -62,46 +62,50 @@ OneSelf is open-source, self-hosted **personal context management**. Your résum
 
 ## 🚀 Quick start
 
-### 🐳 Option 1: Docker Compose
+### 🐳 Option 1: CLI install
 
-Requires Docker and Docker Compose v2. The default ingress is a Cloudflare Tunnel; for Caddy or Tailscale see [Deployment](#-deployment).
+> Requires Docker and Docker Compose v2.
 
-The default install directory is `$HOME/.local/share/oneself` (`$XDG_DATA_HOME/oneself` when that variable is set). On Windows Git Bash it is `%LOCALAPPDATA%\oneself`, that is `C:\Users\<name>\AppData\Local\oneself`. WSL keeps the Linux home directory and does not use `/mnt/c`. The script prints the actual path before it does anything else. It does not install into the current directory or the source tree. It then asks for the public origin and ingress, and runs `docker compose pull && up -d`. It does not install an ingress program, publish database ports, or write agent credentials. Choose another directory with `ONESELF_DIR`, or with `sh -s -- --dir`.
+**macOS / Linux**
 
 ```bash
 curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
 ```
 
-To choose a directory:
-
-```bash
-ONESELF_DIR=/path/to/oneself curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
-curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh -s -- --dir /path/to/oneself
-```
-
-`ONESELF_YES=1` is the same as `--yes`. `--dir` does not change the Compose project name `oneself`, so a second directory attaches to the same volumes.
-
-On Windows, use PowerShell rather than Git Bash. The default directory is `%LOCALAPPDATA%\oneself`, and the script prints it first:
+**Windows** (PowerShell, not Git Bash)
 
 ```powershell
 powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
 ```
 
-There is one install implementation: the CLI binary ([`apps/cli`](apps/cli)). The Release `oneself.sh` / `oneself.ps1` are thin bootstraps (repo copies: [`deploy/oneself-bootstrap.sh`](deploy/oneself-bootstrap.sh), [`deploy/oneself-bootstrap.ps1`](deploy/oneself-bootstrap.ps1)) that download and verify the platform binary and hand over to it. Alpine/musl uses `oneself-linux-*-musl`; if a Release has no musl asset, wait for one that does. There is no separate shell installer. A script taken from a Release pins the image to that version. The install directory then holds `bin/oneself` (`bin\oneself.exe` on Windows); the `oneself.sh` / `oneself.ps1` next to it are thin launchers that only forward to that binary. `bin/oneself update` (or `./oneself.sh update`; on Windows `powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\oneself\oneself.ps1" update`) only pulls the pinned tag. To move to a newer release, run the command above again (optionally with the `update` subcommand, e.g. `curl … | sh -s -- update`). Existing passwords are left in place. Re-running an **older** Release's install command never moves an install backwards; set `ONESELF_REF=v1.2.3` explicitly to force a specific (even older) version. `doctor` only checks. Agents still use `npx skills add https://your-origin -a <agent> -s oneself`.
+<img src="docs/assets/cli-install.gif" alt="OneSelf CLI install demo: run curl … | sh, set the admin account, pick the local/LAN ingress, and finish with the install summary showing the home page and admin URLs" width="100%" />
 
-Or prepare it by hand:
+The installer prompts for the public origin and ingress, then starts the services. Then:
 
-```bash
-cp .env.example .env
-```
+1. Open the printed `PUBLIC_ORIGIN` (home page)
+2. Sign in at `/admin` and change the password
+3. Give `PUBLIC_ORIGIN/.well-known/pcp` to your agent
 
-Set `PUBLIC_ORIGIN`, `OWNER_PASSWORD`, `POSTGRES_PASSWORD`, `RUSTFS_ACCESS_KEY`, `RUSTFS_SECRET_KEY`, and the ingress variable. The app image is `docker.io/ptonlix/oneself:latest`.
+**Install options**
 
-```bash
-docker compose pull && docker compose up -d
-```
+- Directory: `$HOME/.local/share/oneself` by default (`%LOCALAPPDATA%\oneself` on Windows), never the source tree; the script prints it first
+- Another directory: `ONESELF_DIR=/path` or `sh -s -- --dir /path` (the Compose project stays `oneself`, sharing the same volumes)
+- Non-interactive: `ONESELF_YES=1`
+- Ingress: local/LAN by default; Cloudflare Tunnel, Caddy, or Tailscale also available, see [Deployment](#-deployment)
+- Variables: see [Configuration](#-configuration)
 
-On startup the app applies pending database migrations and does not listen if that fails. Open `PUBLIC_ORIGIN`, change the password at `/admin`, and give `PUBLIC_ORIGIN/.well-known/pcp` to the agent.
+**Operations**
+
+- Commands: `bin/oneself update | doctor | backup | restore`
+- `update` only pulls the pinned image and restarts; `doctor` only checks
+- Upgrade: re-run a newer Release's install command; passwords are kept
+- An older Release never downgrades an install; set `ONESELF_REF=v1.2.3` to force a version
+
+**Implementation**
+
+- One install implementation: the CLI binary in [`apps/cli`](apps/cli)
+- `oneself.sh` / `oneself.ps1` are thin bootstraps ([`deploy/oneself-bootstrap.sh`](deploy/oneself-bootstrap.sh), [`deploy/oneself-bootstrap.ps1`](deploy/oneself-bootstrap.ps1)) that download and verify the platform binary, then hand over
+- Alpine/musl uses `oneself-linux-*-musl`
 
 ### 💻 Option 2: Local development
 
@@ -294,12 +298,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 
 ## 🚢 Deployment
 
-<details>
-<summary><strong>Docker Compose and public ingress in detail</strong></summary>
-
-`compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is `docker.io/ptonlix/oneself` and listens on `3000`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version. Update with `docker compose pull && docker compose up -d`, or run `bin/oneself update` (or the `./oneself.sh update` launcher) in the install directory. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image. A version-tag GitHub Release attaches `oneself.sh` / `oneself.ps1` (bootstrap), platform binaries (glibc and musl where built), `oneself-compose.tar.gz`, and flat-name `SHA256SUMS`. Assets are uploaded before the app image is pushed.
-
-The ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env` (the installer offers four choices, defaulting to local/LAN); switching ingress does not change the app image:
+`compose.yaml` runs the app, PostgreSQL 18, and RustFS; none of them publishes a host port. The ingress is chosen by `COMPOSE_PROFILES` in `.env` from four mutually exclusive profiles (the installer asks once); switching ingress does not change the app image:
 
 | Profile           | Who can reach it                  | Needs                                                   |
 | ----------------- | --------------------------------- | ------------------------------------------------------- |
@@ -308,11 +307,10 @@ The ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILE
 | `caddy`           | Internet, your own domain         | `APP_DOMAIN`, `ACME_EMAIL`; ports 80 and 443 reachable  |
 | `tailscale`       | Devices on the same tailnet only  | `TAILSCALE_AUTHKEY`. Serve only, no Funnel              |
 
-Every public ingress only forwards HTTPS to the app (`local` is plain HTTP) and never stores site files. `PUBLIC_ORIGIN` must match the chosen ingress's public address. Without a tunnel token or auth key the ingress container may fail while the app and database keep running.
-
-Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`. The app has simple built-in rate limits per IP per minute: 10 for login and device codes, 30 for public search and uploads; the client address is taken only from the ingress's own header.
-
-</details>
+- `PUBLIC_ORIGIN` must match the chosen ingress's public address.
+- Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`.
+- Without the installer: `cp .env.example .env`, fill in the variables, then `docker compose pull && docker compose up -d`.
+- Agents connect with `npx skills add https://your-origin -a <agent> -s oneself`.
 
 ## 📚 Documentation
 

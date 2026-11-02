@@ -62,23 +62,50 @@ OneSelf 是开源、自托管的**个人上下文管理**系统。简历、经�
 
 ## 🚀 快速开始
 
-### 🐳 方式一：Docker Compose
+### 🐳 方式一：CLI 安装
 
-需要 Docker 与 Docker Compose v2。
+> 需要 Docker 与 Docker Compose v2。
+
+**macOS / Linux**
 
 ```bash
 curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
 ```
 
-按提示选对外源和入口，启动后打开打印的 `PUBLIC_ORIGIN`，到 `/admin` 改密，把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent。
-
-Windows 用 PowerShell：
+**Windows**（PowerShell）
 
 ```powershell
 powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
 ```
 
-默认装到用户数据目录（不进源码树）。换目录、入口（Cloudflare / Caddy / Tailscale）、更新与排查见 [部署](#-部署)；变量说明见 [配置](#-配置)。安装与运维只有一套实现：CLI 二进制（[apps/cli](apps/cli)）。Release 的 `oneself.sh` / `oneself.ps1` 只是薄启动脚本（仓库里是 [deploy/oneself-bootstrap.sh](deploy/oneself-bootstrap.sh)、[deploy/oneself-bootstrap.ps1](deploy/oneself-bootstrap.ps1)），下载并校验本平台二进制后交给它。Alpine/musl 用 `oneself-linux-*-musl`；某个 Release 没有 musl 资产时请等带 musl 资产的版本，不再提供纯 shell 安装器。
+<img src="docs/assets/cli-install.gif" alt="OneSelf CLI 安装演示：运行 curl … | sh，设置管理员、选择本机/局域网入口，结束时显示「✓ OneSelf 安装成功」以及首页、管理端地址" width="100%" />
+
+安装器会按提示选对外源和入口，并拉起服务。装好后：
+
+1. 打开打印的 `PUBLIC_ORIGIN`（首页）
+2. 到 `/admin` 登录并改密
+3. 把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent
+
+**安装选项**
+
+- 目录：默认 `$HOME/.local/share/oneself`（Windows 为 `%LOCALAPPDATA%\oneself`），不进源码树
+- 换目录：`ONESELF_DIR=/path` 或 `sh -s -- --dir /path`（Compose 项目名仍是 `oneself`，共用同一组卷）
+- 非交互：`ONESELF_YES=1`
+- 入口：默认本机/局域网，也可选 Cloudflare / Caddy / Tailscale，见 [部署](#-部署)
+- 变量：见 [配置](#-配置)
+
+**运维**
+
+- 命令：`bin/oneself update | doctor | backup | restore`
+- `update` 只按已钉版本拉镜像并重启；`doctor` 只检查
+- 升级：重跑新 Release 的安装命令，口令保留
+- 不会被旧 Release 降级；确要换旧版设 `ONESELF_REF=v1.2.3`
+
+**实现**
+
+- 安装与运维只有一套实现：CLI 二进制 [apps/cli](apps/cli)
+- `oneself.sh` / `oneself.ps1` 是薄启动脚本（[deploy/oneself-bootstrap.sh](deploy/oneself-bootstrap.sh)、[deploy/oneself-bootstrap.ps1](deploy/oneself-bootstrap.ps1)），只下载、校验本平台二进制后转交
+- Alpine/musl 用 `oneself-linux-*-musl`
 
 ### 💻 方式二：本地开发
 
@@ -253,14 +280,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 
 ## 🚢 部署
 
-<details>
-<summary><strong>Docker Compose 部署与公网入口</strong></summary>
-
-安装脚本默认目录：`$HOME/.local/share/oneself`（或 `$XDG_DATA_HOME/oneself`）；Windows 为 `%LOCALAPPDATA%\oneself`。可用 `ONESELF_DIR` 或 `sh -s -- --dir` 换目录；非交互加 `ONESELF_YES=1`。`--dir` 不改变 Compose 项目名 `oneself`。
-
-从 Release 取到的脚本会把镜像固定到该版本。装完后安装目录里有 `bin/oneself`（Windows 为 `bin\oneself.exe`）；同目录的 `oneself.sh` / `oneself.ps1` 只是转调它的薄 launcher，不含安装逻辑。`bin/oneself update`（或 `./oneself.sh update`；Windows：`powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\oneself\oneself.ps1" update`）只按已钉镜像拉取并重启；换到新版本请再跑一次新 Release 的安装命令（可带 `update` 子命令，如 `curl … | sh -s -- update`），已有口令不会被覆盖。再跑**旧** Release 的安装命令不会把已装的新版本降回去；确实要换到旧版本时，显式设置 `ONESELF_REF=v1.2.3`。`doctor` 只检查。也可手动：`cp .env.example .env`，填好变量后 `docker compose pull && docker compose up -d`。
-
-`compose.yaml` 含应用、PostgreSQL 18 和 RustFS；应用容器与数据都不直接映射宿主机端口。镜像：`docker.io/ptonlix/oneself`。访问入口由 `.env` 的 `COMPOSE_PROFILES` 选择（安装时四选一，默认本机/局域网）：
+`compose.yaml` 含应用、PostgreSQL 18 和 RustFS，三者都不直接映射宿主机端口。访问入口由 `.env` 的 `COMPOSE_PROFILES` 选择，四种互斥（安装时四选一），换入口不换应用镜像：
 
 | profile         | 谁能访问                      | 需要                                         |
 | --------------- | ----------------------------- | -------------------------------------------- |
@@ -269,9 +289,10 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 | `caddy`         | 公网，自己的域名              | `APP_DOMAIN`、`ACME_EMAIL`，80/443 可达      |
 | `tailscale`     | 同一 tailnet                  | `TAILSCALE_AUTHKEY`。只做 Serve，不开 Funnel |
 
-`PUBLIC_ORIGIN` 须与所选入口一致。Cloudflare 不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。Agent 接入：`npx skills add https://站点 -a <agent> -s oneself`。
-
-</details>
+- `PUBLIC_ORIGIN` 须与所选入口的对外地址一致。
+- 走 Cloudflare 时不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。
+- 不用安装器：`cp .env.example .env` 填好变量后 `docker compose pull && docker compose up -d`。
+- Agent 接入：`npx skills add https://站点 -a <agent> -s oneself`。
 
 ## 📚 文档
 
