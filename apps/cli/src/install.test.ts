@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askText, profileForYes, updateHints } from "./install.ts";
+import { askText, profileForYes } from "./install.ts";
+import { updateHints } from "./summary.ts";
 import { originOk } from "./validate.ts";
 
 const originPrompt = {

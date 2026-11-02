@@ -75,6 +75,14 @@ export type InstallBinaryResult = {
   readonly pathHint: string;
 };
 
+/** Shorten an absolute path under $HOME for shell snippets (kept literal inside single quotes). */
+export function shellHomePath(target: string, home: string = homedir()): string {
+  if (home && (target === home || target.startsWith(`${home}/`))) {
+    return `$HOME${target.slice(home.length)}`;
+  }
+  return target;
+}
+
 /**
  * Copy this CLI into <install>/bin/oneself so update/doctor stay available.
  * Also link into ~/.local/bin when that directory already exists.
@@ -107,20 +115,7 @@ export async function persistCliBinary(root: string): Promise<InstallBinaryResul
   const pathHint =
     process.platform === "win32"
       ? `把 ${path.join(root, "bin")} 加到 PATH，之后可直接运行 oneself（或用完整路径 ${dest}）`
-      : `echo 'export PATH="${root}/bin:$PATH"' >> ${rc} && source ${rc}`;
+      : `echo 'export PATH="${shellHomePath(path.join(root, "bin"))}:$PATH"' >> ${rc} && source ${rc}`;
 
   return { dest, linked, pathHint };
-}
-
-export function formatBinaryNextSteps(result: InstallBinaryResult | undefined): string[] {
-  if (!result) return [];
-  const lines = [`CLI 二进制  ${result.dest}`];
-  if (result.linked) {
-    lines.push(`已写入      ${result.linked}（若该目录在 PATH 里，可直接打 oneself）`);
-  } else {
-    lines.push(`加入 PATH   ${result.pathHint}`);
-  }
-  const exe = process.platform === "win32" ? "oneself.exe" : "oneself";
-  lines.push(`之后可用    ${exe} update | doctor | backup | restore`);
-  return lines;
 }

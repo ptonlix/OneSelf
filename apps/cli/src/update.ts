@@ -7,7 +7,8 @@ import { composeCmd, pinImageFromRelease, stopOtherIngress } from "./compose.ts"
 import { readEnvFile } from "./env-file.ts";
 import { requireInstalledLayout, resolveInstallRoot } from "./resolve-root.ts";
 import { installLaunchers } from "./launchers.ts";
-import { formatBinaryNextSteps, persistCliBinary } from "./self-bin.ts";
+import { persistCliBinary } from "./self-bin.ts";
+import { formatUpdateSummary } from "./summary.ts";
 import { maybeSyncBundle } from "./sync.ts";
 import { INGRESS_PROFILES, profileOk } from "./validate.ts";
 
@@ -68,10 +69,5 @@ export async function runUpdate(options: UpdateOptions): Promise<void> {
   const binary = await persistCliBinary(root);
   // Replaces full-shell launchers left by older releases with the thin ones.
   await installLaunchers(root);
-  p.outro(
-    [
-      "已按当前 .env 的镜像更新。换版本请重新跑对应 Release 的安装命令（或用它带 update 子命令）；只改安装文件与镜像标签，不覆盖口令。",
-      ...formatBinaryNextSteps(binary),
-    ].join("\n"),
-  );
+  p.outro(formatUpdateSummary(root, binary));
 }

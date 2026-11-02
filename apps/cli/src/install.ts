@@ -12,7 +12,8 @@ import { installLaunchers } from "./launchers.ts";
 import { type HostPortChoice, pickHostPort } from "./port.ts";
 import { defaultInstallDir } from "./platform.ts";
 import { isSourceCheckout, maybeSyncBundle, readInstalledRef } from "./sync.ts";
-import { formatBinaryNextSteps, persistCliBinary } from "./self-bin.ts";
+import { persistCliBinary } from "./self-bin.ts";
+import { formatInstallSummary } from "./summary.ts";
 import {
   DEFAULT_HOST_PORT,
   DEFAULT_PROFILE,
@@ -325,21 +326,6 @@ async function chooseHostPort(current: string, yes: boolean): Promise<string> {
   return String(choice.port);
 }
 
-/** Platform-correct update command lines for the completion summary. */
-export function updateHints(root: string, platform: NodeJS.Platform = process.platform): string[] {
-  if (platform === "win32") {
-    const ps1 = path.win32.join(root, "oneself.ps1");
-    return [
-      `更新        powershell -ExecutionPolicy Bypass -File "${ps1}" update`,
-      "升级正式版  在 PowerShell 里再执行一次新 Release 的 irm … | iex；已有口令不会被覆盖",
-    ];
-  }
-  return [
-    `更新        ${path.posix.join(root, "oneself.sh")} update`,
-    "升级正式版  再执行一次新 Release 的 curl … | sh；已有口令不会被覆盖",
-  ];
-}
-
 export async function runInstall(options: InstallOptions): Promise<void> {
   requireTtyOrYes(options.yes);
   await showBanner(true);
@@ -538,17 +524,12 @@ export async function runInstall(options: InstallOptions): Promise<void> {
   const binary = await persistCliBinary(root);
   const launchers = await installLaunchers(root);
   p.outro(
-    [
-      pc.bold("下一步"),
-      `管理端      ${origin}/admin`,
-      `Agent 发现  ${origin}/.well-known/pcp`,
-      `接入 Agent  npx skills add ${origin} -a <agent> -s oneself -y`,
-      `安装路径    ${root}`,
-      ...(profile === "local"
-        ? ["公网访问    以后可重新运行安装，在「访问入口」改选 Cloudflare / Caddy / Tailscale"]
-        : []),
-      ...(launchers ? updateHints(root) : []),
-      ...formatBinaryNextSteps(binary),
-    ].join("\n"),
+    formatInstallSummary({
+      origin,
+      root,
+      localOnly: profile === "local",
+      launchers,
+      binary,
+    }),
   );
 }
