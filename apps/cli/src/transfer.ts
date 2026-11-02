@@ -45,6 +45,7 @@ async function findTransferCli(installRoot: string): Promise<string | undefined>
 
 export async function runTransfer(options: TransferOptions): Promise<void> {
   await showBanner(false);
+  process.stdout.write("\n");
   const title = options.kind === "backup" ? "备份（导出）" : "恢复（导入）";
   p.intro(pc.bold(`OneSelf ${title}`));
 

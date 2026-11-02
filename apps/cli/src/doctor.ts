@@ -18,6 +18,23 @@ import {
   secretOk,
 } from "./validate.ts";
 
+/**
+ * 解析 `docker compose port` 的 stdout。
+ * 镜像只 EXPOSE、未 publish 时，较新的 Compose 会打印 `:0` / `0.0.0.0:0` 并以 0 退出；
+ * 这不算宿主机映射。只有 HostPort 非 0 才算真正发布。
+ */
+export function composePublishedPort(stdout: string): string | undefined {
+  const line = stdout
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (!line) return undefined;
+  const m = /^(.*):(\d+)$/.exec(line);
+  if (!m) return line;
+  if (Number(m[2]) === 0) return undefined;
+  return line;
+}
+
 export type DoctorOptions = {
   readonly dir: string | undefined;
 };
@@ -63,6 +80,7 @@ async function fetchText(url: string): Promise<string | undefined> {
 
 export async function runDoctor(options: DoctorOptions): Promise<number> {
   await showBanner(false);
+  process.stdout.write("\n");
   p.intro(pc.bold("OneSelf doctor"));
 
   const root = await resolveInstallRoot(options.dir);
@@ -185,8 +203,8 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
 
     if (services.includes("postgres")) {
       const published = await composeCmd(root, profile, ["port", "postgres", "5432"]);
-      const portLine = published.stdout.trim();
-      if (portLine) fail(`PostgreSQL 映射到了宿主机：${portLine}`);
+      const mapped = composePublishedPort(published.stdout);
+      if (mapped) fail(`PostgreSQL 映射到了宿主机：${mapped}`);
       else ok("PostgreSQL 没有宿主机端口");
     }
     if (services.includes("app")) ok("应用容器在跑");

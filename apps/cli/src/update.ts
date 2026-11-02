@@ -19,6 +19,7 @@ export type UpdateOptions = {
 
 export async function runUpdate(options: UpdateOptions): Promise<void> {
   await showBanner(false);
+  process.stdout.write("\n");
   p.intro(pc.bold("OneSelf 更新"));
 
   const root = await resolveInstallRoot(options.dir);
