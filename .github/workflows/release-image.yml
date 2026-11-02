@@ -114,7 +114,7 @@ jobs:
             prerelease=(--prerelease)
           fi
           printf '%s\n' "${prerelease[*]-}" > "${RUNNER_TEMP}/prerelease.flag"
-          cp "${notes}" "${RUNNER_TEMP}/release-notes.txt"
+          # notes already written to ${RUNNER_TEMP}/release-notes.txt
 
           stage="${RUNNER_TEMP}/oneself-release"
           rm -rf "${stage}"
