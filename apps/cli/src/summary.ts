@@ -17,7 +17,7 @@ function cliName(platform: NodeJS.Platform): string {
 }
 
 /** Platform-correct launcher update command (used when no CLI binary was persisted). */
-export function updateCommand(root: string, platform: NodeJS.Platform = process.platform): string {
+function updateCommand(root: string, platform: NodeJS.Platform = process.platform): string {
   if (platform === "win32") {
     const ps1 = path.win32.join(root, "oneself.ps1");
     return `powershell -ExecutionPolicy Bypass -File "${ps1}" update`;
@@ -26,7 +26,7 @@ export function updateCommand(root: string, platform: NodeJS.Platform = process.
 }
 
 /** One-line upgrade hint for the completion summary. */
-export function upgradeHint(platform: NodeJS.Platform = process.platform): string {
+function upgradeHint(platform: NodeJS.Platform = process.platform): string {
   return platform === "win32"
     ? "升级：在 PowerShell 重跑新 Release 的 irm … | iex，口令保留"
     : "升级：重跑新 Release 的 curl … | sh，口令保留";
@@ -38,7 +38,7 @@ export function updateHints(root: string, platform: NodeJS.Platform = process.pl
 }
 
 /** "运维" section: how to reach update/doctor/backup/restore afterwards. */
-export function opsLines(
+function opsLines(
   binary: InstallBinaryResult | undefined,
   root: string,
   launchers: boolean,
