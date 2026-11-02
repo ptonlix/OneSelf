@@ -10,7 +10,7 @@ const plain = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 const root = "/home/a/.local/share/oneself";
 const origin = "http://10.0.0.2:3001";
 
-test("install summary leads with success, then admin and agent", () => {
+test("install summary leads with success, then home, admin and agent", () => {
   const out = plain(
     formatInstallSummary({
       origin,
@@ -28,10 +28,13 @@ test("install summary leads with success, then admin and agent", () => {
   const lines = out.split("\n");
   assert.match(lines[0] ?? "", /^✓ OneSelf 安装成功/);
   assert.doesNotMatch(out, /下一步/);
+  // Home page comes first, as its own section with the bare origin on one line.
+  const home = out.indexOf("首页");
+  assert.ok(lines.some((l) => l.trim() === origin));
   const admin = out.indexOf(`${origin}/admin`);
   const agent = out.indexOf(`npx skills add ${origin} -a <agent> -s oneself -y`);
   const ops = out.indexOf("oneself update | doctor | backup | restore");
-  assert.ok(admin > 0 && agent > admin && ops > agent);
+  assert.ok(home > 0 && admin > home && agent > admin && ops > agent);
   assert.match(out, /\.well-known\/pcp/);
   assert.match(out, /export PATH="\$HOME\/\.local\/share\/oneself\/bin:\$PATH"/);
   assert.match(out, /公网访问/);

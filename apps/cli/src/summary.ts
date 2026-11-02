@@ -76,6 +76,7 @@ export function formatInstallSummary(summary: InstallSummary): string {
   ];
   return [
     pc.green(pc.bold("✓ OneSelf 安装成功，服务已在后台运行")),
+    ...section("首页", [pc.cyan(origin)]),
     ...section("管理端", [pc.cyan(`${origin}/admin`)]),
     ...section("接入 Agent", [
       pc.cyan(`npx skills add ${origin} -a <agent> -s oneself -y`),
