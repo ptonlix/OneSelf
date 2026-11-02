@@ -44,14 +44,14 @@ Agent 不连接数据库和对象存储，也不读取磁盘路径。它只调�
 
 ### 系统总览图
 
-访客只拿到当前指针指向的静态文件，再由浏览器匿名读取公开 PCP。任意 AI Agent 二选一接入：使用所属人批准生成的 API Key，或走 OAuth 2.1 设备码、由所属人在管理端批准。浏览器和 Agent 都先到达唯一的 HTTPS 入口，再进入这一个进程。默认入口是 cloudflared。
+访客只拿到当前指针指向的静态文件，再由浏览器匿名读取公开 PCP。任意 AI Agent 二选一接入：使用所属人批准生成的 API Key，或走 OAuth 2.1 设备码、由所属人在管理端批准。浏览器和 Agent 都先到达唯一的入口，再进入这一个进程。安装 CLI 默认写本机/局域网入口 `local`（明文 HTTP，只给本机和局域网）；对公网时换成 cloudflared、Caddy 或 Tailscale 的 HTTPS 入口。
 
 ```mermaid
 flowchart LR
     Owner["所属人<br/>管理端"]
     Visitor["访客"]
     Agent["任意 AI Agent / 脚本"]
-    Front["HTTPS 入口<br/>默认 cloudflared"]
+    Front["唯一入口<br/>默认 local（本机/局域网 HTTP）<br/>公网：cloudflared / Caddy / Tailscale（HTTPS）"]
 
     subgraph App["OneSelf（单进程）"]
         Admin["管理端静态包"]
@@ -86,7 +86,7 @@ flowchart LR
     Owner["Account owner<br/>admin UI"]
     Visitor["Visitor"]
     Agent["Any AI agent / script"]
-    Front["HTTPS front<br/>cloudflared by default"]
+    Front["Single ingress<br/>local (host/LAN HTTP) by default<br/>public: cloudflared / Caddy / Tailscale (HTTPS)"]
 
     subgraph App["OneSelf (one process)"]
         Admin["Admin static bundle"]
@@ -142,7 +142,7 @@ flowchart LR
 | MCP | 官方 TypeScript SDK，同进程 Streamable HTTP | 工具函数直接调用操作层。路径是 `POST /mcp`。不启用旧的 SSE，不另起进程 |
 | 测试 | Vitest | 领域规则不启动 HTTP。HTTP 和 MCP 各有一条契约测试，断言同一资料操作的结果一致，并断言 MCP 没有密钥管理工具 |
 | 架构约束 | dependency-cruiser | 领域层不能引用 Hono、React、数据库驱动或对象存储 SDK |
-| 部署 | `compose.yaml`：应用容器 + PostgreSQL + RustFS + 一个入口 | 与 MercLink 相同的单盘 RustFS 接法，但没有 Redis。入口是互斥 profile，默认 cloudflared，只做 HTTPS |
+| 部署 | `compose.yaml`：应用容器 + PostgreSQL + RustFS + 一个入口 | 与 MercLink 相同的单盘 RustFS 接法，但没有 Redis。入口是互斥 profile，安装默认 `local`（本机/局域网明文 HTTP）；公网用 cloudflared、caddy 或 tailscale，只做 HTTPS |
 
 开发依赖放在 `compose.dev.yaml`：PostgreSQL 和 RustFS。应用在宿主机用 pnpm 跑。RustFS 只发布 `9000`，控制台 `9001` 不发布，开发密钥只给本机。生产的 RustFS 不映射宿主机端口，密钥来自环境变量。两边都是用户 `10001:10001`，启动前把数据卷 `chown` 给它，再用 aws-cli 建桶。镜像固定 `rustfs/rustfs:1.0.1`。不要挂旧的 MinIO 卷。
 
@@ -150,21 +150,22 @@ flowchart LR
 
 ### 入口
 
-公网入口不在应用进程里，也不是第二套应用。应用只在 Compose 网络内提供 HTTP，不把端口映射到宿主机公网。PostgreSQL 和 RustFS 继续不映射宿主机端口。
+公网入口不在应用进程里，也不是第二套应用。应用容器只在 Compose 网络内提供 HTTP，自身不映射宿主机端口。PostgreSQL 和 RustFS 继续不映射宿主机端口。
 
-同一时间只启用一个入口 profile。`.env` 的 `COMPOSE_PROFILES` 默认是 `cloudflared`，所以普通的 `docker compose up` 就带上它。换成 `caddy` 或 `tailscale` 时只改这个值，不改应用镜像。三个服务都写成 profile，避免加上 `--profile caddy` 时 cloudflared 仍然跟着起来。
+同一时间只启用一个入口 profile。安装 CLI 默认写 `COMPOSE_PROFILES=local`：一个只做 HTTP 转发的 Caddy 容器把 `HOST_PORT`（默认 3000）映射到宿主机，`PUBLIC_ORIGIN` 是 `http://本机IP:端口`，装完即可在本机/局域网访问，之后再换公网入口。换成 `cloudflared`、`caddy` 或 `tailscale` 时只改这个值和 `PUBLIC_ORIGIN`，不改应用镜像。四个服务都写成 profile，避免两个入口同时起来。
 
 | profile | 镜像 | 谁能访问 | 什么时候用 |
 | --- | --- | --- | --- |
-| `cloudflared` | `CLOUDFLARED_IMAGE`，默认是写死标签的 `cloudflare/cloudflared`，不用 `latest` | 公网。主机名在 Cloudflare DNS 上 | 默认。不开放路由器端口。域名放到 Cloudflare |
+| `local` | `CADDY_IMAGE`，只跑明文 HTTP 转发（`compose.yaml` 内联 Caddyfile，覆写 `X-Real-IP` / `X-Forwarded-For`） | 本机和同一局域网（云主机放行端口后也可公网 IP 访问），明文 HTTP | 默认。先用起来，不需要域名或令牌 |
+| `cloudflared` | `CLOUDFLARED_IMAGE`，默认是写死标签的 `cloudflare/cloudflared`，不用 `latest` | 公网。主机名在 Cloudflare DNS 上 | 不开放路由器端口。域名放到 Cloudflare |
 | `caddy` | `CADDY_IMAGE`，默认是写死标签的 `caddy` | 公网。自己的域名，证书在这台机器上 | 80 和 443 必须能从公网到达。不把 TLS 交给 Cloudflare |
 | `tailscale` | `TAILSCALE_IMAGE`，默认是写死标签的 `tailscale/tailscale` | 只有这个 tailnet 里的设备 | 不想买域名。地址是 `https://机器名.tailnet.ts.net`。不开 Funnel |
 
-三个容器都只把 HTTPS 转到应用的站内地址。不挂站点目录，也不保存上传的 zip。不把 API、MCP 或 OAuth 改写成 Workers，也不把数据库换成 D1。对象存储仍然可以换成 R2，那是另一件事。
+公网入口容器都只把 HTTPS 转到应用的站内地址（`local` 是明文 HTTP）。不挂站点目录，也不保存上传的 zip。不把 API、MCP 或 OAuth 改写成 Workers，也不把数据库换成 D1。对象存储仍然可以换成 R2，那是另一件事。
 
 `PUBLIC_ORIGIN` 是唯一对外源，例如 `https://自己的域名` 或 `https://机器名.tailnet.ts.net`。发现文档、OAuth issuer、批准地址和媒体绝对地址只使用它，不从 `Host` 或转发头现推。它是 HTTPS 时，所属人 Cookie 加 `Secure`。管理端写请求的 `Origin` 必须等于它。没有这个变量时，只接受本机开发源，不以公网入口启动。
 
-限流使用的客户端地址只取这一跳入口送来的值。cloudflared 用 `CF-Connecting-IP`。Caddy 和 Tailscale 用它们自己写入的转发头。应用不信任其他来源的 `X-Forwarded-For`。
+限流使用的客户端地址只取这一跳入口送来的值。cloudflared 用 `CF-Connecting-IP`。Caddy 和 Tailscale 用它们自己写入的转发头。`local` 也是 Caddy：它用 `{remote_host}` 覆写 `X-Real-IP` 和 `X-Forwarded-For`，应用在 `COMPOSE_PROFILES=local` 时只读 `X-Real-IP`，客户端自带的同名头被覆盖，缺这个头时归入同一个 direct 桶。应用不信任其他来源的 `X-Forwarded-For`，所以伪造的转发头进不了限流桶。但 `{remote_host}` 是 Docker 交给 Caddy 的对端地址：Docker Desktop（Mac/Windows）和默认开着 userland-proxy 的 Docker（多数 Linux 也是）都会把它换成网桥网关地址，因此默认安装下外部客户端仍可能共用一个桶，登录额度可能被别人打满。只有关闭 userland-proxy、由 iptables 保留来源地址时，Linux 才能按真实客户端分桶；Docker Desktop 和默认 userland-proxy 做不到。
 
 Cloudflare 在前面时，不缓存 `/pcp`、`/oauth`、`/admin`、`/skills`、`/media`、`/_preview`。已经开始的 HTTP 响应若超过代理读超时仍未结束，会被它断开。页面、登录、设备码和普通 MCP 调用不受这个限制影响。
 
@@ -207,7 +208,7 @@ OneSelf/
 │       ├── context.md           写页规则。不插入 origin
 │       └── public-page.md       公开页规则。不插入 origin
 ├── deploy/
-│   ├── Caddyfile                只反代，不放站点文件。cloudflared 和 Tailscale 不另建目录
+│   ├── Caddyfile                只反代，不放站点文件。local 的 HTTP 转发配置内联在 compose.yaml；cloudflared 和 Tailscale 不另建目录
 │   ├── oneself-bootstrap.sh     Release 上的 oneself.sh：校验并 exec 本平台 CLI 二进制，stdin 接 /dev/tty
 │   └── oneself-bootstrap.ps1    Release 上的 oneself.ps1：同上；irm | iex 下不 exit，用 Start-Process 接控制台
 ├── tests/
@@ -246,7 +247,7 @@ OneSelf/
 
 站点指针怎么变是纯规则，放在 `packages/domain/src/site-pointer.ts`：预览不改指针，批准才指向 `rel_…` 或 `public-page`，保留路径整包拒绝。事务由 `app/` 加 adapters 完成。`site-files/` 只按当前指针吐字节。
 
-仓库根的 `Dockerfile` 打进管理端 dist、原始页面 dist、源码 zip 和 `skills/`。不放进 `apps/server`。`compose.yaml` 留在仓库根。`deploy/` 放 Caddyfile、两份完整宿主安装脚本和两份 Release 启动脚本（`oneself-bootstrap.*`）；cloudflared 和 Tailscale 只靠环境变量，不为对称再建目录，也不做 `apps/ingress`。仓库根的 `skills/` 是产品说明。`.agents/skills/` 是开发技能，不进镜像，两者不合并、不改名。
+仓库根的 `Dockerfile` 打进管理端 dist、原始页面 dist、源码 zip 和 `skills/`。不放进 `apps/server`。`compose.yaml` 留在仓库根。`deploy/` 放 Caddyfile 和两份 Release 启动脚本（`oneself-bootstrap.*`）；`local` 的转发配置内联在 `compose.yaml`，cloudflared 和 Tailscale 只靠环境变量，不为对称再建目录，也不做 `apps/ingress`。仓库根的 `skills/` 是产品说明。`.agents/skills/` 是开发技能，不进镜像，两者不合并、不改名。
 
 单元测试与被测源码放在一起，文件名 `*.test.ts`。领域规则在 `packages/domain`，不启动 HTTP 或数据库。注册表、表结构、适配器、公开客户端和原始页面的测试留在各自的包里。服务器的进程内契约测试留在 `apps/server`，用内存端口，不连生产端点；HTTP 和 MCP 各有一条，断言同一资料操作的结果一致，并断言 MCP 没有密钥管理工具。管理端页面不要求单元测试。
 

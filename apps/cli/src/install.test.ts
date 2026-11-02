@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { askText, updateHints } from "./install.ts";
+import { askText, profileForYes, updateHints } from "./install.ts";
 import { originOk } from "./validate.ts";
 
 const originPrompt = {
@@ -33,4 +33,12 @@ test("completion hints are platform-correct", () => {
   const unix = updateHints("/home/a/.local/share/oneself", "linux").join("\n");
   assert.match(unix, /\/home\/a\/\.local\/share\/oneself\/oneself\.sh update/);
   assert.doesNotMatch(unix, /ps1/);
+});
+
+test("--yes picks local ingress unless .env or COMPOSE_PROFILES says otherwise", () => {
+  assert.equal(profileForYes("", undefined), "local");
+  assert.equal(profileForYes("", ""), "local");
+  assert.equal(profileForYes("", "caddy"), "caddy");
+  assert.equal(profileForYes("tailscale", "caddy"), "tailscale");
+  assert.throws(() => profileForYes("", "cloudflared,caddy"), /COMPOSE_PROFILES/);
 });

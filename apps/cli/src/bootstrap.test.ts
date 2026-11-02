@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-floating-promises -- node:test registers tests synchronously */
 // Exercises deploy/oneself-bootstrap.sh with a stubbed curl: which refs reach the CLI.
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, chmodSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,7 +16,8 @@ const skip = process.platform === "win32";
 function run(
   extraEnv: Record<string, string>,
   pinned?: string,
-): { env: Record<string, string>; urls: string } {
+  opts: { tty?: boolean } = {},
+): { env: Record<string, string>; urls: string; args: string[]; stderr: string } {
   const dir = mkdtempSync(path.join(tmpdir(), "oneself-boot-"));
   try {
     const stubBin = path.join(dir, "stub");
@@ -27,6 +28,7 @@ function run(
     writeFileSync(fakePath, fake);
     const sum = createHash("sha256").update(fake).digest("hex");
     const curl = `#!/bin/sh
+printf '%s\\n' "$*" >> "${dir}/args"
 out=; url=
 while [ $# -gt 0 ]; do
   case "$1" in -o) out=$2; shift 2 ;; -*) shift ;; *) url=$1; shift ;; esac
@@ -40,6 +42,10 @@ esac
     writeFileSync(path.join(stubBin, "curl"), curl);
     chmodSync(path.join(stubBin, "curl"), 0o755);
     let body = readFileSync(script, "utf8");
+    if (opts.tty) {
+      // Pretend stderr is a terminal (the progress-bar branch) without needing a pty.
+      body = body.replace("if [ -t 2 ]; then", "if true; then");
+    }
     if (pinned) {
       body = body.replace(/^ONESELF_BOOTSTRAP_REF=.*$/m, `ONESELF_BOOTSTRAP_REF=${pinned}`);
     }
@@ -51,13 +57,21 @@ esac
       XDG_CACHE_HOME: path.join(dir, "cache"),
       ...extraEnv,
     };
-    execFileSync("sh", [scriptPath], { env, stdio: ["ignore", "ignore", "pipe"] });
+    const result = spawnSync("sh", [scriptPath], { env, stdio: ["ignore", "ignore", "pipe"] });
+    if (result.status !== 0) {
+      throw new Error(`bootstrap exited ${String(result.status)}: ${result.stderr.toString()}`);
+    }
     const parsed: Record<string, string> = {};
     for (const line of readFileSync(path.join(dir, "out"), "utf8").split("\n")) {
       const i = line.indexOf("=");
       if (i > 0) parsed[line.slice(0, i)] = line.slice(i + 1);
     }
-    return { env: parsed, urls: readFileSync(path.join(dir, "urls"), "utf8") };
+    return {
+      env: parsed,
+      urls: readFileSync(path.join(dir, "urls"), "utf8"),
+      args: readFileSync(path.join(dir, "args"), "utf8").trim().split("\n"),
+      stderr: result.stderr.toString(),
+    };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -94,4 +108,22 @@ test("user-set ONESELF_REF is passed through as forced", { skip }, () => {
 
 test("invalid ONESELF_REF is rejected before download", { skip }, () => {
   assert.throws(() => run({ ONESELF_REF: "main;rm" }, "v1.2.0"));
+});
+
+test("non-TTY stderr downloads silently and prints the URL", { skip }, () => {
+  const { args, stderr } = run({}, "v1.2.0");
+  assert.equal(args.length, 2);
+  assert.match(args[0] ?? "", /^-fsSL /);
+  assert.doesNotMatch(args[0] ?? "", /--progress-bar/);
+  assert.match(stderr, /下载 https:\/\/github\.com\/.*\/releases\/download\/v1\.2\.0\/oneself-/);
+});
+
+test("TTY stderr shows a curl progress bar for the binary only", { skip }, () => {
+  const { args, stderr, env } = run({}, "v1.2.0", { tty: true });
+  assert.equal(env.BUNDLED, "v1.2.0");
+  assert.match(args[0] ?? "", /^-fL --progress-bar --retry 3 /);
+  assert.doesNotMatch(args[0] ?? "", /-fsSL/);
+  // SHA256SUMS stays silent.
+  assert.match(args[1] ?? "", /^-fsSL .*SHA256SUMS/);
+  assert.match(stderr, /oneself: 下载 oneself-[a-z0-9-]+（v1\.2\.0）/);
 });

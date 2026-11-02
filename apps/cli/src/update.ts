@@ -9,7 +9,7 @@ import { requireInstalledLayout, resolveInstallRoot } from "./resolve-root.ts";
 import { installLaunchers } from "./launchers.ts";
 import { formatBinaryNextSteps, persistCliBinary } from "./self-bin.ts";
 import { maybeSyncBundle } from "./sync.ts";
-import { profileOk } from "./validate.ts";
+import { INGRESS_PROFILES, profileOk } from "./validate.ts";
 
 export type UpdateOptions = {
   readonly dir: string | undefined;
@@ -37,7 +37,9 @@ export async function runUpdate(options: UpdateOptions): Promise<void> {
   const env = await readEnvFile(path.join(root, ".env"));
   const profile = env.get("COMPOSE_PROFILES") ?? "";
   if (!profileOk(profile)) {
-    throw new Error("COMPOSE_PROFILES 必须恰好是一个入口");
+    throw new Error(
+      `COMPOSE_PROFILES 必须恰好是一个入口：${INGRESS_PROFILES.join("、")}（重新运行 install 可选择）`,
+    );
   }
 
   await stopOtherIngress(

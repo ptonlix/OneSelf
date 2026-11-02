@@ -11,7 +11,7 @@ description: Use when implementing, reviewing, or changing OneSelf. Triggers on 
 
 - Node.js 24、TypeScript `strict`、pnpm。不提交 `package-lock.json` 或 `yarn.lock`。
 - 一个进程提供 API、MCP、OAuth、管理端静态文件和已发布站点。不拆微服务，不引入 Redis。
-- 公网入口是 Compose 的互斥 profile，默认 `cloudflared`。可换 `caddy` 或只在 tailnet 内的 `tailscale`。不要同时开两个，也不要装进应用镜像。
+- 入口是 Compose 的互斥 profile，安装默认 `local`（本机/局域网明文 HTTP，只由 `local` 转发容器映射 `HOST_PORT`，应用容器不映射端口）。公网换 `cloudflared`、`caddy` 或只在 tailnet 内的 `tailscale`。不要同时开两个，也不要装进应用镜像。限流地址：`local` 和 `caddy` 只信入口覆写的 `X-Real-IP`，伪造头无效；但 `local` 在 Docker Desktop 或默认 userland-proxy 下拿到的是网桥网关地址，外部客户端仍可能共用一个桶，只有 Linux 关闭 userland-proxy 才按真实客户端分桶。
 - 服务端用 Hono，只做认证、解析和返回。不用 Next.js、Express、Nest，也不用 `hono/jsx`。
 - 管理端和原始页面是 Vite + React 的静态包。公开站点不是服务端模板。
 - 领域代码是纯 TypeScript。不能引用 Hono、React、数据库驱动或对象存储 SDK。

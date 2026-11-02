@@ -89,7 +89,7 @@ import { createOauthEngine, type OauthEngine, type PersistedGrant } from "../oau
 
 const RATE_WINDOW_MS = 60_000;
 
-export type IngressMode = "none" | "cloudflared" | "caddy" | "tailscale";
+export type IngressMode = "none" | "local" | "cloudflared" | "caddy" | "tailscale";
 
 export type ServerOptions = {
   readonly publicOrigin?: string;
@@ -294,7 +294,8 @@ export class Runtime {
     if (this.ingress === "cloudflared") {
       return headerValue(request, "cf-connecting-ip") ?? "direct";
     }
-    if (this.ingress === "caddy") {
+    // caddy 与 local 都是 Caddy 反代，用 header_up 覆盖 X-Real-IP 为这一跳看到的对端地址。
+    if (this.ingress === "caddy" || this.ingress === "local") {
       return headerValue(request, "x-real-ip") ?? "direct";
     }
     if (this.ingress === "tailscale") {

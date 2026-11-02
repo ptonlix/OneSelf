@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 
 import { readEnvFile, writeEnvValue } from "./env-file.ts";
-import { secretOk } from "./validate.ts";
+import { INGRESS_PROFILES, secretOk } from "./validate.ts";
 
 const IMAGE_REPO = process.env.ONESELF_IMAGE_REPO ?? "docker.io/ptonlix/oneself";
 
@@ -101,7 +101,7 @@ export async function stopOtherIngress(
   onWarn: (msg: string) => void,
   onInfo: (msg: string) => void,
 ): Promise<void> {
-  for (const name of ["cloudflared", "caddy", "tailscale"] as const) {
+  for (const name of INGRESS_PROFILES) {
     if (name === selected) continue;
     if (dryRun) {
       onInfo(`会停止另一个入口 ${name}`);

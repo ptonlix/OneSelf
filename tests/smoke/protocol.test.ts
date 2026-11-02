@@ -612,6 +612,67 @@ it("trusts only the overwritten X-Real-IP when the ingress is caddy", async () =
   await server.close();
 });
 
+it("trusts only the overwritten X-Real-IP when the ingress is local", async () => {
+  const server = await boot({ ingress: "local" });
+  for (let index = 0; index < 30; index += 1) {
+    const response = await server.request("/pcp/v1/public/search", {
+      method: "POST",
+      headers: jsonHeaders({
+        "x-real-ip": "192.168.1.20",
+        "x-forwarded-for": `198.51.100.${String(index)}`,
+      }),
+      body: JSON.stringify({ q: "token" }),
+    });
+    expect(response.status).toBe(200);
+  }
+  // A client-forged X-Forwarded-For does not move it to a new bucket.
+  const spoofed = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({
+      "x-real-ip": "192.168.1.20",
+      "x-forwarded-for": "203.0.113.99",
+    }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  await expectRateLimited(spoofed);
+  // Another LAN client has its own bucket.
+  const fresh = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({
+      "x-real-ip": "192.168.1.21",
+      "x-forwarded-for": "192.168.1.20",
+    }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  expect(fresh.status).toBe(200);
+  await server.close();
+});
+
+it("falls back to one direct bucket when the local proxy header is missing", async () => {
+  const server = await boot({ ingress: "local" });
+  for (let index = 0; index < 30; index += 1) {
+    const response = await server.request("/pcp/v1/public/search", {
+      method: "POST",
+      headers: jsonHeaders({ "x-forwarded-for": `198.51.100.${String(index)}` }),
+      body: JSON.stringify({ q: "token" }),
+    });
+    expect(response.status).toBe(200);
+  }
+  const limited = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({ "x-forwarded-for": "203.0.113.99" }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  await expectRateLimited(limited);
+  const proxied = await server.request("/pcp/v1/public/search", {
+    method: "POST",
+    headers: jsonHeaders({ "x-real-ip": "192.168.1.30" }),
+    body: JSON.stringify({ q: "token" }),
+  });
+  expect(proxied.status).toBe(200);
+  await server.close();
+});
+
 it("trusts the last ingress hop when the ingress is tailscale", async () => {
   const server = await boot({ ingress: "tailscale" });
   for (let index = 0; index < 30; index += 1) {

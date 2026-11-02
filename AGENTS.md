@@ -15,7 +15,7 @@
 
 - Node.js 24、TypeScript `strict`、pnpm。只用 `pnpm install` 和 `pnpm run <script>`。不要生成 `package-lock.json` 或 `yarn.lock`。
 - 一个进程提供 API、MCP、OAuth、管理端静态文件和已发布站点。不拆微服务，不引入 Redis、队列或第二套数据库。
-- 公网入口是 Compose 的互斥 profile，默认 `cloudflared`。可换 `caddy` 或只在 tailnet 内的 `tailscale`。不要同时开两个，也不要把入口程序装进应用镜像。
+- 访问入口是 Compose 的互斥 profile，默认 `local`（只把 `HOST_PORT` 映射到宿主机，本机/局域网 http 访问）。可换 `cloudflared`、`caddy` 或只在 tailnet 内的 `tailscale`。不要同时开两个，也不要把入口程序装进应用镜像。
 - 服务端用 Hono，只做认证、解析和返回。不用 Next.js、Express、Nest，也不用 `hono/jsx`。
 - 管理端和原始页面是 Vite + React 的静态包。公开站点不是服务端模板。
 - 数据库是 PostgreSQL 18 + Drizzle。表结构只来自 migration。不把 `drizzle-kit push` 当部署方式，也不同时支持 PGLite。

@@ -8,7 +8,15 @@ import { showBanner } from "./banner.ts";
 import { composeCmd, runningServices } from "./compose.ts";
 import { readEnvFile } from "./env-file.ts";
 import { resolveInstallRoot } from "./resolve-root.ts";
-import { originOk, profileOk, secretOk } from "./validate.ts";
+import {
+  DEFAULT_HOST_PORT,
+  DEFAULT_PROFILE,
+  INGRESS_PROFILES,
+  originOkFor,
+  portOk,
+  profileOk,
+  secretOk,
+} from "./validate.ts";
 
 export type DoctorOptions = {
   readonly dir: string | undefined;
@@ -84,7 +92,7 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
     fail("找不到 compose.yaml 或 deploy/Caddyfile。doctor 不会下载，也不会创建目录。");
   }
 
-  let profile = "cloudflared";
+  let profile: string = DEFAULT_PROFILE;
   let origin = "";
 
   if (!(await exists(path.join(root, ".env")))) {
@@ -105,13 +113,26 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
     profile = env.get("COMPOSE_PROFILES") ?? "";
     if (profileOk(profile)) ok(`入口只有 ${profile}`);
     else {
-      fail(`COMPOSE_PROFILES=${profile}，必须恰好是 cloudflared、caddy 或 tailscale`);
-      profile = "cloudflared";
+      fail(`COMPOSE_PROFILES=${profile}，必须恰好是 ${INGRESS_PROFILES.join("、")} 之一`);
+      profile = DEFAULT_PROFILE;
     }
 
     origin = env.get("PUBLIC_ORIGIN") ?? "";
-    if (originOk(origin, process.env.ONESELF_ALLOW_HTTP === "1")) {
+    const hostPort = env.get("HOST_PORT") || DEFAULT_HOST_PORT;
+    if (
+      originOkFor(
+        profile,
+        origin,
+        process.env.ONESELF_ALLOW_HTTP === "1",
+        profile === "local" ? hostPort : undefined,
+      )
+    ) {
       ok(`站点地址 ${origin}`);
+    } else if (profile === "local") {
+      fail(
+        `本机入口的站点地址须是 http://主机:${hostPort}（与 HOST_PORT 一致，不能是 https）。重新运行 install 可重配。`,
+      );
+      origin = "";
     } else {
       fail("站点地址不合法或仍是占位。不会从请求 Host 推断。");
       origin = "";
@@ -128,7 +149,15 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
       else fail(`${key} 仍是占位、为空，或含 $`);
     }
 
-    if (profile === "cloudflared") {
+    if (profile === "local") {
+      const port = env.get("HOST_PORT") ?? "";
+      if (port === "") ok(`宿主机端口默认 ${DEFAULT_HOST_PORT}`);
+      else if (portOk(port)) ok(`宿主机端口 ${port}`);
+      else fail(`HOST_PORT=${port} 不是合法端口`);
+      if (origin.startsWith("http://127.0.0.1") || origin.startsWith("http://localhost")) {
+        warn("站点地址是回环地址，只有本机能访问。");
+      }
+    } else if (profile === "cloudflared") {
       if (!(env.get("TUNNEL_TOKEN") ?? "")) {
         warn("TUNNEL_TOKEN 为空。入口可以失败，应用和数据库仍应留下。");
       }
@@ -148,9 +177,10 @@ export async function runDoctor(options: DoctorOptions): Promise<number> {
 
   if ((await exists(path.join(root, "compose.yaml"))) && (await dockerComposeOk())) {
     const services = await runningServices(root, profile);
-    const ingresses = ["cloudflared", "caddy", "tailscale"].filter((n) => services.includes(n));
+    const ingresses = INGRESS_PROFILES.filter((n) => services.includes(n));
     if (ingresses.length > 1) fail(`有 ${ingresses.length} 个入口容器在跑`);
     else if (ingresses.length === 1) ok("正在跑的入口不超过一个");
+    else if (profile === "local") warn("本机入口容器 local 没在跑，宿主机端口访问不到应用。");
     else warn("入口容器没在跑。没有令牌时这是允许的。");
 
     if (services.includes("postgres")) {

@@ -38,15 +38,104 @@ try {
     } else {
       $base = "https://github.com/$repo/releases/download/$ref"
     }
+    # 交互控制台里给二进制下载画一行进度条；非交互（CI、重定向）保持静默。
+    # 不用 Invoke-WebRequest 自带进度：Windows PowerShell 5.1 渲染它会让大文件下载慢很多。
+    $interactive = [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected
+    $download = {
+      param([string]$Uri, [string]$OutFile)
+      $req = [Net.WebRequest]::Create($Uri)
+      $req.UserAgent = 'oneself-bootstrap'
+      $resp = $req.GetResponse()
+      try {
+        $total = $resp.ContentLength
+        $src = $resp.GetResponseStream()
+        $out = [IO.File]::Open($OutFile, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        try {
+          $buf = New-Object byte[] 262144
+          $done = [long]0
+          $width = 30
+          $totalMb = '{0:N1}' -f ($total / 1MB)
+          $sw = [Diagnostics.Stopwatch]::StartNew()
+          $last = [long]-1000
+          $draw = {
+            param([long]$Bytes)
+            $mb = '{0:N1}' -f ($Bytes / 1MB)
+            if ($total -gt 0) {
+              $pct = [Math]::Min(100, [int][Math]::Floor($Bytes * 100 / $total))
+              $fill = [int][Math]::Floor($pct * $width / 100)
+              $bar = ('#' * $fill) + ('-' * ($width - $fill))
+              $line = '  [{0}] {1,3}%  {2} / {3} MB ' -f $bar, $pct, $mb, $totalMb
+            } else {
+              $line = '  {0} MB ' -f $mb
+            }
+            [Console]::Write("`r$line")
+          }
+          try {
+            while (($n = $src.Read($buf, 0, $buf.Length)) -gt 0) {
+              $out.Write($buf, 0, $n)
+              $done += $n
+              if (($sw.ElapsedMilliseconds - $last) -ge 150) {
+                $last = $sw.ElapsedMilliseconds
+                & $draw $done
+              }
+            }
+            & $draw $done
+          } finally {
+            # 成功或中断都换行，避免后续输出接在进度条后面。
+            [Console]::WriteLine()
+          }
+        } finally {
+          $out.Dispose()
+          $src.Dispose()
+        }
+      } finally {
+        $resp.Dispose()
+      }
+    }
+
+    # 与 Unix 的 curl --retry 3 对齐：网络错误、5xx、408、429 最多重试 3 次（间隔 1 秒）；
+    # 其他 4xx（如 404 资产不存在）重试无用，直接抛出。
+    $withRetry = {
+      param([scriptblock]$Action, [string]$What)
+      $attempt = 0
+      while ($true) {
+        $attempt += 1
+        try {
+          & $Action
+          return
+        } catch {
+          $status = 0
+          $e = $_.Exception
+          while ($e) {
+            if ($e.PSObject.Properties['Response'] -and $e.Response) {
+              try { $status = [int]$e.Response.StatusCode } catch { }
+              break
+            }
+            $e = $e.InnerException
+          }
+          $permanent = $status -ge 400 -and $status -lt 500 -and $status -ne 408 -and $status -ne 429
+          if ($permanent -or $attempt -gt 3) { throw }
+          Write-Host "oneself: $What 失败，1 秒后重试（$attempt/3）"
+          Start-Sleep -Seconds 1
+        }
+      }
+    }
+
     $cache = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'oneself\cache'
     New-Item -ItemType Directory -Force -Path $cache | Out-Null
     $bin = Join-Path $cache $asset
     $tmpBin = "$bin.$PID.download"
     $sums = Join-Path $cache "SHA256SUMS.$PID"
     try {
-      Write-Host "oneself: 下载 $base/$asset"
-      Invoke-WebRequest -Uri "$base/$asset" -OutFile $tmpBin -UseBasicParsing
-      Invoke-WebRequest -Uri "$base/SHA256SUMS" -OutFile $sums -UseBasicParsing
+      if ($interactive) {
+        Write-Host "oneself: 下载 $asset（$ref）"
+        & $withRetry { & $download "$base/$asset" $tmpBin } "下载 $asset"
+      } else {
+        Write-Host "oneself: 下载 $base/$asset"
+        & $withRetry { Invoke-WebRequest -Uri "$base/$asset" -OutFile $tmpBin -UseBasicParsing } "下载 $asset"
+      }
+      # SHA256SUMS 很小，始终静默。
+      & $withRetry { Invoke-WebRequest -Uri "$base/SHA256SUMS" -OutFile $sums -UseBasicParsing } '下载 SHA256SUMS'
       $expected = (
         Get-Content -LiteralPath $sums |
         Where-Object { $_ -match ('^\s*[0-9A-Fa-f]{64}\s+\*?' + [regex]::Escape($asset) + '\s*$') } |
@@ -75,7 +164,7 @@ try {
     $needsTty = @('install') -contains $cli[0]
     if ($needsTty -and -not $yes -and [Console]::IsInputRedirected) {
       throw ('oneself: 当前 PowerShell 的标准输入不是终端，无法提问。请在交互式 PowerShell 窗口里运行 ' +
-        'irm … | iex，或设置 $env:ONESELF_YES=1 并预先写好 PUBLIC_ORIGIN、OWNER_PASSWORD 等环境变量。')
+        'irm … | iex，或设置 $env:ONESELF_YES=1 并预先写好 OWNER_PASSWORD 等环境变量（默认本机/局域网入口）。')
     }
 
     # Windows command-line quoting (CommandLineToArgvW rules) for Start-Process.

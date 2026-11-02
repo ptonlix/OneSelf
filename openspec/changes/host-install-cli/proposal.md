@@ -21,7 +21,7 @@
 
 ### Modified Capabilities
 
-- 无。
+- 无。`ingress` 尚在 `oneself-mvp` 变更里未归档，默认 `local` 入口与其限流地址直接写在 `openspec/changes/oneself-mvp/specs/ingress/spec.md`。
 
 ## Impact
 

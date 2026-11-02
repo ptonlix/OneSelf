@@ -92,8 +92,18 @@ sums="${cache_root}/SHA256SUMS.$$"
 trap 'rm -f "$tmp_bin" "$sums"' EXIT
 trap 'rm -f "$tmp_bin" "$sums"; exit 130' INT
 trap 'rm -f "$tmp_bin" "$sums"; exit 143' TERM
-printf 'oneself: 下载 %s\n' "$url" >&2
-if ! curl -fsSL --retry 3 --retry-delay 1 "$url" -o "$tmp_bin"; then
+# 二进制有几十 MB：stderr 是终端时用 curl 自带的进度条（打在 stderr），
+# 否则（CI、日志重定向）保持静默。SHA256SUMS 很小，始终静默。
+if [ -t 2 ]; then
+  printf 'oneself: 下载 %s（%s）\n' "$asset" "$ref" >&2
+  dl_failed=0
+  curl -fL --progress-bar --retry 3 --retry-delay 1 "$url" -o "$tmp_bin" || dl_failed=1
+else
+  printf 'oneself: 下载 %s\n' "$url" >&2
+  dl_failed=0
+  curl -fsSL --retry 3 --retry-delay 1 "$url" -o "$tmp_bin" || dl_failed=1
+fi
+if [ "$dl_failed" -ne 0 ]; then
   if [ -n "$libc" ]; then
     die "下载失败: $url（这个 Release 没有 ${asset}；musl/Alpine 请等带 musl 资产的 Release，或改用 glibc 主机）"
   fi

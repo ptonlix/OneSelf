@@ -268,7 +268,7 @@ async function forward(
 }
 
 function readIngress(value: string | undefined): IngressMode {
-  if (value === "cloudflared" || value === "caddy" || value === "tailscale") {
+  if (value === "local" || value === "cloudflared" || value === "caddy" || value === "tailscale") {
     return value;
   }
   return "none";

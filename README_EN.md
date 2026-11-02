@@ -155,7 +155,7 @@ See [`.env.example`](.env.example) for every variable with comments. `.env` is g
 | `OWNER_RESET_PASSWORD`                                            | Set temporarily if you forget the password; on restart it replaces the hash and forces a change again. Remove it afterwards. There is no email reset |
 | `DATABASE_URL`                                                    | PostgreSQL connection string; built from `POSTGRES_PASSWORD` in Compose                                                                              |
 | `OBJECT_STORAGE_*`                                                | S3-compatible endpoint, region, bucket, and keys; supplied from `RUSTFS_ACCESS_KEY` / `RUSTFS_SECRET_KEY` in Compose                                 |
-| `COMPOSE_PROFILES`                                                | Public ingress: `cloudflared` (default), `caddy`, or `tailscale`; only one at a time                                                                 |
+| `COMPOSE_PROFILES`                                                | Ingress: `local` (default, LAN `http://IP:HOST_PORT`), `cloudflared`, `caddy`, or `tailscale`; only one at a time                                    |
 | `TUNNEL_TOKEN` / `APP_DOMAIN`, `ACME_EMAIL` / `TAILSCALE_AUTHKEY` | For cloudflared, Caddy, and Tailscale respectively                                                                                                   |
 | `ONESELF_IMAGE`                                                   | App image. Installs use `docker.io/ptonlix/oneself:latest`. Use `oneself:local` only when building from source                                       |
 | `HOST` / `PORT`                                                   | Listen address and port, default `127.0.0.1:3000`; `0.0.0.0` inside the container                                                                    |
@@ -299,15 +299,16 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 
 `compose.yaml` runs the app, PostgreSQL 18, and single-disk RustFS (`rustfs/rustfs:1.0.1`), and creates the bucket with aws-cli on first start. None of the app, database, or object storage publishes a host port; data lives in named volumes. The app image is `docker.io/ptonlix/oneself` and listens on `3000`. Pushing a tag such as `v1.2.3` makes the release workflow push `oneself:1.2.3` and move `latest`. A prerelease tag pushes only the version. Update with `docker compose pull && docker compose up -d`, or run `bin/oneself update` (or the `./oneself.sh update` launcher) in the install directory. The build receives no secrets or `PUBLIC_ORIGIN`, and ingress programs are not part of this image. A version-tag GitHub Release attaches `oneself.sh` / `oneself.ps1` (bootstrap), platform binaries (glibc and musl where built), `oneself-compose.tar.gz`, and flat-name `SHA256SUMS`. Assets are uploaded before the app image is pushed.
 
-The public ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env`; switching ingress does not change the app image:
+The ingress is a mutually exclusive Compose profile selected by `COMPOSE_PROFILES` in `.env` (the installer offers four choices, defaulting to local/LAN); switching ingress does not change the app image:
 
-| Profile                 | Who can reach it                 | Needs                                                  |
-| ----------------------- | -------------------------------- | ------------------------------------------------------ |
-| `cloudflared` (default) | Internet, hostname on Cloudflare | `TUNNEL_TOKEN`. No router ports opened                 |
-| `caddy`                 | Internet, your own domain        | `APP_DOMAIN`, `ACME_EMAIL`; ports 80 and 443 reachable |
-| `tailscale`             | Devices on the same tailnet only | `TAILSCALE_AUTHKEY`. Serve only, no Funnel             |
+| Profile           | Who can reach it                  | Needs                                                   |
+| ----------------- | --------------------------------- | ------------------------------------------------------- |
+| `local` (default) | This host / LAN, `http://IP:port` | `HOST_PORT` (default 3000). Only this port is published |
+| `cloudflared`     | Internet, hostname on Cloudflare  | `TUNNEL_TOKEN`. No router ports opened                  |
+| `caddy`           | Internet, your own domain         | `APP_DOMAIN`, `ACME_EMAIL`; ports 80 and 443 reachable  |
+| `tailscale`       | Devices on the same tailnet only  | `TAILSCALE_AUTHKEY`. Serve only, no Funnel              |
 
-Every ingress only forwards HTTPS to the app and never stores site files. `PUBLIC_ORIGIN` must match the chosen ingress's public address. Without a tunnel token or auth key the ingress container may fail while the app and database keep running.
+Every public ingress only forwards HTTPS to the app (`local` is plain HTTP) and never stores site files. `PUBLIC_ORIGIN` must match the chosen ingress's public address. Without a tunnel token or auth key the ingress container may fail while the app and database keep running.
 
 Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`. The app has simple built-in rate limits per IP per minute: 10 for login and device codes, 30 for public search and uploads; the client address is taken only from the ingress's own header.
 

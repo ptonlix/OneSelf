@@ -1,6 +1,8 @@
-# 生产。应用、PostgreSQL、RustFS 不映射宿主机端口。
-# 三个入口都是 profile。默认 COMPOSE_PROFILES=cloudflared，见 .env.example。
-# 换成 caddy 或 tailscale 时只改这个值。不要同时开两个入口。
+# 生产。应用、PostgreSQL、RustFS 本身不映射宿主机端口。
+# 四个访问入口都是 profile，由 COMPOSE_PROFILES 选一个，见 .env.example：
+#   local（默认）：只把应用端口 HOST_PORT（默认 3000）映射到宿主机，本机/局域网用 http://IP:端口 访问
+#   cloudflared / caddy / tailscale：公网或 tailnet 入口
+# 换入口时只改这个值。不要同时开两个入口。
 # Cloudflare 不缓存 /pcp、/oauth、/admin、/skills、/media、/_preview。
 # 已开始的响应若超过 Cloudflare 代理读超时仍未结束，会被断开。
 # 页面、登录、设备码和普通 MCP 调用应在该时限内结束。
@@ -97,6 +99,36 @@ services:
         'aws --endpoint-url http://rustfs:9000 s3api create-bucket --bucket "$$OBJECT_STORAGE_BUCKET" || aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket "$$OBJECT_STORAGE_BUCKET"',
       ]
     restart: "no"
+
+  # 本机/局域网入口：一个只做明文 HTTP 转发的 Caddy，把 HOST_PORT 映射到宿主机。
+  # 和 deploy/Caddyfile 一样用 header_up 覆盖 X-Real-IP / X-Forwarded-For，应用按 X-Real-IP 限流，
+  # 不信客户端自带的转发头。配置写在这里（同 tailscale），安装包仍只有 compose.yaml、.env.example、deploy/Caddyfile。
+  # 应用容器本身仍不映射端口，换成其它入口时这个容器会被停掉。
+  local:
+    image: ${CADDY_IMAGE:-caddy:2.11.7-alpine}
+    profiles: ["local"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        cat > /tmp/Caddyfile <<'EOF'
+        {
+          auto_https off
+          admin off
+        }
+        :3000 {
+          reverse_proxy app:3000 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+          }
+        }
+        EOF
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    ports:
+      - "${HOST_PORT:-3000}:3000"
+    depends_on:
+      - app
+    restart: unless-stopped
 
   cloudflared:
     image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2025.8.1}
