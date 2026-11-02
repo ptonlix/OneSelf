@@ -317,10 +317,7 @@ export async function runInstall(options: InstallOptions): Promise<void> {
   if (profile === "cloudflared") {
     const token = existing.get("TUNNEL_TOKEN") ?? "";
     if (!token && !options.yes) {
-      const answer = await askPassword(
-        { message: "Cloudflare Tunnel 令牌（可选）" },
-        false,
-      );
+      const answer = await askPassword({ message: "Cloudflare Tunnel 令牌（可选）" }, false);
       if (answer && !options.dryRun) {
         await writeEnvValue(envPath, "TUNNEL_TOKEN", answer);
       }
