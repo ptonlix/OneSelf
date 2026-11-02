@@ -20,7 +20,8 @@
     "data:import": "node --env-file=.env --experimental-strip-types scripts/transfer-cli.ts import",
     "boundaries": "depcruise --config .dependency-cruiser.cjs apps packages",
     "knip": "knip",
-    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test && pnpm run boundaries && pnpm run knip"
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run build && pnpm run test && pnpm run boundaries && pnpm run knip",
+    "oneself": "pnpm --filter @oneself/cli start"
   },
   "devDependencies": {
     "@types/node": "24.19.1",

@@ -78,7 +78,7 @@ Windows 用 PowerShell：
 powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"
 ```
 
-默认装到用户数据目录（不进源码树）。换目录、入口（Cloudflare / Caddy / Tailscale）、更新与排查见 [部署](#-部署)；变量说明见 [配置](#-配置)。仓库内脚本：[deploy/oneself.sh](deploy/oneself.sh)、[deploy/oneself.ps1](deploy/oneself.ps1)。
+默认装到用户数据目录（不进源码树）。换目录、入口（Cloudflare / Caddy / Tailscale）、更新与排查见 [部署](#-部署)；变量说明见 [配置](#-配置)。安装与运维只有一套实现：CLI 二进制（[apps/cli](apps/cli)）。Release 的 `oneself.sh` / `oneself.ps1` 只是薄启动脚本（仓库里是 [deploy/oneself-bootstrap.sh](deploy/oneself-bootstrap.sh)、[deploy/oneself-bootstrap.ps1](deploy/oneself-bootstrap.ps1)），下载并校验本平台二进制后交给它。Alpine/musl 用 `oneself-linux-*-musl`；某个 Release 没有 musl 资产时请等带 musl 资产的版本，不再提供纯 shell 安装器。
 
 ### 💻 方式二：本地开发
 
@@ -258,15 +258,15 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 
 安装脚本默认目录：`$HOME/.local/share/oneself`（或 `$XDG_DATA_HOME/oneself`）；Windows 为 `%LOCALAPPDATA%\oneself`。可用 `ONESELF_DIR` 或 `sh -s -- --dir` 换目录；非交互加 `ONESELF_YES=1`。`--dir` 不改变 Compose 项目名 `oneself`。
 
-从 Release 取到的脚本会把镜像固定到该版本；在安装目录执行 `./oneself.sh update` 或再跑一次安装命令可更新，已有口令不会被覆盖。`doctor` 只检查。也可手动：`cp .env.example .env`，填好变量后 `docker compose pull && docker compose up -d`。
+从 Release 取到的脚本会把镜像固定到该版本。装完后安装目录里有 `bin/oneself`（Windows 为 `bin\oneself.exe`）；同目录的 `oneself.sh` / `oneself.ps1` 只是转调它的薄 launcher，不含安装逻辑。`bin/oneself update`（或 `./oneself.sh update`；Windows：`powershell -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\oneself\oneself.ps1" update`）只按已钉镜像拉取并重启；换到新版本请再跑一次新 Release 的安装命令（可带 `update` 子命令，如 `curl … | sh -s -- update`），已有口令不会被覆盖。再跑**旧** Release 的安装命令不会把已装的新版本降回去；确实要换到旧版本时，显式设置 `ONESELF_REF=v1.2.3`。`doctor` 只检查。也可手动：`cp .env.example .env`，填好变量后 `docker compose pull && docker compose up -d`。
 
 `compose.yaml` 含应用、PostgreSQL 18 和 RustFS；应用与数据都不映射宿主机端口。镜像：`docker.io/ptonlix/oneself`。公网入口由 `.env` 的 `COMPOSE_PROFILES` 选择：
 
-| profile               | 谁能访问                  | 需要                                               |
-| --------------------- | ------------------------- | -------------------------------------------------- |
-| `cloudflared`（默认） | 公网，主机名在 Cloudflare | `TUNNEL_TOKEN`。不开放路由器端口                   |
-| `caddy`               | 公网，自己的域名          | `APP_DOMAIN`、`ACME_EMAIL`，80/443 可达            |
-| `tailscale`           | 同一 tailnet              | `TAILSCALE_AUTHKEY`。只做 Serve，不开 Funnel       |
+| profile               | 谁能访问                  | 需要                                         |
+| --------------------- | ------------------------- | -------------------------------------------- |
+| `cloudflared`（默认） | 公网，主机名在 Cloudflare | `TUNNEL_TOKEN`。不开放路由器端口             |
+| `caddy`               | 公网，自己的域名          | `APP_DOMAIN`、`ACME_EMAIL`，80/443 可达      |
+| `tailscale`           | 同一 tailnet              | `TAILSCALE_AUTHKEY`。只做 Serve，不开 Funnel |
 
 `PUBLIC_ORIGIN` 须与所选入口一致。Cloudflare 不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。Agent 接入：`npx skills add https://站点 -a <agent> -s oneself`。
 

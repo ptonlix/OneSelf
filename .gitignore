@@ -72,3 +72,7 @@ Thumbs.db
 
 # 本地 Agent 缓存。项目技能本身保留在 .agents/skills。
 .serena/
+
+# CLI binary build
+apps/cli/dist/
+apps/cli/node_modules/

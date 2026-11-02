@@ -1,0 +1,18 @@
+{
+  "name": "@oneself/cli",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "oneself": "./src/main.ts"
+  },
+  "scripts": {
+    "start": "node --experimental-strip-types src/main.ts",
+    "dev": "node --experimental-strip-types src/main.ts",
+    "build:bin": "sh scripts/build-binaries.sh",
+    "build:bin:local": "bun build --compile --outfile=dist/oneself ./src/main.ts"
+  },
+  "dependencies": {
+    "@clack/prompts": "0.11.0",
+    "picocolors": "1.1.1"
+  }
+}

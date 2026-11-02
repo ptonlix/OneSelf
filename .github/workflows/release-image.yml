@@ -2,6 +2,10 @@ name: release-image
 
 # GitHub tag 过滤是 glob，不是正则。+ 不会表示“一位或多位”，写成 v[0-9]+ 会匹配不到 v1.2.3。
 # 这里只负责让版本形标签进入工作流。真正的形状检查在登录前的脚本里，不匹配就不登录、不推送。
+#
+# 顺序：先编 Release 资产（脚本、二进制、校验和）并上传，再 push 镜像。
+# 避免镜像已上 Hub 而二进制失败导致资产不完整。
+# Bun Action 必须是官方 oven-sh/setup-bun（不是 oven-shi）。
 on:
   push:
     tags:
@@ -71,6 +75,130 @@ jobs:
             echo "${tags}"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.18.1"
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@12.9.1 --activate
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.14"
+      - name: Install workspace deps
+        run: pnpm install --frozen-lockfile
+      - name: Build install binaries
+        run: |
+          set -euo pipefail
+          sh apps/cli/scripts/build-binaries.sh "${RUNNER_TEMP}/oneself-bin"
+          # Flatten into RUNNER_TEMP so SHA256SUMS second column matches download names.
+          for f in "${RUNNER_TEMP}"/oneself-bin/oneself-*; do
+            [ -f "$f" ] || continue
+            cp "$f" "${RUNNER_TEMP}/$(basename "$f")"
+          done
+
+      - name: Package release assets
+        id: assets
+        env:
+          IMAGE: ${{ steps.tags.outputs.image }}
+          VERSION: ${{ steps.tags.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          notes="${RUNNER_TEMP}/release-notes.txt"
+          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'OneSelf %s\n\n正式安装（curl 下载校验过的本平台 CLI 二进制；提问读 /dev/tty）：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/latest/download/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/latest/download/oneself.ps1 | iex"\n```\n\nUnix 默认安装到 $HOME/.local/share/oneself。Windows 默认安装到 %%LOCALAPPDATA%%\\oneself。装完后二进制在安装目录 bin/，并可能写入 ~/.local/bin。\nglibc 资源：oneself-linux-amd64 / arm64。Alpine/musl：oneself-linux-*-musl（若本 Release 有该资产）。\n安装与运维只有 CLI 一套实现。oneself-compose.tar.gz 只含 compose.yaml、.env.example、deploy/Caddyfile。装完后安装目录里的 oneself.sh / oneself.ps1 只是转调 bin/oneself 的薄 launcher。\nAlpine/musl：本 Release 没有 musl 资产时请等下一个带 musl 资产的 Release，不再提供 shell 安装器。\n应用镜像是 %s:latest，这个版本同时也是 %s:%s。同一标签包含 linux/amd64 和 linux/arm64。\n安装会把镜像标签固定成这个版本。update 只拉取这个标签。换更新的正式版时再执行一次上面的安装命令，已有口令不会被覆盖。\n入口容器不在这个镜像里。Agent 用 npx skills add，不由安装脚本写入凭据。\n' "${tag}" "${GITHUB_REPOSITORY}" "${GITHUB_REPOSITORY}" "${IMAGE}" "${IMAGE}" "${VERSION}" > "${notes}"
+            prerelease=()
+          else
+            printf 'OneSelf %s\n\n这是预发布。应用镜像：%s:%s\nlatest 不会移动。安装：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/download/%s/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/download/%s/oneself.ps1 | iex"\n```\n' "${tag}" "${IMAGE}" "${VERSION}" "${GITHUB_REPOSITORY}" "${tag}" "${GITHUB_REPOSITORY}" "${tag}" > "${notes}"
+            prerelease=(--prerelease)
+          fi
+          printf '%s\n' "${prerelease[*]-}" > "${RUNNER_TEMP}/prerelease.flag"
+          cp "${notes}" "${RUNNER_TEMP}/release-notes.txt"
+
+          stage="${RUNNER_TEMP}/oneself-release"
+          rm -rf "${stage}"
+          mkdir -p "${stage}/deploy"
+          # Compose files only. All install logic lives in the CLI binaries.
+          cp compose.yaml .env.example "${stage}/"
+          cp deploy/Caddyfile "${stage}/deploy/Caddyfile"
+          tar -C "${stage}" -czf "${RUNNER_TEMP}/oneself-compose.tar.gz" compose.yaml .env.example deploy/Caddyfile
+
+          # Public curl entry: pinned bootstrap (downloads verified binary).
+          # Only the script's own tag is pinned. ONESELF_REF stays reserved for an
+          # explicit user override (downgrade protection relies on that).
+          sed "s/^ONESELF_BOOTSTRAP_REF=.*/ONESELF_BOOTSTRAP_REF=${tag}/" deploy/oneself-bootstrap.sh > "${RUNNER_TEMP}/oneself.sh"
+          if ! grep -qx "ONESELF_BOOTSTRAP_REF=${tag}" "${RUNNER_TEMP}/oneself.sh"; then
+            echo "failed to pin bootstrap ONESELF_BOOTSTRAP_REF=${tag}" >&2
+            exit 1
+          fi
+          sed "s/^\$BootstrapRef = 'latest'/\$BootstrapRef = '${tag}'/" deploy/oneself-bootstrap.ps1 > "${RUNNER_TEMP}/oneself.ps1"
+          if ! grep -qx "\$BootstrapRef = '${tag}'" "${RUNNER_TEMP}/oneself.ps1"; then
+            echo "failed to pin bootstrap ps1 BootstrapRef=${tag}" >&2
+            exit 1
+          fi
+          chmod 755 "${RUNNER_TEMP}/oneself.sh"
+
+          required=(
+            oneself.sh
+            oneself.ps1
+            oneself-compose.tar.gz
+            oneself-darwin-arm64
+            oneself-darwin-amd64
+            oneself-linux-amd64
+            oneself-linux-arm64
+            oneself-windows-amd64.exe
+          )
+          optional=(
+            oneself-linux-amd64-musl
+            oneself-linux-arm64-musl
+          )
+          (
+            cd "${RUNNER_TEMP}"
+            files=()
+            for f in "${required[@]}"; do
+              [ -f "$f" ] || { echo "missing required asset: $f" >&2; exit 1; }
+              files+=("$f")
+            done
+            for f in "${optional[@]}"; do
+              [ -f "$f" ] && files+=("$f")
+            done
+            sha256sum "${files[@]}" > SHA256SUMS
+          )
+
+      - name: Publish GitHub release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          notes="${RUNNER_TEMP}/release-notes.txt"
+          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            prerelease=()
+          else
+            prerelease=(--prerelease)
+          fi
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            gh release edit "${tag}" --notes-file "${notes}"
+          else
+            gh release create "${tag}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}" "${prerelease[@]}"
+          fi
+          upload=(
+            "${RUNNER_TEMP}/oneself.sh"
+            "${RUNNER_TEMP}/oneself.ps1"
+            "${RUNNER_TEMP}/oneself-compose.tar.gz"
+            "${RUNNER_TEMP}/oneself-darwin-arm64"
+            "${RUNNER_TEMP}/oneself-darwin-amd64"
+            "${RUNNER_TEMP}/oneself-linux-amd64"
+            "${RUNNER_TEMP}/oneself-linux-arm64"
+            "${RUNNER_TEMP}/oneself-windows-amd64.exe"
+            "${RUNNER_TEMP}/SHA256SUMS"
+          )
+          for musl in oneself-linux-amd64-musl oneself-linux-arm64-musl; do
+            [ -f "${RUNNER_TEMP}/${musl}" ] && upload+=("${RUNNER_TEMP}/${musl}")
+          done
+          gh release upload "${tag}" "${upload[@]}" --clobber
+
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -79,6 +207,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       # 不传 build-args，不挂载 secret。PUBLIC_ORIGIN、所属人密码和对象存储密钥不进构建。
       # 入口程序不在这个镜像里。buildx 一次推出含 linux/amd64 和 linux/arm64 的清单。
+      # 镜像 push 放在 Release 资产之后：资产失败时不会留下半套 Hub 标签。
       - uses: docker/setup-qemu-action@v3
         with:
           platforms: arm64
@@ -108,53 +237,3 @@ jobs:
             --push \
             "${args[@]}" \
             .
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          IMAGE: ${{ steps.tags.outputs.image }}
-          VERSION: ${{ steps.tags.outputs.version }}
-        run: |
-          set -euo pipefail
-          tag="${GITHUB_REF_NAME}"
-          notes="${RUNNER_TEMP}/release-notes.txt"
-          if [[ "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            printf 'OneSelf %s\n\n正式安装：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/latest/download/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/latest/download/oneself.ps1 | iex"\n```\n\nUnix 默认安装到 $HOME/.local/share/oneself。Windows 默认安装到 %%LOCALAPPDATA%%\\oneself。执行时会打印这个路径。\n应用镜像是 %s:latest，这个版本同时也是 %s:%s。同一标签包含 linux/amd64 和 linux/arm64。\n安装脚本把镜像标签固定成这个版本。update 只拉取这个标签。换更新的正式版时再执行一次上面的安装命令，已有口令不会被覆盖。\n入口容器不在这个镜像里。Agent 用 npx skills add，不由安装脚本写入凭据。\n' "${tag}" "${GITHUB_REPOSITORY}" "${GITHUB_REPOSITORY}" "${IMAGE}" "${IMAGE}" "${VERSION}" > "${notes}"
-            prerelease=()
-          else
-            printf 'OneSelf %s\n\n这是预发布。应用镜像：%s:%s\nlatest 不会移动。安装脚本：\n\n```bash\ncurl -fsSL https://github.com/%s/releases/download/%s/oneself.sh | sh\n```\n\n```powershell\npowershell -c "irm https://github.com/%s/releases/download/%s/oneself.ps1 | iex"\n```\n' "${tag}" "${IMAGE}" "${VERSION}" "${GITHUB_REPOSITORY}" "${tag}" "${GITHUB_REPOSITORY}" "${tag}" > "${notes}"
-            prerelease=(--prerelease)
-          fi
-          if gh release view "${tag}" >/dev/null 2>&1; then
-            gh release edit "${tag}" --notes-file "${notes}"
-          else
-            gh release create "${tag}" --target "${GITHUB_SHA}" --title "${tag}" --notes-file "${notes}" "${prerelease[@]}"
-          fi
-          stage="${RUNNER_TEMP}/oneself-release"
-          rm -rf "${stage}"
-          mkdir -p "${stage}/deploy"
-          sed "s/^ONESELF_BUNDLED_REF=.*/ONESELF_BUNDLED_REF=${tag}/" deploy/oneself.sh > "${stage}/deploy/oneself.sh"
-          if ! grep -qx "ONESELF_BUNDLED_REF=${tag}" "${stage}/deploy/oneself.sh"; then
-            echo "failed to pin ONESELF_BUNDLED_REF=${tag}" >&2
-            exit 1
-          fi
-          sed "s/BundledRef = ''/BundledRef = '${tag}'/" deploy/oneself.ps1 > "${stage}/deploy/oneself.ps1"
-          if ! grep -q "BundledRef = '${tag}'" "${stage}/deploy/oneself.ps1"; then
-            echo "failed to pin BundledRef = '${tag}'" >&2
-            exit 1
-          fi
-          chmod 755 "${stage}/deploy/oneself.sh" "${stage}/deploy/oneself.ps1"
-          cp compose.yaml .env.example "${stage}/"
-          cp deploy/Caddyfile "${stage}/deploy/Caddyfile"
-          cp "${stage}/deploy/oneself.sh" "${RUNNER_TEMP}/oneself.sh"
-          cp "${stage}/deploy/oneself.ps1" "${RUNNER_TEMP}/oneself.ps1"
-          tar -C "${stage}" -czf "${RUNNER_TEMP}/oneself-compose.tar.gz" compose.yaml .env.example deploy/Caddyfile deploy/oneself.sh deploy/oneself.ps1
-          (
-            cd "${RUNNER_TEMP}"
-            sha256sum oneself.sh oneself.ps1 oneself-compose.tar.gz > SHA256SUMS
-          )
-          gh release upload "${tag}" \
-            "${RUNNER_TEMP}/oneself.sh" \
-            "${RUNNER_TEMP}/oneself.ps1" \
-            "${RUNNER_TEMP}/oneself-compose.tar.gz" \
-            "${RUNNER_TEMP}/SHA256SUMS" \
-            --clobber
