@@ -31,14 +31,15 @@
 
 ## 💡 What is OneSelf
 
-Every time you connect a new AI, you explain your background all over again, and the more you share, the harder it gets to tell what may be public and what belongs to only one AI.
+You shouldn't have to start with an introduction every time.
 
-OneSelf is open-source, self-hosted **personal context management**. Your résumé, experience, notes, photos, and scanned documents come together as one context about you: text becomes pages, and images and PDFs are attached to those pages as originals. Any AI agent reads, writes back to, and maintains it through one set of PCP operations, available over both HTTP and MCP. You approve which agent sees which sources and whether it may edit or publish, and you can take that access back at any time. Your public homepage is just another outlet of the same context: it shows only what you mark public, and a redesign goes live only when you say so.
+You switched AIs. You are still you. Your experience, knowledge, work, and preferences should not move with a platform.
 
-- **Efficiency**: one context shared by every AI. Agents onboard themselves from the discovery document and skills, and they help you organize and write back, so you never have to introduce yourself again.
-- **Privacy**: private by default, granted per source, every grant approved by you and revocable at any time, and the whole service runs on your own machine.
+OneSelf puts that material back in your hands.
 
-> In short: One self. One context. Every AI. You decide which context goes to which AI, how much of it, and when to take it back.
+Open source and self-hosted. One set of personal material, shared by many AIs. Every read, edit, and publication needs your approval.
+
+**Your material, your call. AIs come to know you, instead of you adapting to each AI.**
 
 ## ✨ Features
 
