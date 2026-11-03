@@ -118,6 +118,13 @@ test("non-TTY stderr downloads silently and prints the URL", { skip }, () => {
   assert.match(stderr, /下载 https:\/\/github\.com\/.*\/releases\/download\/v1\.2\.0\/oneself-/);
 });
 
+test("piped stdin duplicates an open terminal fd and does not open /dev/tty", { skip }, () => {
+  const body = readFileSync(script, "utf8");
+  assert.doesNotMatch(body, /<\/dev\/tty/);
+  assert.match(body, /exec "\$bin" "\$@" <&1/);
+  assert.match(body, /exec "\$bin" "\$@" <&2/);
+});
+
 test("TTY stderr shows a curl progress bar for the binary only", { skip }, () => {
   const { args, stderr, env } = run({}, "v1.2.0", { tty: true });
   assert.equal(env.BUNDLED, "v1.2.0");

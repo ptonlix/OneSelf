@@ -173,7 +173,7 @@ Tailscale 容器使用 userspace networking，这样 Mac 上的 Docker 没有 `/
 
 没有隧道令牌或 auth key 时，入口容器可以失败，应用和数据库仍然留在。本机开发用 `compose.dev.yaml`，不要为了让入口先起来而把数据库端口映射出去。
 
-公开 `curl|sh` / `irm` 入口是钉版本的薄启动脚本（`deploy/oneself-bootstrap.sh` / `.ps1`）：校验 `SHA256SUMS` 后下载本平台 CLI 二进制，Unix 将 stdin 接到 `/dev/tty`。宿主安装与运维只有一套实现：`apps/cli`（install / update / doctor / backup / restore）。它负责钉 `ONESELF_IMAGE`、校验 compose 包、入口互斥、`--yes`（同样校验 `PUBLIC_ORIGIN`），并在安装目录留下 `bin/oneself` 与只转调它的薄 launcher（`oneself.sh` / `oneself.ps1`，不含安装逻辑）。启动脚本只把自己的 Release 标签导出为 `ONESELF_BUNDLED_REF`；`ONESELF_REF` 只在用户事先显式设置时才传下去。CLI 未显式指定时拿 `.oneself-release` 的 `ref=` 和 `ONESELF_BUNDLED_REF` 比，已装更新就不往回同步；`install` 与 `update` 走同一条同步路径。`oneself-compose.tar.gz` 只含 `compose.yaml`、`.env.example`、`deploy/Caddyfile`，不再带 shell 安装器；直接运行 `bin/oneself update` 只刷新已钉镜像，换版本要重跑新 Release 的启动脚本。Linux musl/Alpine 用 `oneself-linux-*-musl`；某个 Release 没有该资产时启动脚本直接失败，等带 musl 资产的 Release，不回退到 shell。Release 先上传资产再 push 镜像；Bun 只用官方 `oven-sh/setup-bun`。不安装入口程序，不映射数据库端口，也不从主机名推断 `PUBLIC_ORIGIN`。这不是第二套部署，也不负责给 Agent 写凭据。契约见 `openspec/changes/host-install-cli/`。
+公开 `curl|sh` / `irm` 入口是钉版本的薄启动脚本（`deploy/oneself-bootstrap.sh` / `.ps1`）：校验 `SHA256SUMS` 后下载本平台 CLI 二进制，Unix 在 stdin 不是终端时，把已打开的 stdout（否则 stderr）复制到二进制的 stdin，不新开 `/dev/tty`。宿主安装与运维只有一套实现：`apps/cli`（install / update / doctor / backup / restore）。它负责钉 `ONESELF_IMAGE`、校验 compose 包、入口互斥、`--yes`（同样校验 `PUBLIC_ORIGIN`），并在安装目录留下 `bin/oneself` 与只转调它的薄 launcher（`oneself.sh` / `oneself.ps1`，不含安装逻辑）。启动脚本只把自己的 Release 标签导出为 `ONESELF_BUNDLED_REF`；`ONESELF_REF` 只在用户事先显式设置时才传下去。CLI 未显式指定时拿 `.oneself-release` 的 `ref=` 和 `ONESELF_BUNDLED_REF` 比，已装更新就不往回同步；`install` 与 `update` 走同一条同步路径。`oneself-compose.tar.gz` 只含 `compose.yaml`、`.env.example`、`deploy/Caddyfile`，不再带 shell 安装器；直接运行 `bin/oneself update` 只刷新已钉镜像，换版本要重跑新 Release 的启动脚本。Linux musl/Alpine 用 `oneself-linux-*-musl`；某个 Release 没有该资产时启动脚本直接失败，等带 musl 资产的 Release，不回退到 shell。Release 先上传资产再 push 镜像；Bun 只用官方 `oven-sh/setup-bun`。不安装入口程序，不映射数据库端口，也不从主机名推断 `PUBLIC_ORIGIN`。这不是第二套部署，也不负责给 Agent 写凭据。契约见 `openspec/changes/host-install-cli/`。
 
 ---
 
@@ -209,7 +209,7 @@ OneSelf/
 │       └── public-page.md       公开页规则。不插入 origin
 ├── deploy/
 │   ├── Caddyfile                只反代，不放站点文件。local 的 HTTP 转发配置内联在 compose.yaml；cloudflared 和 Tailscale 不另建目录
-│   ├── oneself-bootstrap.sh     Release 上的 oneself.sh：校验并 exec 本平台 CLI 二进制，stdin 接 /dev/tty
+│   ├── oneself-bootstrap.sh     Release 上的 oneself.sh：校验并 exec 本平台 CLI 二进制，stdin 复制已打开的终端描述符
 │   └── oneself-bootstrap.ps1    Release 上的 oneself.ps1：同上；irm | iex 下不 exit，用 Start-Process 接控制台
 ├── tests/
 │   └── smoke/                   冒烟。只打已经启动的进程

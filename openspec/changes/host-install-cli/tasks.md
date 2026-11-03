@@ -5,7 +5,7 @@
 - [x] 1.8 删除完整 `deploy/oneself.sh` / `deploy/oneself.ps1` 与 `ONESELF_USE_CLI` 交接；Release 说明不再提 shell 安装器
 - [x] 1.3 SHA256SUMS 使用扁平文件名；bootstrap 下载后校验（先下到临时文件，校验通过才替换缓存）
 - [x] 1.4 bootstrap 只钉自己的标签（`ONESELF_BOOTSTRAP_REF` / `$BootstrapRef`），导出为 `ONESELF_BUNDLED_REF`；`ONESELF_REF` 仅在用户事先显式设置时传下去；非法 ref 下载前拒绝
-- [x] 1.5 Unix：真正能打开 `/dev/tty` 才重定向（无控制终端时不再崩）
+- [x] 1.5 Unix：stdin 不是终端时复制已打开的 stdout/stderr，不新开 `/dev/tty`（否则 macOS 上方向键无效）
 - [x] 1.6 Windows：`irm | iex` 下不 `exit`，失败 `throw`；`Start-Process -NoNewWindow` 接控制台；变量与环境变量不泄漏到调用者会话
 - [ ] 1.7 在真实 Windows（PowerShell 5.1 与 7）交互式窗口里手测 `irm | iex` 安装、提问与失败路径（目前只在 Linux pwsh 7 上用桩验证了 iex 行为与退出码）
 

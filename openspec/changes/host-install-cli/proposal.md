@@ -6,7 +6,7 @@
 
 ## What Changes
 
-- 公开安装入口仍是 Release 上的 `oneself.sh` / `oneself.ps1`：薄启动脚本下载**校验过的**本平台 CLI 二进制，Unix 将 stdin 接到 `/dev/tty` 再执行。
+- 公开安装入口仍是 Release 上的 `oneself.sh` / `oneself.ps1`：薄启动脚本下载**校验过的**本平台 CLI 二进制，Unix 把已打开的终端描述符复制到 stdin 再执行（不新开 `/dev/tty`）。
 - 宿主安装与运维只有一套实现：`apps/cli`。**删除**完整的 `deploy/oneself.sh` / `deploy/oneself.ps1`（以及 `ONESELF_USE_CLI` 交接）；`oneself-compose.tar.gz` 只含 `compose.yaml`、`.env.example`、`deploy/Caddyfile`。
 - 安装目录内的 `oneself.sh` / `oneself.ps1` 由 CLI 生成，只转调 `bin/oneself`，不含安装逻辑；旧 Release 留下的 `deploy/oneself.*` 在下次 install / update 时删除。
 - CLI 必须：写 `.oneself-release`、钉 `ONESELF_IMAGE`、校验 `oneself-compose.tar.gz` 的 SHA256、再装时同步/拒绝无意义降级、停掉其它入口、`--yes` / `ONESELF_YES`、安装后留下 `bin/oneself` 与薄 launcher。

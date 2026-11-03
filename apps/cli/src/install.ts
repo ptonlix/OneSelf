@@ -57,7 +57,7 @@ function requireTtyOrYes(yes: boolean): void {
   const entry =
     process.platform === "win32"
       ? "在交互式 PowerShell 窗口里运行 Release 的 oneself.ps1（irm | iex）"
-      : "用 Release 的 oneself.sh（curl|sh 会从 /dev/tty 提问）";
+      : "用 Release 的 oneself.sh（curl|sh 会把终端接到 stdin 再提问）";
   throw new Error(`非交互终端：请${entry}，或设置 ONESELF_YES=1 / --yes 并预先写好环境变量。`);
 }
 

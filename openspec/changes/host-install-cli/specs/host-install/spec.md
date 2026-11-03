@@ -12,7 +12,7 @@ The GitHub Release asset `oneself.sh` (and `oneself.ps1` on Windows) MUST downlo
 
 When stderr (Unix) or the console (Windows) is interactive, the binary download MUST show a progress bar; otherwise it MUST stay silent. The `SHA256SUMS` download is always silent. Both scripts MUST retry transient download failures (network errors, 5xx) at least 3 times and MUST NOT retry other 4xx responses.
 
-On Unix the script MUST execute the binary with stdin attached to `/dev/tty` when that device can actually be opened (not merely when it exists), and otherwise keep the original stdin.
+On Unix, when stdin is not a terminal but stdout or stderr is, the script MUST duplicate that already-open terminal descriptor onto the binary's stdin (`<&1`, otherwise `<&2`). It MUST NOT open `/dev/tty` for this handoff: a fresh open is still a TTY, but the Bun-compiled CLI on macOS does not receive keypresses on it, so arrow keys and Enter do nothing. When no standard stream is a terminal, the script MUST keep the original stdin.
 
 On Windows the script runs inside the caller's session under `irm | iex`. It MUST NOT call `exit` (that closes the user's PowerShell window); it MUST report failure with `throw` and return normally on success. It MUST start the binary so that it inherits the console (`Start-Process -NoNewWindow -Wait`), not through a pipeline that hands it a non-TTY stdin. It MUST NOT leave its variables or the `ONESELF_*` env vars it set behind in the caller's session.
 
@@ -20,6 +20,11 @@ On Windows the script runs inside the caller's session under `irm | iex`. It MUS
 
 - **WHEN** a user runs `curl -fsSL https://github.com/<owner>/OneSelf/releases/latest/download/oneself.sh | sh` for a stable tag
 - **THEN** the script downloads `oneself-<os>-<arch>` (or `oneself-linux-<arch>-musl` on musl hosts), checks it against `SHA256SUMS`, and runs `install` with a real terminal for prompts, with `ONESELF_BUNDLED_REF=<tag>` and no `ONESELF_REF`
+
+#### Scenario: Piped stdin reuses the shell terminal descriptor
+
+- **WHEN** the bootstrap runs with stdin not a terminal and stdout a terminal
+- **THEN** it executes the CLI with stdin duplicated from that stdout descriptor, and does not open `/dev/tty`
 
 #### Scenario: Windows install via irm | iex
 
@@ -74,7 +79,7 @@ Without a TTY, `install` MUST require `--yes` or `ONESELF_YES=1` and required va
 #### Scenario: Piped stdin without yes
 
 - **WHEN** `oneself install` runs with stdin not a TTY and without `--yes`
-- **THEN** it exits with an error telling the user to use the public bootstrap (which attaches `/dev/tty`) or pass `--yes`
+- **THEN** it exits with an error telling the user to use the public bootstrap (which attaches the controlling terminal) or pass `--yes`
 
 ### Requirement: Release workflow order and Action authenticity
 

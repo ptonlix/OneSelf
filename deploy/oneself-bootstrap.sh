@@ -149,12 +149,16 @@ case "$1" in
   *) set -- install "$@" ;;
 esac
 
-# curl|sh leaves stdin as a pipe; prompts must read the real terminal.
-# `[ -r /dev/tty ]` is true even without a controlling terminal (CI, cron, ssh -T),
-# where opening it fails; probe by actually opening it. Without a terminal the CLI
-# runs with the original stdin and requires --yes / ONESELF_YES=1.
-if (: </dev/tty) 2>/dev/null; then
-  exec "$bin" "$@" </dev/tty
-else
-  exec "$bin" "$@"
+# curl|sh leaves stdin as a pipe. Do not open /dev/tty for the handoff: that
+# fd is a TTY, but the Bun-compiled CLI on macOS never receives keypresses on
+# it, so arrow keys and Enter do nothing. Duplicate the shell's already-open
+# terminal (stdout, else stderr) instead. With no terminal, keep the original
+# stdin; the CLI then requires --yes / ONESELF_YES=1.
+if [ ! -t 0 ]; then
+  if [ -t 1 ]; then
+    exec "$bin" "$@" <&1
+  elif [ -t 2 ]; then
+    exec "$bin" "$@" <&2
+  fi
 fi
+exec "$bin" "$@"

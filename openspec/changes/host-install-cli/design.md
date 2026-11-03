@@ -2,7 +2,7 @@
 
 ## Decisions
 
-1. **公开入口是 bootstrap，契约在 CLI。** `curl|sh` 只负责选资产、核对 SHA256SUMS、`exec` 并在 Unix 上重定向 `</dev/tty`。钉版本、compose 校验、入口互斥由 CLI 完成。
+1. **公开入口是 bootstrap，契约在 CLI。** `curl|sh` 只负责选资产、核对 SHA256SUMS、`exec`。Unix 上 stdin 不是终端时，把已打开的 stdout（否则 stderr）复制到二进制的 stdin（`<&1` / `<&2`），不新开 `/dev/tty`：新开的描述符在 macOS 上会被 Bun 编译的 CLI 当成 TTY，但方向键和回车送不进去。钉版本、compose 校验、入口互斥由 CLI 完成。
 2. **SHA256SUMS 第二列必须是下载文件名。** CI 把二进制摊平到 `RUNNER_TEMP` 再 `sha256sum`，避免 `oneself-bin/…` 路径导致 `sha256sum -c` / awk 对不上。
 3. **先资产后镜像。** 编二进制与上传 Release 失败时不 push Docker Hub，避免 Hub 有标签而 GitHub 资产残缺。
 4. **musl 可选。** Bun 的 `bun-linux-*-musl` 目标失败时跳过，不阻断 glibc 资产；bootstrap 在 Alpine 上优先请求 `*-musl`。
@@ -14,7 +14,7 @@
 
 ## Risks
 
-- curl|sh 在无 `/dev/tty` 环境只能靠 `--yes` + 环境变量。
+- curl|sh 在 stdout/stderr 都不是终端时只能靠 `--yes` + 环境变量。
 - Windows 控制台继承只在 Linux pwsh 上用桩验证过；PowerShell 5.1 与真实控制台仍需手测（tasks 1.7）。
 - 若用户的 PowerShell 本身 stdin 就被重定向（例如被别的程序管道调用），子进程同样拿不到 TTY，只能走 `--yes`。
 - musl 目标随 Bun 版本变化；某个 Release 编不出 musl 时 Alpine 用户只能等下一个 Release（或换 glibc 主机），没有 shell 后备。
