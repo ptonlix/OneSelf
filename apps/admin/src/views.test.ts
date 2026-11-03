@@ -239,6 +239,9 @@ describe("login and password screens", () => {
     );
     expect(markup).toContain('<label for="login-password">密码</label>');
     expect(markup).toContain('id="login-password"');
+    expect(markup).toContain('type="password"');
+    expect(markup).toContain('aria-label="显示密码"');
+    expect(markup).toContain('type="button"');
     for (const removed of ["没有邮箱找回", "Argon2id", "HttpOnly", "每分钟"]) {
       expect(markup).not.toContain(removed);
     }
@@ -271,6 +274,8 @@ describe("login and password screens", () => {
     );
     expect(markup).toContain(">登出<");
     expect(markup).toContain(">保存密码<");
+    expect(markup).toContain('id="owner-password"');
+    expect(markup).toContain('aria-label="显示密码"');
     expect(markup).not.toContain("nav-i");
   });
 });

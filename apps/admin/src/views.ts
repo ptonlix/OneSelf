@@ -14,6 +14,7 @@ import {
   message,
   navLink,
   pageHead,
+  PasswordField,
   previewPath,
   ReadGrantNotice,
   shortRelease,
@@ -320,11 +321,9 @@ export function LoginView(props: {
             ],
           }),
         ),
-        h("input", {
-          className: "input",
+        createElement(PasswordField, {
           id: "login-password",
           name: "password",
-          type: "password",
           autoComplete: "current-password",
         }),
       ),
@@ -361,13 +360,12 @@ export function PasswordView(props: {
       : null,
     message(props.message),
     h(
-      "label",
+      "div",
       { className: "field" },
-      h("span", null, "新密码"),
-      h("input", {
-        className: "input",
+      h("label", { htmlFor: "owner-password" }, "新密码"),
+      createElement(PasswordField, {
+        id: "owner-password",
         name: "password",
-        type: "password",
         autoComplete: "new-password",
       }),
     ),

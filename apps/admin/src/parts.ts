@@ -16,6 +16,40 @@ export function h(tag: string, props: Props | null, ...children: ReactNode[]): R
   return createElement(tag, props, ...children);
 }
 
+/** Password field with a reveal control. The input keeps `name` so the form still reads it. */
+export function PasswordField(props: {
+  id: string;
+  name: string;
+  autoComplete: string;
+}): ReactElement {
+  const [visible, setVisible] = useState(false);
+  return h(
+    "div",
+    { className: "secret" },
+    h("input", {
+      className: "input",
+      id: props.id,
+      name: props.name,
+      type: visible ? "text" : "password",
+      autoComplete: props.autoComplete,
+    }),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "secret-toggle",
+        "aria-label": visible ? "隐藏密码" : "显示密码",
+        "aria-pressed": visible,
+        "aria-controls": props.id,
+        onClick: () => {
+          setVisible((current) => !current);
+        },
+      },
+      createElement(Icon, { name: visible ? "eye-off" : "eye", size: 18 }),
+    ),
+  );
+}
+
 export function message(text: string | null): ReactElement | null {
   if (text === null || text === "") return null;
   return h("p", { className: "note danger", role: "alert" }, text);

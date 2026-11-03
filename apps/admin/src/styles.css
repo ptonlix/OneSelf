@@ -731,6 +731,37 @@ h3 {
 .password-card {
   max-width: 560px;
 }
+.field > label {
+  font-size: 13px;
+  color: var(--fg-2);
+}
+.secret {
+  position: relative;
+}
+.secret > .input {
+  padding-right: 48px;
+}
+.secret-toggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--fg-2);
+  cursor: pointer;
+}
+.secret-toggle:hover,
+.secret-toggle:focus-visible {
+  color: var(--fg);
+  background: rgb(255 255 255 / 0.06);
+  outline: none;
+}
 
 /* ---------- narrow screens ---------- */
 @media (max-width: 980px) {
