@@ -1,0 +1,67 @@
+name: 缺陷 / Bug
+description: 安装好的实例或仓库里的行为与文档不符。A running instance or the repo disagrees with the docs.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        不要粘贴所属人密码、API Key 原文（`osk_`）、OAuth 令牌、对象存储密钥、带口令的 `DATABASE_URL`，或 `data:export` 导出包。
+        Do not paste an owner password, an API key (`osk_`), an OAuth token, an object-storage secret, a `DATABASE_URL` with a password, or a `data:export` archive.
+  - type: textarea
+    id: what
+    attributes:
+      label: 做了什么 / What you did
+      description: 操作名、路径或点击的管理端页面。The operation name, path, or admin screen.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望 / Expected
+      description: 写明依据的文档（例如 docs/PRD.md 或 README 的哪一节）。Name the doc this expectation comes from.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际 / Actual
+      description: 响应里的 error 码即可（not_found、unauthorized、forbidden、conflict、invalid、payload_too_large、password_change_required）。不要贴完整令牌。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: 镜像标签或 git 修订，例如 v0.4.7。Image tag or git revision.
+      placeholder: v0.4.7
+    validations:
+      required: true
+  - type: dropdown
+    id: ingress
+    attributes:
+      label: 入口 / Ingress
+      options:
+        - local
+        - cloudflared
+        - caddy
+        - tailscale
+        - 从源码运行 / running from source
+        - 不确定 / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: 其他 / Anything else
+      description: 日志请先打码。Redact logs first.
+    validations:
+      required: false
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: 确认 / Confirm
+      options:
+        - label: 我没有附上密码、密钥、令牌或导出包。I did not attach a password, key, token, or export archive.
+          required: true

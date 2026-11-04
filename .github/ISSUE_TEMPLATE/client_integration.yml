@@ -1,0 +1,61 @@
+name: 客户端接入 / Client integration
+description: 某个 HTTP 或 MCP 客户端按文档接入时遇到的问题。Trouble connecting a client the way the docs describe.
+title: "[Client]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这个仓库没有「已验证客户端」名单。请写你实际在用的程序和版本，维护者不会因此把它标成官方支持。
+        This repository has no verified-client list. Name the program and version you used. That does not mark it as officially supported.
+
+        接入只按文档：读 `/.well-known/pcp`；API Key（`Authorization: ApiKey` 或 `X-Api-Key`）或 OAuth 设备码（`Authorization: Bearer`）都要所属人批准；`POST /mcp` 与 HTTP 共用一组操作。
+        Do not paste the key, the refresh token, the owner password, or a private page.
+  - type: input
+    id: client
+    attributes:
+      label: 客户端 / Client
+      description: 程序名和版本。Product name and version.
+      placeholder: example-client 1.2.3
+    validations:
+      required: true
+  - type: dropdown
+    id: path
+    attributes:
+      label: 走的哪条 / Which path
+      options:
+        - HTTP（OpenAPI / PCP）
+        - MCP（POST /mcp，Streamable HTTP）
+        - Skill（npx skills add）
+        - 还没确定 / not sure yet
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 已经做了什么 / What you already did
+      description: 例如是否打开过发现文档、所属人是否在 /admin 批准、whoami 返回了哪些目录。不要贴密钥。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 结果 / Result
+      description: HTTP 状态和响应里的 error 码。错误体只有 error 和 message。
+    validations:
+      required: true
+  - type: textarea
+    id: ask
+    attributes:
+      label: 希望仓库补什么 / What should the repo add
+      description: 文档缺口、还是你认为协议本身少了一步。不要要求把该客户端写成已验证。
+    validations:
+      required: true
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: 确认 / Confirm
+      options:
+        - label: 我没有附上密码、API Key、刷新令牌或私有页正文。I did not attach a password, API key, refresh token, or private page body.
+          required: true
