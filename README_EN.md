@@ -95,7 +95,11 @@ The installer prompts for the public origin and ingress, then starts the service
 
 1. Open the printed `PUBLIC_ORIGIN` (home page)
 2. Sign in at `/admin` and change the password
-3. Give `PUBLIC_ORIGIN/.well-known/pcp` to your agent
+3. Give `PUBLIC_ORIGIN/.well-known/pcp` to your agent, and tell that agent to install the Skill (replace the origin with the printed `PUBLIC_ORIGIN`, and `<agent>` with the agent name):
+
+```bash
+npx skills add https://your-origin -a <agent> -s oneself -y
+```
 
 **Install options**
 
@@ -321,7 +325,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 - `PUBLIC_ORIGIN` must match the chosen ingress's public address.
 - Behind Cloudflare, do not cache `/pcp`, `/oauth`, `/.well-known`, `/admin`, `/skills`, `/media`, or `/_preview`.
 - Without the installer: `cp .env.example .env`, fill in the variables, then `docker compose pull && docker compose up -d`.
-- Agents connect with `npx skills add https://your-origin -a <agent> -s oneself`.
+- Agents connect with `npx skills add https://your-origin -a <agent> -s oneself -y`.
 
 ## 📚 Documentation
 
@@ -329,7 +333,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
 - [Skill: oneself](skills/oneself/SKILL.md)
 - On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
-- Install: `npx skills add https://your-site`
+- Install: `npx skills add https://your-site -a <agent> -s oneself -y`
 
 ## 🤝 Contributing
 

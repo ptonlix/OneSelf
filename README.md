@@ -95,7 +95,11 @@ powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/o
 
 1. 打开打印的 `PUBLIC_ORIGIN`（首页）
 2. 到 `/admin` 登录并改密
-3. 把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent
+3. 把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent，并让相关 Agent 安装 Skill（把站点换成打印的 `PUBLIC_ORIGIN`，`<agent>` 换成对应 Agent 名）：
+
+```bash
+npx skills add https://你的站点 -a <agent> -s oneself -y
+```
 
 **安装选项**
 
@@ -303,7 +307,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 - `PUBLIC_ORIGIN` 须与所选入口的对外地址一致。
 - 走 Cloudflare 时不要缓存 `/pcp`、`/oauth`、`/.well-known`、`/admin`、`/skills`、`/media`、`/_preview`。
 - 不用安装器：`cp .env.example .env` 填好变量后 `docker compose pull && docker compose up -d`。
-- Agent 接入：`npx skills add https://站点 -a <agent> -s oneself`。
+- Agent 接入：`npx skills add https://站点 -a <agent> -s oneself -y`。
 
 ## 📚 文档
 
@@ -311,7 +315,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 - [技术架构](docs/ARCHITECTURE.md)
 - [Skill：oneself](skills/oneself/SKILL.md)
 - 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/oneself/SKILL.md`
-- 安装 Skill：`npx skills add https://站点`
+- 安装 Skill：`npx skills add https://站点 -a <agent> -s oneself -y`
 
 ## 🤝 贡献
 
