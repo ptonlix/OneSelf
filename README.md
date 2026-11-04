@@ -10,11 +10,7 @@
 
 </div>
 
-<a href="docs/assets/oneself-demo.mp4">
-  <img src="docs/assets/oneself-demo-poster.jpg" alt="两个客户端读同一份个人上下文，并打开公开页。这段没有批准或作废授权。" width="100%" />
-</a>
-
-[播放演示](docs/assets/oneself-demo.mp4)（42 秒，H.264）
+https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
 
 **一行安装**（Docker 与 Docker Compose v2）
 

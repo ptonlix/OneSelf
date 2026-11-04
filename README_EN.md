@@ -10,11 +10,7 @@
 
 </div>
 
-<a href="docs/assets/oneself-demo.mp4">
-  <img src="docs/assets/oneself-demo-poster.jpg" alt="Two clients read the same personal context and open the public page. This clip does not show approving or revoking a grant." width="100%" />
-</a>
-
-[Play the demo](docs/assets/oneself-demo.mp4) (42 seconds, H.264)
+https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
 
 **One-line install** (Docker and Docker Compose v2)
 
