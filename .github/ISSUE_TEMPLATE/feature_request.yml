@@ -1,0 +1,40 @@
+name: 功能建议 / Feature request
+description: 提议一块这一版还没有的能力。Suggest a capability this version does not have yet.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        第一版明确不做的事项在 `docs/PRD.md` 第 3 节。如果提议落在那里，请说明为什么要重新考虑。
+        Section 3 of `docs/PRD.md` lists what this version does not do. If your idea is on that list, say why it should be reconsidered.
+        不要在这里粘贴密钥或真实个人上下文。Do not paste secrets or real personal context.
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题 / Problem
+      description: 现在哪一步做不到，卡在谁身上（所属人、Agent 还是访客）。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提议 / Proposal
+      description: 调用方会看到什么变化。不要写一套新的操作表；操作名以 packages/operations 为准。
+    validations:
+      required: true
+  - type: textarea
+    id: non-goal
+    attributes:
+      label: 和现有非目标的关系 / Relation to current non-goals
+      description: 对照 docs/PRD.md 第 3 节。不相关就写「不在第 3 节」。
+    validations:
+      required: true
+  - type: checkboxes
+    id: secrets
+    attributes:
+      label: 确认 / Confirm
+      options:
+        - label: 我没有附上密码、密钥、令牌、导出包或别人的私有页。I did not attach secrets, an export archive, or someone else's private pages.
+          required: true

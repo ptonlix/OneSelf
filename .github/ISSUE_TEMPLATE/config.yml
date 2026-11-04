@@ -1,0 +1,7 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 用法与想法 / Questions and ideas
+    url: https://github.com/ptonlix/OneSelf/discussions
+    about: >-
+      安装、接入和用法优先走 Discussions。维护者尚未打开 Discussions 时，这个链接还不可用，请改开 Issue。
+      Questions about install and setup belong in Discussions once a maintainer enables them.
