@@ -95,7 +95,7 @@ The installer prompts for the public origin and ingress, then starts the service
 
 1. Open the printed `PUBLIC_ORIGIN` (home page)
 2. Sign in at `/admin` and change the password
-3. Give `PUBLIC_ORIGIN/.well-known/pcp` to your agent, and tell that agent to install the Skill (replace the origin with the printed `PUBLIC_ORIGIN`, and `<agent>` with the agent name):
+3. Tell your agent to install the Skill (replace the origin with the printed `PUBLIC_ORIGIN`, and `<agent>` with the agent name):
 
 ```bash
 npx skills add https://your-origin -a <agent> -s oneself -y

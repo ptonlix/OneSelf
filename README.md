@@ -95,7 +95,7 @@ powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/o
 
 1. 打开打印的 `PUBLIC_ORIGIN`（首页）
 2. 到 `/admin` 登录并改密
-3. 把 `PUBLIC_ORIGIN/.well-known/pcp` 交给 Agent，并让相关 Agent 安装 Skill（把站点换成打印的 `PUBLIC_ORIGIN`，`<agent>` 换成对应 Agent 名）：
+3. 告诉相关 Agent 安装 Skill（把站点换成打印的 `PUBLIC_ORIGIN`，`<agent>` 换成对应 Agent 名）：
 
 ```bash
 npx skills add https://你的站点 -a <agent> -s oneself -y
