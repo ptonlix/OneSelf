@@ -6,27 +6,7 @@
 
 <p><strong>One self. One context. Every AI.</strong></p>
 
-<p>Every new AI means pasting your experience, notes, and preferences again, with no clear line for what that agent may see.</p>
-
-</div>
-
-https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
-
-**One-line install** (Docker and Docker Compose v2)
-
-```bash
-curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
-```
-
-Windows (PowerShell): `powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"`
-
-Options, upgrades, and running from source are under [Quick start](#-quick-start).
-
-**Clients (documented configuration, not a verified list)**
-
-This repository does not name any client as supported. The documented ways in are HTTP (OpenAPI) and `POST /mcp`, which share one operation table, and `npx skills add https://your-origin -a <agent> -s oneself`. The `<agent>` value is interpreted by the installer. It is not a list of products this repo has verified.
-
-<div align="center">
+<p>Open-source personal context management: build one context about you, let every AI understand you, and keep privacy and efficiency in balance.</p>
 
 <p>
   <a href="https://github.com/ptonlix/OneSelf/stargazers"><img src="https://img.shields.io/github/stars/ptonlix/OneSelf" alt="GitHub stars" /></a>
@@ -45,24 +25,6 @@ This repository does not name any client as supported. The documented ways in ar
   <img src="https://img.shields.io/badge/MCP-Streamable_HTTP-6E56CF" alt="MCP Streamable HTTP" />
 </p>
 
-</div>
-
-## Why OneSelf
-
-The OneSelf column is limited to facts this repository already states. The other two columns only say where that kind of product usually sits in a comparison. They are not a feature audit of Mem0, OpenMemory, or Basic Memory. What those projects do is defined by their own docs.
-
-|               | OneSelf                                                                                                                                     | Mem0 / OpenMemory-style memory layer                           | Basic Memory                                                 |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------ |
-| Job           | One personal context, shared by many AIs                                                                                                    | A layer that stores and retrieves memories for an app or agent | Markdown notes on your machine                               |
-| Where it runs | On your machine. Docker Compose, PostgreSQL, and RustFS. The default ingress is this host or the LAN                                        | See that project's docs                                        | See that project's docs                                      |
-| Who may read  | You approve every API key and every OAuth device-code grant, and you can revoke each one on its own                                         | See that project's docs                                        | See that project's docs                                      |
-| What stays    | Markdown pages, originals, Facts, and Timeline. Each page keeps its last 50 versions. Deleted pages and sources can be restored for 30 days | See that project's docs                                        | See that project's docs                                      |
-| Public page   | Optional. The built-in home page is only an introduction. A personal homepage goes live only after you approve it                           | This repo does not state whether they have a public homepage   | This repo does not state whether they have a public homepage |
-
-An agent cannot issue itself a key, and it cannot approve a grant for you. Uploading a site bundle does not publish it.
-
-<div align="center">
-
 <p>
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-architecture">Architecture</a> ·
@@ -72,6 +34,8 @@ An agent cannot issue itself a key, and it cannot approve a grant for you. Uploa
 </p>
 
 </div>
+
+https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
 
 ---
 

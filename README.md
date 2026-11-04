@@ -6,27 +6,7 @@
 
 <p><strong>One self. One context. Every AI.</strong></p>
 
-<p>每接一个新的 AI，都要把经历、笔记和偏好再贴一遍，还分不清哪些只能给这个 Agent。</p>
-
-</div>
-
-https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
-
-**一行安装**（Docker 与 Docker Compose v2）
-
-```bash
-curl -fsSL https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.sh | sh
-```
-
-Windows（PowerShell）：`powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/oneself.ps1 | iex"`
-
-选项、升级和从源码跑见 [快速开始](#-快速开始)。
-
-**接入（documented configuration，不是 verified client）**
-
-仓库没有把任何一个具体客户端写成已支持。文档里的接法是：HTTP（OpenAPI）和 `POST /mcp` 共用一组操作；Skill 用 `npx skills add https://站点 -a <agent> -s oneself`。`<agent>` 由安装器解释，不是本仓库验证过的产品名单。
-
-<div align="center">
+<p>开源个人上下文管理：建立一份关于你的上下文，让每个 AI 都了解你，在隐私与效率之间取得平衡。</p>
 
 <p>
   <a href="https://github.com/ptonlix/OneSelf/stargazers"><img src="https://img.shields.io/github/stars/ptonlix/OneSelf" alt="GitHub stars" /></a>
@@ -45,24 +25,6 @@ Windows（PowerShell）：`powershell -c "irm https://github.com/ptonlix/OneSelf
   <img src="https://img.shields.io/badge/MCP-Streamable_HTTP-6E56CF" alt="MCP Streamable HTTP" />
 </p>
 
-</div>
-
-## 为什么是 OneSelf
-
-只写本仓库已经说明的事实。右边两列是这类产品通常被拿来比较的位置，不是对 Mem0、OpenMemory 或 Basic Memory 的功能核对。它们各自能做什么，以它们自己的文档为准。
-
-|          | OneSelf                                                                              | Mem0 / OpenMemory 风格的记忆层     | Basic Memory                       |
-| -------- | ------------------------------------------------------------------------------------ | ---------------------------------- | ---------------------------------- |
-| 解决什么 | 一份个人上下文，给多个 AI 共用                                                       | 给应用或 Agent 存取记忆的一层      | 放在本机的 Markdown 笔记           |
-| 跑在哪   | 你的机器上。Docker Compose，PostgreSQL 与 RustFS；默认入口是本机/局域网              | 以该项目文档为准                   | 以该项目文档为准                   |
-| 谁能读   | 每把 API Key、每条 OAuth 设备码都要所属人批准，并可单独作废                          | 以该项目文档为准                   | 以该项目文档为准                   |
-| 留下什么 | Markdown 页、原件、Facts、Timeline；每页最近 50 个版本；页和目录删除后 30 天内可恢复 | 以该项目文档为准                   | 以该项目文档为准                   |
-| 公开页   | 可选。内置首页只做介绍；个人展示页要所属人同意后才上线                               | 本仓库不把对方有没有公开页写成结论 | 本仓库不把对方有没有公开页写成结论 |
-
-Agent 不能自己发密钥，也不能替你点批准。上传站点包不等于上线。
-
-<div align="center">
-
 <p>
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-架构">架构</a> ·
@@ -72,6 +34,8 @@ Agent 不能自己发密钥，也不能替你点批准。上传站点包不等�
 </p>
 
 </div>
+
+https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
 
 ---
 
