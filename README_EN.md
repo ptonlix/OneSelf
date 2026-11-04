@@ -10,13 +10,11 @@
 
 </div>
 
-<!-- TODO(demo-gif): Film docs/demo-gif-storyboard.md (30–60s).
-     Save the file as docs/assets/oneself-demo.gif (it does not exist yet).
-     Then replace this blockquote with:
-     <img src="docs/assets/oneself-demo.gif" alt="Two clients read one personal context, then a grant is approved and revoked" width="100%" />
-     Do not reuse docs/assets/cli-install.gif; that clip is only the installer. -->
+<a href="docs/assets/oneself-demo.mp4">
+  <img src="docs/assets/oneself-demo-poster.jpg" alt="Two clients read the same personal context and open the public page. This clip does not show approving or revoking a grant." width="100%" />
+</a>
 
-> **Demo GIF not recorded yet.** Shot list, captions, and the README snippet to paste afterwards are in [docs/demo-gif-storyboard.md](docs/demo-gif-storyboard.md). Put the file at `docs/assets/oneself-demo.gif`.
+[Play the demo](docs/assets/oneself-demo.mp4) (42 seconds, H.264)
 
 **One-line install** (Docker and Docker Compose v2)
 
@@ -370,7 +368,6 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
 - [Skill: oneself](skills/oneself/SKILL.md)
-- [Demo GIF storyboard](docs/demo-gif-storyboard.md)
 - On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
 - Install: `npx skills add https://your-site`
 

@@ -41,7 +41,7 @@ Chinese first, English after. Read `AGENTS.md` at the repository root before cha
 4. **写一份 `docs/client-integration.md`，只整理现有的接入规则。** 读 `/.well-known/pcp`，在 API Key 和 OAuth 设备码里二选一，两种都要所属人批准；HTTP 与 MCP 同一组操作；错误体是 `{ error, message }`；公开页脚本使用 `credentials: omit`，不携带管理端 Cookie。不要把任何一个客户端产品写成已支持。可以链到「客户端接入」Issue 模板。
 5. **让中文 README 的「项目结构」注释和英文 README 对齐。** 英文树写明了 `ports` 与 `adapters` 分开、`openspec/`，以及 Dockerfile 里有什么。中文树更短。只按仓库里真实的目录改注释，不要搬动代码。
 
-效果 GIF 由维护者按 [docs/demo-gif-storyboard.md](docs/demo-gif-storyboard.md) 录。请不要提交含真实个人资料或密钥的录屏。
+不要提交含真实个人资料或密钥的录屏。
 
 ## English
 
@@ -80,4 +80,4 @@ Each one stays inside facts the repo already states. None of them adds a product
 4. **Add `docs/client-integration.md` by restating the connection rules that already exist.** Read `/.well-known/pcp`, choose an API key or the OAuth device flow, and have the owner approve either one. HTTP and MCP share one operation table. Errors are `{ error, message }`. Public-page scripts use `credentials: omit` and do not send the admin cookie. Do not name any client product as supported. You can link the client-integration issue template.
 5. **Align the Chinese "项目结构" comments with the English tree.** The English tree already separates `ports` and `adapters`, mentions `openspec/`, and says what the Dockerfile carries. The Chinese tree is shorter. Edit comments to match the directories that are actually in the repo. Do not move code.
 
-The demo GIF is recorded by a maintainer from [docs/demo-gif-storyboard.md](docs/demo-gif-storyboard.md). Do not commit a recording that contains real personal context or secrets.
+Do not commit a recording that contains real personal context or secrets.

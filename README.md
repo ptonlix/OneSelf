@@ -10,13 +10,11 @@
 
 </div>
 
-<!-- TODO(demo-gif): Film docs/demo-gif-storyboard.md (30–60s).
-     Save the file as docs/assets/oneself-demo.gif (it does not exist yet).
-     Then replace this blockquote with:
-     <img src="docs/assets/oneself-demo.gif" alt="两个客户端读同一份个人上下文，然后批准并作废一条授权" width="100%" />
-     Do not reuse docs/assets/cli-install.gif; that clip is only the installer. -->
+<a href="docs/assets/oneself-demo.mp4">
+  <img src="docs/assets/oneself-demo-poster.jpg" alt="两个客户端读同一份个人上下文，并打开公开页。这段没有批准或作废授权。" width="100%" />
+</a>
 
-> **效果 GIF 待拍摄。** 分镜、字幕和录完后要换上的图片写法在 [docs/demo-gif-storyboard.md](docs/demo-gif-storyboard.md)。成片请放到 `docs/assets/oneself-demo.gif`。
+[播放演示](docs/assets/oneself-demo.mp4)（42 秒，H.264）
 
 **一行安装**（Docker 与 Docker Compose v2）
 
@@ -352,7 +350,6 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 - [产品需求（PRD）](docs/PRD.md)
 - [技术架构](docs/ARCHITECTURE.md)
 - [Skill：oneself](skills/oneself/SKILL.md)
-- [效果 GIF 分镜](docs/demo-gif-storyboard.md)
 - 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/oneself/SKILL.md`
 - 安装 Skill：`npx skills add https://站点`
 
