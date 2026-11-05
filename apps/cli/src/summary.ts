@@ -102,9 +102,7 @@ export function formatUpdateSummary(
   platform: NodeJS.Platform = process.platform,
   checkedLatest = false,
 ): string {
-  const detail = checkedLatest
-    ? "不覆盖口令。没有新版本时，只重新拉取当前镜像"
-    : "不覆盖口令";
+  const detail = checkedLatest ? "不覆盖口令。没有新版本时，只重新拉取当前镜像" : "不覆盖口令";
   return [
     pc.green(pc.bold("✓ OneSelf 已更新")),
     `${HEAD}${pc.dim(detail)}`,
