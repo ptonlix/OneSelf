@@ -94,12 +94,14 @@ powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/o
 安装器会按提示选对外源和入口，并拉起服务。装好后：
 
 1. 打开打印的 `PUBLIC_ORIGIN`（首页）
-2. 到 `/admin` 登录并改密
-3. 告诉相关 Agent 安装 Skill（把站点换成打印的 `PUBLIC_ORIGIN`，`<agent>` 换成对应 Agent 名）：
+2. 把这条命令交给正在对话的 Agent（`<agent>` 换成对应 Agent 名）：
 
 ```bash
 npx skills add https://你的站点 -a <agent> -s oneself -y
 ```
+
+3. Agent 没有凭据时会申请设备码。到 `/admin` 登录后，在 `/admin/device` 批准。
+4. API Key 只给脚本或长期密钥，不是第一次对话的接入方式。
 
 **安装选项**
 
@@ -112,6 +114,7 @@ npx skills add https://你的站点 -a <agent> -s oneself -y
 **运维**
 
 - 命令：`bin/oneself update | doctor | backup | restore`
+- `backup` / `restore` 在安装目录用 `compose.yaml` 完成，不需要检出仓库或 `scripts/transfer-cli.ts`
 - `update` 只按已钉版本拉镜像并重启；`doctor` 只检查
 - 升级：重跑新 Release 的安装命令，口令保留
 - 不会被旧 Release 降级；确要换旧版设 `ONESELF_REF=v1.2.3`

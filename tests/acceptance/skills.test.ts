@@ -175,7 +175,12 @@ describe("product skills", () => {
   it("keeps the owner approval workflows in the Skill", () => {
     expect(entry).toContain("## 连接并由所属人批准");
     expect(entry).toContain("`verification_uri_complete`");
-    expect(entry).toContain("{origin}/admin/api-keys/new");
+    expect(entry).toContain("申请设备码，不要先请所属人创建 API Key");
+    expect(entry).toContain("`user_code`");
+    expect(entry.indexOf("申请设备码")).toBeLessThan(entry.indexOf("API Key 是另一种选择"));
+    expect(entry).toContain("脚本或 CI");
+    expect(entry).not.toContain("{origin}/admin/api-keys/new");
+    expect(entry).not.toMatch(/https?:\/\//);
     expect(entry).toContain("Agent 不能自己创建或作废密钥");
     expect(entry).toContain("请求头按发现文档 `auth` 写");
     expect(publicPage).toContain("Agent 不能调用 `POST /admin/site-activations/{id}/approve`");

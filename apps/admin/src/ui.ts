@@ -30,11 +30,13 @@ import {
   subscribeToLocation,
   writeClipboard,
 } from "./browser";
+import { PAGE_SIZE, type RecordsTab } from "./continuity";
 import {
   countPublic,
   greetingFor,
   HomeView,
   LOADING_OVERVIEW,
+  RecordsView,
   runLimited,
   STATUS_CONCURRENCY,
   type OverviewData,
@@ -196,6 +198,8 @@ function screenForRoute(
     case "login":
     case "unknown":
       return createElement(HomeScreen, { client, onFailure, onNavigate: go });
+    case "records":
+      return createElement(RecordsScreen, { client, onFailure });
     case "password":
       return createElement(PasswordScreen, {
         client,
@@ -701,6 +705,14 @@ function HomeScreen(props: {
     }
   }, [client, onFailure, patch]);
 
+  const loadConnect = useCallback(async (): Promise<void> => {
+    try {
+      patch({ connectOrigin: { state: "ready", value: await client.readConnectOrigin() } });
+    } catch (reason: unknown) {
+      patch({ connectOrigin: { state: "error", message: onFailure(reason) } });
+    }
+  }, [client, onFailure, patch]);
+
   useEffect(() => {
     alive.current = true;
     const loadSources = async (): Promise<void> => {
@@ -754,11 +766,18 @@ function HomeScreen(props: {
         patch({ sites: { state: "error", message: onFailure(reason) } });
       }
     };
-    void Promise.all([loadSources(), loadPublic(), loadKeys(), loadSites(), loadGrants()]);
+    void Promise.all([
+      loadSources(),
+      loadPublic(),
+      loadKeys(),
+      loadSites(),
+      loadGrants(),
+      loadConnect(),
+    ]);
     return () => {
       alive.current = false;
     };
-  }, [client, onFailure, patch, loadKeys, loadGrants]);
+  }, [client, onFailure, patch, loadKeys, loadGrants, loadConnect]);
 
   return createElement(HomeView, {
     data,
@@ -813,6 +832,137 @@ function HomeScreen(props: {
   });
 }
 
+function RecordsScreen(props: {
+  client: AdminClient;
+  onFailure: (reason: unknown) => string;
+}): ReactElement {
+  const { client, onFailure } = props;
+  const [data, setData] = useState<OverviewData>(LOADING_OVERVIEW);
+  const [armedDelete, setArmedDelete] = useState<string | null>(null);
+  const [armedRestore, setArmedRestore] = useState<string | null>(null);
+  const [directoryPending, setDirectoryPending] = useState(false);
+  const [directoryMessage, setDirectoryMessage] = useState<string | null>(null);
+  const [tab, setTab] = useState<RecordsTab>("directories");
+  const [directoryPage, setDirectoryPage] = useState(0);
+  const [deletedCursor, setDeletedCursor] = useState(0);
+  const [recentCursor, setRecentCursor] = useState(0);
+  const [deletedHasMore, setDeletedHasMore] = useState(false);
+  const [recentHasMore, setRecentHasMore] = useState(false);
+  const alive = useRef(true);
+
+  const patch = useCallback((change: Partial<OverviewData>) => {
+    if (alive.current) setData((current) => ({ ...current, ...change }));
+  }, []);
+
+  const loadDeleted = useCallback(
+    async (cursor = 0): Promise<void> => {
+      try {
+        const value = await client.listDeletedSources(cursor === 0 ? undefined : String(cursor));
+        setDeletedCursor(cursor);
+        setDeletedHasMore(value.length === PAGE_SIZE);
+        patch({ deletedSources: { state: "ready", value } });
+      } catch (reason: unknown) {
+        patch({ deletedSources: { state: "error", message: onFailure(reason) } });
+      }
+    },
+    [client, onFailure, patch],
+  );
+
+  const loadRecent = useCallback(
+    async (cursor = 0): Promise<void> => {
+      try {
+        const value = await client.queryPages(cursor === 0 ? undefined : String(cursor));
+        setRecentCursor(cursor);
+        setRecentHasMore(value.length === PAGE_SIZE);
+        patch({ recent: { state: "ready", value } });
+      } catch (reason: unknown) {
+        patch({ recent: { state: "error", message: onFailure(reason) } });
+      }
+    },
+    [client, onFailure, patch],
+  );
+
+  useEffect(() => {
+    alive.current = true;
+    const loadSources = async (): Promise<void> => {
+      let rows: SourceRow[];
+      try {
+        rows = (await client.listSources()).map((source) => ({
+          id: source.id,
+          status: { state: "loading" },
+        }));
+      } catch (reason: unknown) {
+        patch({ sources: { state: "error", message: onFailure(reason) } });
+        return;
+      }
+      patch({ sources: { state: "ready", value: rows } });
+    };
+    void Promise.all([loadSources(), loadDeleted(), loadRecent()]);
+    return () => {
+      alive.current = false;
+    };
+  }, [client, onFailure, patch, loadDeleted, loadRecent]);
+
+  return createElement(RecordsView, {
+    data,
+    directoryMessage,
+    armedDelete,
+    armedRestore,
+    directoryPending,
+    tab,
+    onTab: setTab,
+    directoryPage,
+    deletedPage: deletedCursor / PAGE_SIZE,
+    recentPage: recentCursor / PAGE_SIZE,
+    deletedHasMore,
+    recentHasMore,
+    onDirectoryPage: setDirectoryPage,
+    onDeletedPage: (page) => {
+      void loadDeleted(page * PAGE_SIZE);
+    },
+    onRecentPage: (page) => {
+      void loadRecent(page * PAGE_SIZE);
+    },
+    onArmDelete: setArmedDelete,
+    onDeleteSource: (id) => {
+      setDirectoryPending(true);
+      setDirectoryMessage(null);
+      void (async () => {
+        try {
+          await client.deleteSource(id);
+          reloadPage();
+        } catch (reason: unknown) {
+          setDirectoryMessage(onFailure(reason));
+        } finally {
+          setArmedDelete(null);
+          setDirectoryPending(false);
+        }
+      })();
+    },
+    onArmRestore: setArmedRestore,
+    onRestoreSource: (id) => {
+      setDirectoryPending(true);
+      setDirectoryMessage(null);
+      void (async () => {
+        try {
+          await client.restoreSource(id);
+          reloadPage();
+        } catch (reason: unknown) {
+          setDirectoryMessage(onFailure(reason));
+        } finally {
+          setArmedRestore(null);
+          setDirectoryPending(false);
+        }
+      })();
+    },
+  });
+}
+
 function isCode(reason: unknown, code: string): boolean {
   return reason instanceof AdminRequestError && reason.code === code;
+}
+
+function reloadPage(): void {
+  const current = globalThis as { location?: { reload?: () => void } };
+  current.location?.reload?.();
 }

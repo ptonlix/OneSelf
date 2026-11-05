@@ -1,14 +1,18 @@
 import { createElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { PAGE_SIZE, requestNextPage } from "./continuity";
 import { READ_GRANT_NOTICE, SITE_RELEASE_NOTICE } from "./copy";
+import { originFromDiscovery } from "./http";
 import {
   HomeView,
   LOADING_OVERVIEW,
+  RecordsView,
   runLimited,
   STATUS_CONCURRENCY,
   type OverviewData,
   type OverviewProps,
+  type RecordsProps,
 } from "./overview";
 import type { ApiKeyRequest, SiteActivation, SourceDraft } from "./types";
 import {
@@ -187,7 +191,7 @@ function deviceView(done: boolean): string {
 }
 
 describe("admin shell", () => {
-  it("has six entries, marks the current one and links the public home", () => {
+  it("has seven entries, marks the current one and links the public home", () => {
     const markup = html(
       createElement(Shell, {
         showNav: true,
@@ -198,10 +202,10 @@ describe("admin shell", () => {
         children: "body",
       }),
     );
-    for (const label of ["概览", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
+    for (const label of ["概览", "资料", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
       expect(markup).toContain(`>${label}<`);
     }
-    expect(markup.match(/class="nav-i/g)).toHaveLength(5);
+    expect(markup.match(/class="nav-i/g)).toHaveLength(6);
     expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
     expect(markup).toMatch(/<a[^>]*class="nav-i on"[^>]*aria-current="page"[^>]*>.*?API Key/);
     expect(markup).toContain('href="/"');
@@ -449,6 +453,9 @@ const overviewData: OverviewData = {
       revoked_at: "2026-05-04T00:00:00Z",
     },
   ]),
+  deletedSources: ready([]),
+  recent: ready([]),
+  connectOrigin: ready("http://127.0.0.1:3000"),
 };
 
 function overviewProps(change: Partial<OverviewProps> = {}): OverviewProps {
@@ -470,7 +477,32 @@ function overviewProps(change: Partial<OverviewProps> = {}): OverviewProps {
   };
 }
 
-type Node = ReactElement<{ children?: ReactNode; onClick?: () => void }>;
+function recordsProps(change: Partial<RecordsProps> = {}): RecordsProps {
+  return {
+    data: overviewData,
+    directoryMessage: null,
+    armedDelete: null,
+    armedRestore: null,
+    directoryPending: false,
+    tab: "directories",
+    onTab: noop,
+    directoryPage: 0,
+    deletedPage: 0,
+    recentPage: 0,
+    deletedHasMore: false,
+    recentHasMore: false,
+    onDirectoryPage: noop,
+    onDeletedPage: noop,
+    onRecentPage: noop,
+    onArmDelete: noop,
+    onDeleteSource: noop,
+    onArmRestore: noop,
+    onRestoreSource: noop,
+    ...change,
+  };
+}
+
+type Node = ReactElement<{ children?: ReactNode; onClick?: () => void; disabled?: boolean }>;
 
 function elements(node: ReactNode): Node[] {
   if (Array.isArray(node)) return node.flatMap((child: ReactNode) => elements(child));
@@ -549,7 +581,12 @@ describe("overview", () => {
     const markup = html(
       HomeView(
         overviewProps({
-          data: { ...overviewData, apiKeys: { state: "error", message: "服务暂时不可用" } },
+          data: {
+            ...overviewData,
+            apiKeys: { state: "error", message: "服务暂时不可用" },
+            recent: { state: "error", message: "最近写入失败" },
+            deletedSources: { state: "error", message: "已删除目录失败" },
+          },
         }),
       ),
     );
@@ -557,6 +594,167 @@ describe("overview", () => {
     expect(section(markup, "API Key")).toContain("读取失败：服务暂时不可用");
     expect(section(markup, "站点")).toContain("/_preview/public-page/");
     expect(section(markup, "已批准设备")).toContain("grant_…0001");
+    expect(markup).not.toContain("已删除目录");
+    expect(markup).not.toContain("最近写入");
+  });
+
+  it("does not send delete or restore on the first click", () => {
+    const onDeleteSource = vi.fn();
+    const onRestoreSource = vi.fn();
+    const onArmDelete = vi.fn();
+    const onArmRestore = vi.fn();
+    const live = RecordsView(
+      recordsProps({
+        onDeleteSource,
+        onArmDelete,
+      }),
+    );
+    const deleted = RecordsView(
+      recordsProps({
+        tab: "deleted",
+        onRestoreSource,
+        onArmRestore,
+        data: {
+          ...overviewData,
+          deletedSources: ready([{ id: "old-notes", deleted_at: "2026-10-01T00:00:00.000Z" }]),
+        },
+      }),
+    );
+    press(row(live, "dir-notes"), "删除");
+    press(row(deleted, "old-notes"), "恢复");
+    expect(onArmDelete).toHaveBeenCalledWith("notes");
+    expect(onArmRestore).toHaveBeenCalledWith("old-notes");
+    expect(onDeleteSource).not.toHaveBeenCalled();
+    expect(onRestoreSource).not.toHaveBeenCalled();
+  });
+
+  it("shows the second page of recent writes instead of treating 20 as the total", () => {
+    const onRecentPage = vi.fn();
+    const first = Array.from({ length: 20 }, (_, index) => ({
+      source: "notes",
+      slug: `p${String(index).padStart(2, "0")}`,
+      type: "note",
+      title: `Page ${String(index)}`,
+      updated_at: "2026-10-20T00:00:00.000Z",
+    }));
+    const firstTree = RecordsView(
+      recordsProps({
+        tab: "recent",
+        recentHasMore: true,
+        onRecentPage,
+        data: { ...overviewData, recent: ready(first) },
+      }),
+    );
+    expect(textOf(firstTree)).toContain("Page 0");
+    expect(textOf(firstTree)).not.toContain("Page 20");
+    const next = elements(firstTree).find(
+      (element) => element.type === "button" && textOf(element) === "下一页",
+    );
+    if (next === undefined) throw new Error("no next page");
+    next.props.onClick?.();
+    expect(onRecentPage).toHaveBeenCalledWith(1);
+    const second = html(
+      RecordsView(
+        recordsProps({
+          tab: "recent",
+          recentPage: 1,
+          data: {
+            ...overviewData,
+            recent: ready([
+              {
+                source: "notes",
+                slug: "last",
+                type: "note",
+                title: "Page 20",
+                updated_at: "2026-10-01T00:00:00.000Z",
+              },
+            ]),
+          },
+        }),
+      ),
+    );
+    expect(section(second, "最近写入")).toContain("Page 20");
+    expect(section(second, "最近写入")).toContain("notes / last");
+    expect(section(second, "最近写入")).not.toContain("编辑");
+    expect(section(second, "最近写入")).not.toContain("Page 0");
+  });
+
+  it("keeps the restore list when a directory delete fails", () => {
+    const live = html(
+      RecordsView(
+        recordsProps({
+          directoryMessage: "不能删除 notes",
+        }),
+      ),
+    );
+    const deleted = html(
+      RecordsView(
+        recordsProps({
+          tab: "deleted",
+          data: {
+            ...overviewData,
+            deletedSources: ready([{ id: "old-notes", deleted_at: "2026-10-01T00:00:00.000Z" }]),
+          },
+        }),
+      ),
+    );
+    expect(section(live, "目录")).toContain("不能删除 notes");
+    expect(section(live, "目录")).toContain("notes");
+    expect(section(deleted, "已删除目录")).toContain("old-notes");
+    expect(section(deleted, "已删除目录")).toContain("恢复");
+    expect(section(deleted, "已删除目录")).not.toContain("读取失败");
+    expect(section(deleted, "已删除目录")).not.toContain("不能删除 notes");
+  });
+
+  it("does not offer or request another page when the current page is short", () => {
+    const deleted = [{ id: "old-notes", deleted_at: "2026-10-01T00:00:00.000Z" }];
+    const recent = [
+      {
+        source: "notes",
+        slug: "one",
+        type: "note",
+        title: "Only page",
+        updated_at: "2026-10-20T00:00:00.000Z",
+      },
+    ];
+    const loadDeleted = vi.fn();
+    const loadRecent = vi.fn();
+    requestNextPage(0, deleted.length, loadDeleted);
+    requestNextPage(0, recent.length, loadRecent);
+    expect(loadDeleted).not.toHaveBeenCalled();
+    expect(loadRecent).not.toHaveBeenCalled();
+    const markup = html(
+      RecordsView(
+        recordsProps({
+          tab: "deleted",
+          deletedHasMore: deleted.length === PAGE_SIZE,
+          onDeletedPage: loadDeleted,
+          data: {
+            ...overviewData,
+            deletedSources: ready(deleted),
+            recent: ready(recent),
+          },
+        }),
+      ),
+    );
+    const next = elements(
+      RecordsView(
+        recordsProps({
+          tab: "deleted",
+          onDeletedPage: loadDeleted,
+          data: { ...overviewData, deletedSources: ready(deleted) },
+        }),
+      ),
+    ).find((element) => element.type === "button" && textOf(element) === "下一页");
+    next?.props.onClick?.();
+    expect(section(markup, "已删除目录")).toContain("分页");
+    expect(section(markup, "已删除目录")).toContain("old-notes");
+    expect(next?.props.disabled).toBe(true);
+    expect(loadDeleted).not.toHaveBeenCalled();
+    expect(loadRecent).not.toHaveBeenCalled();
+    requestNextPage(0, PAGE_SIZE, loadDeleted);
+    expect(loadDeleted).toHaveBeenCalledOnce();
+    expect(loadDeleted).toHaveBeenCalledWith(PAGE_SIZE);
   });
 
   it("renders while every panel is still loading", () => {
@@ -608,5 +806,40 @@ describe("source status reads", () => {
     expect(STATUS_CONCURRENCY).toBe(4);
     expect(peak).toBe(4);
     expect(seen.sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+  });
+});
+
+describe("device-code empty state", () => {
+  const empty = {
+    ...overviewData,
+    apiKeys: ready([]),
+    grants: ready([]),
+    connectOrigin: ready("http://127.0.0.1:3000"),
+  };
+
+  it("shows the configured origin command and ignores a spoofed host", () => {
+    const discovery = {
+      host: "http://evil.example",
+      openapi: "http://evil.example/openapi.json",
+      skills: { oneself: "http://127.0.0.1:3000/skills/oneself/SKILL.md" },
+    };
+    expect(JSON.stringify(discovery)).toContain("http://evil.example");
+    const origin = originFromDiscovery(discovery);
+    expect(origin).toBe("http://127.0.0.1:3000");
+    const markup = html(
+      HomeView(overviewProps({ data: { ...empty, connectOrigin: ready(origin) } })),
+    );
+    expect(markup).toContain(`npx skills add ${origin} -a &lt;agent&gt; -s oneself -y`);
+    expect(markup).toContain("/admin/device");
+    expect(markup).not.toContain("http://evil.example");
+    expect(section(markup, "已批准设备")).toContain("还没有批准过设备");
+    expect(section(markup, "API Key")).toContain("还没有 API Key");
+  });
+
+  it("does not replace the grant panel when a grant already exists", () => {
+    const markup = html(HomeView(overviewProps()));
+    expect(markup).not.toContain("npx skills add");
+    expect(section(markup, "已批准设备")).toContain("grant_");
+    expect(section(markup, "API Key")).toContain("laptop-agent");
   });
 });

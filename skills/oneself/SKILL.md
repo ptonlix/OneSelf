@@ -40,10 +40,9 @@ metadata:
 
 ## 连接并由所属人批准
 
-没有可用凭据时，二选一，两种都要所属人在管理端确认：
+没有可用凭据时，申请设备码，不要先请所属人创建 API Key。从发现文档的 `oauth` 元数据取设备码端点并申请，把返回的 `verification_uri_complete` 和 `user_code` 交给所属人批准；按返回的间隔轮询换 token 的端点，拿到 `refresh_token` 后按下文保存。
 
-- OAuth 设备码：从发现文档的 `oauth` 元数据取设备码端点并申请，把返回的 `verification_uri_complete`（在 `/admin/device` 下）和 `user_code` 交给所属人批准；按返回的间隔轮询换 token 的端点，拿到 `refresh_token` 后按下文保存。
-- API Key：请所属人在 `{origin}/admin/api-keys/new` 发起并批准，原文只显示一次，由所属人交给你。Agent 不能自己创建或作废密钥。
+API Key 是另一种选择，只在所属人要给脚本或 CI 一把长期密钥时使用。由所属人在管理端发起并批准，原文只显示一次，再交给你。Agent 不能自己创建或作废密钥，也不要在第一次连接时请所属人新建 API Key。
 
 请求头按发现文档 `auth` 写。权限相同时两种方式结果一致。调用 `whoami` 确认拿到的目录权限和 `site:write`。
 

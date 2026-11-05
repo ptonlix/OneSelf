@@ -77,10 +77,6 @@ export const pages = pgTable(
     ),
     index("pages_source_type_idx").on(table.source, table.type),
     index("pages_frontmatter_idx").using("gin", table.frontmatter),
-    index("pages_title_body_search_idx").using(
-      "gin",
-      sql`to_tsvector('simple', ${table.title} || ' ' || ${table.body})`,
-    ),
   ],
 );
 

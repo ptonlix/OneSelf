@@ -120,3 +120,16 @@ export interface OauthGrantView {
   created_at: string;
   revoked_at: string | null;
 }
+
+export interface DeletedSource {
+  id: string;
+  deleted_at: string;
+}
+
+export interface QueryPage {
+  source: string;
+  slug: string;
+  type: string;
+  title: string;
+  updated_at: string;
+}

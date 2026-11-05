@@ -15,21 +15,22 @@ function printHelp(): void {
   oneself install [--dir <路径>] [--dry-run] [--yes]
   oneself update  [--dir <路径>] [--dry-run]
   oneself doctor  [--dir <路径>]
-  oneself backup  [--dir <路径>] [--dry-run] -- --out <file> --stopped […]
-  oneself restore [--dir <路径>] [--dry-run] -- --from <file.tar.gz> --stopped [--replace] […]
+  oneself backup  [--dir <路径>] [--dry-run] -- --out <file> [--stopped] […]
+  oneself restore [--dir <路径>] [--dry-run] -- --from <file.tar.gz> [--stopped] [--replace] […]
   公开 curl|sh / irm|iex 只下载并校验本二进制再交给它（Unix 把已打开的终端描述符复制到 stdin，不新开 /dev/tty）。
   安装目录里的 oneself.sh / oneself.ps1 只是转调 bin/oneself 的薄 launcher。
 
   install   交互式配置并启动
   update    按 .env 镜像拉取并重启
   doctor    只检查，不改配置，不重启
-  backup    导出（转调仓库 scripts/transfer-cli.ts export）
-  restore   导入（转调 transfer-cli.ts import）
+  backup    用安装目录的 compose.yaml 导出 format 1 档案
+  restore   用安装目录的 compose.yaml 导入 format 1 档案
   help      显示帮助
 
 说明:
   安装路径默认 ${defaultInstallDir()}
-  backup / restore 需要仓库里的传输脚本；生产安装包不含该程序。
+  backup / restore 不需要检出仓库、宿主机 Node、宿主机 pg_dump 或 ONESELF_REPO_ROOT。
+  非交互必须传入 --stopped，且不会自行停止服务。交互式可在确认后只停止 app。
 `);
 }
 

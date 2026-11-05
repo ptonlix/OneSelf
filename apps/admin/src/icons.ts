@@ -168,6 +168,7 @@ export function OrbitMark(props: {
 
 const ICON_PATHS = {
   home: ["M4 11 12 4l8 7v8.5a.5.5 0 0 1-.5.5H15v-6H9v6H4.5a.5.5 0 0 1-.5-.5z"],
+  records: ["M5 6h14M5 12h14M5 18h10"],
   device: [
     "M8 2.5h8a1.5 1.5 0 0 1 1.5 1.5v16a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 20V4A1.5 1.5 0 0 1 8 2.5z",
     "M10.5 18h3",

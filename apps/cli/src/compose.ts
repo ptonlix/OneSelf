@@ -40,7 +40,7 @@ function run(
   });
 }
 
-export async function runInherit(
+async function runInherit(
   command: string,
   args: readonly string[],
   cwd: string,

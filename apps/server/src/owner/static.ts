@@ -9,6 +9,7 @@ const ADMIN_PAGES = new Set([
   "",
   "login",
   "password",
+  "records",
   "device",
   "api-keys/new",
   "site-activations/new",

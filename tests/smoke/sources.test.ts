@@ -1,9 +1,11 @@
+import { SOFT_DELETE_RETENTION_MS } from "../../packages/domain/src/clock.ts";
 import { expect, it } from "vitest";
 
 import {
   addSource,
   boot,
   expectError,
+  issueAccessToken,
   issueApiKey,
   jsonHeaders,
   markdown,
@@ -187,5 +189,95 @@ it("conflicts when adding a source id that is still soft-deleted", async () => {
     "not_found",
   );
   expect(server.runtime.state.sources.filter((source) => source.id === "notes")).toHaveLength(1);
+  await server.close();
+});
+
+it("lists deleted directories for the owner session and pages past 20", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const headers = { accept: "application/json", cookie };
+  server.clock.set(new Date("2026-01-01T00:00:00.000Z"));
+  await addSource(server, cookie, "old");
+  expect(
+    (await server.request("/pcp/v1/sources/old", { method: "DELETE", headers: { cookie } })).status,
+  ).toBe(200);
+  server.clock.set(new Date(Date.parse("2026-01-01T00:00:00.000Z") + SOFT_DELETE_RETENTION_MS + 1));
+  for (let index = 1; index <= 21; index += 1) {
+    const id = `s${String(index).padStart(2, "0")}`;
+    await addSource(server, cookie, id);
+    server.clock.set(new Date(Date.parse("2026-09-01T00:00:00.000Z") + index * 1000));
+    expect(
+      (await server.request(`/pcp/v1/sources/${id}`, { method: "DELETE", headers: { cookie } }))
+        .status,
+    ).toBe(200);
+  }
+  const live = await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }));
+  expect(live).toEqual({ sources: [] });
+  const first = await readJson(await server.request("/admin/deleted-sources", { headers }));
+  const second = await readJson(
+    await server.request("/admin/deleted-sources?cursor=20", { headers }),
+  );
+  expect(first.sources).toHaveLength(20);
+  expect(second.sources).toEqual([{ id: "s01", deleted_at: "2026-09-01T00:00:01.000Z" }]);
+  expect(JSON.stringify(first)).not.toContain("old");
+  expect(JSON.stringify(first)).not.toContain("body");
+  const key = await issueApiKey(server, cookie, { label: "agent", unrestricted_data: true });
+  await expectError(
+    await server.request("/admin/deleted-sources", {
+      headers: { accept: "application/json", authorization: `ApiKey ${key.key}` },
+    }),
+    403,
+    "forbidden",
+  );
+  const token = await issueAccessToken(server, cookie, { unrestricted_data: true });
+  await expectError(
+    await server.request("/admin/deleted-sources", {
+      headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?cursor=nope", {
+      headers: { accept: "application/json", authorization: `ApiKey ${key.key}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?limit=0", {
+      headers: { accept: "application/json", authorization: `ApiKey ${key.key}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?cursor=nope", {
+      headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?limit=0", {
+      headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?cursor=nope", {
+      headers: { accept: "application/json" },
+    }),
+    401,
+    "unauthorized",
+  );
+  await expectError(
+    await server.request("/admin/deleted-sources?cursor=nope", {
+      headers: { accept: "application/json", cookie },
+    }),
+    400,
+    "invalid",
+  );
   await server.close();
 });

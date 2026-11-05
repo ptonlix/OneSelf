@@ -1,12 +1,15 @@
+import { queryBody } from "./continuity";
 import type {
   ApiKeyRequest,
   ApiKeySummary,
   CreateApiKeyBody,
+  DeletedSource,
   DeviceApprovalBody,
   LoginResult,
   OauthGrantView,
   PasswordResult,
   PendingApproval,
+  QueryPage,
   PublicPageSummary,
   RevealedApiKey,
   SiteActivation,
@@ -90,6 +93,11 @@ export interface AdminClient {
   listPublicPages(): Promise<PublicPageSummary[]>;
   listOauthGrants(): Promise<OauthGrantView[]>;
   revokeOauthGrant(id: string): Promise<void>;
+  listDeletedSources(cursor?: string): Promise<DeletedSource[]>;
+  deleteSource(id: string): Promise<void>;
+  restoreSource(id: string): Promise<void>;
+  queryPages(cursor?: string): Promise<QueryPage[]>;
+  readConnectOrigin(): Promise<string>;
 }
 
 export function createAdminClient(transport: HttpTransport): AdminClient {
@@ -196,6 +204,39 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
     async listOauthGrants() {
       return parseOauthGrants(
         await send(transport, { method: "GET", path: "/admin/oauth-grants" }),
+      );
+    },
+    async listDeletedSources(cursor) {
+      const query = cursor === undefined ? "" : `?cursor=${encodeURIComponent(cursor)}`;
+      return parseDeletedSources(
+        await send(transport, { method: "GET", path: `/admin/deleted-sources${query}` }),
+      );
+    },
+    async deleteSource(id) {
+      await send(transport, {
+        method: "DELETE",
+        path: `/pcp/v1/sources/${encodeURIComponent(id)}`,
+      });
+    },
+    async restoreSource(id) {
+      await send(transport, {
+        method: "POST",
+        path: `/pcp/v1/sources/${encodeURIComponent(id)}/restore`,
+        json: {},
+      });
+    },
+    async queryPages(cursor) {
+      return parseQueryPages(
+        await send(transport, {
+          method: "POST",
+          path: "/pcp/v1/query",
+          json: queryBody(cursor),
+        }),
+      );
+    },
+    async readConnectOrigin() {
+      return originFromDiscovery(
+        await send(transport, { method: "GET", path: "/.well-known/pcp", anonymous: true }),
       );
     },
     async revokeOauthGrant(id) {
@@ -508,6 +549,62 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
       sources: parseGrants(item.sources),
       created_at: item.created_at,
       revoked_at: item.revoked_at,
+    };
+  });
+}
+
+const QUERY_FIELDS = ["slug", "source", "title", "type", "updated_at"] as const;
+
+export function originFromDiscovery(body: unknown): string {
+  if (!isRecord(body) || !isRecord(body.skills) || typeof body.skills.oneself !== "string") {
+    throw new ParseError("发现文档无法识别");
+  }
+  const suffix = "/skills/oneself/SKILL.md";
+  const value = body.skills.oneself;
+  if (!value.endsWith(suffix)) throw new ParseError("发现文档无法识别");
+  const origin = value.slice(0, -suffix.length);
+  if (!origin.startsWith("http://") && !origin.startsWith("https://")) {
+    throw new ParseError("发现文档无法识别");
+  }
+  return origin;
+}
+
+function parseDeletedSources(body: unknown): DeletedSource[] {
+  if (!isRecord(body) || !Array.isArray(body.sources)) throw new ParseError("已删除目录无法识别");
+  return body.sources.map((item) => {
+    if (!isRecord(item) || typeof item.id !== "string" || typeof item.deleted_at !== "string") {
+      throw new ParseError("已删除目录无法识别");
+    }
+    if ("body" in item || "markdown" in item) throw new ParseError("已删除目录不能包含正文");
+    return { id: item.id, deleted_at: item.deleted_at };
+  });
+}
+
+function parseQueryPages(body: unknown): QueryPage[] {
+  if (!Array.isArray(body)) throw new ParseError("最近写入无法识别");
+  return body.map((item) => {
+    if (!isRecord(item)) throw new ParseError("最近写入无法识别");
+    if ("body" in item || "markdown" in item || "credential" in item) {
+      throw new ParseError("最近写入不能包含正文");
+    }
+    const fields = Object.keys(item).sort();
+    if (
+      fields.length !== QUERY_FIELDS.length ||
+      fields.some((field, index) => field !== QUERY_FIELDS[index]) ||
+      typeof item.source !== "string" ||
+      typeof item.slug !== "string" ||
+      typeof item.type !== "string" ||
+      typeof item.title !== "string" ||
+      typeof item.updated_at !== "string"
+    ) {
+      throw new ParseError("最近写入无法识别");
+    }
+    return {
+      source: item.source,
+      slug: item.slug,
+      type: item.type,
+      title: item.title,
+      updated_at: item.updated_at,
     };
   });
 }

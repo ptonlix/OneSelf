@@ -1,6 +1,34 @@
 /* Admin layout only. Colours, type, buttons, chips, fields and motion come from brand.css,
    which main.ts loads first. Ported from openspec/changes/redesign-orbit-ui/design/assets/admin.css. */
 
+.rec-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 16px;
+}
+.rec-tab {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--pill);
+  border: 1px solid var(--hair-2);
+  background: transparent;
+  color: var(--fg-2);
+  font: 500 13px/1 var(--sans);
+  cursor: pointer;
+}
+.rec-tab[aria-selected="true"] {
+  color: var(--fg);
+  border-color: transparent;
+  background: rgb(255 255 255 / 0.08);
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px 4px;
+}
+
 *,
 *::before,
 *::after {

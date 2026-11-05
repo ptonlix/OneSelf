@@ -33,8 +33,11 @@ test("install summary leads with success, then home, admin and agent", () => {
   assert.ok(lines.some((l) => l.trim() === origin));
   const admin = out.indexOf(`${origin}/admin`);
   const agent = out.indexOf(`npx skills add ${origin} -a <agent> -s oneself -y`);
+  const device = out.indexOf("/admin/device");
+  const apiKey = out.indexOf("API Key");
   const ops = out.indexOf("oneself update | doctor | backup | restore");
-  assert.ok(home > 0 && admin > home && agent > admin && ops > agent);
+  assert.ok(home > 0 && admin > home && agent > admin && device > agent && ops > agent);
+  assert.ok(apiKey === -1 || device < apiKey);
   assert.match(out, /\.well-known\/pcp/);
   assert.match(out, /export PATH="\$HOME\/\.local\/share\/oneself\/bin:\$PATH"/);
   assert.match(out, /公网访问/);

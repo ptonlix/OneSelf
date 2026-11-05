@@ -130,9 +130,9 @@ flowchart LR
 | 公开数据客户端 | 工作区里的小 TypeScript 包 | 站点脚本用它请求匿名公开 PCP。不让每个页面各写一套请求 |
 | 领域代码 | 纯 TypeScript | 不依赖 Hono、React 或数据库驱动。规则可以用单元测试直接跑 |
 | 操作注册表 | 一份 TypeScript 定义 | 资料和站点操作的 OpenAPI 路由与 MCP 工具都从它生成。密钥管理标记为 `http-only` |
-| 数据库 | PostgreSQL 18 | 索引、JSONB 和全文检索都用它。不同时支持 PGLite |
+| 数据库 | PostgreSQL 18 | 索引和 JSONB 都用它。不同时支持 PGLite |
 | 数据访问 | Drizzle | 显式 SQL、JSON 和事务。表结构只来自 migration |
-| 检索 | Postgres 全文检索 + `frontmatter` 的 GIN | 第一版不引入 Elasticsearch，也不做向量检索。`search` 查 `pages` 的标题、正文和 frontmatter 字符串 |
+| 检索 | 连续子串（`LIKE`） | `search` 对 `pages` 的 `type`、标题、正文和 frontmatter 字符串做连续子串匹配。不用 `to_tsvector('simple')`，不把 `chunks` 当被搜文档。不引入 Elasticsearch、向量索引、`pg_trgm` 或中文分词扩展 |
 | 授权 | `node-oidc-provider` | 生产只启用设备码。授权码加 PKCE 只在测试配置启用。不自己写 OAuth |
 | 所属人密码 | Argon2id | 只存哈希 |
 | API Key 与刷新令牌 | 只存 SHA-256 | 原文只在所属人确认批准页时出现一次。Key 原文以 `osk_` 开头 |
@@ -173,7 +173,7 @@ Tailscale 容器使用 userspace networking，这样 Mac 上的 Docker 没有 `/
 
 没有隧道令牌或 auth key 时，入口容器可以失败，应用和数据库仍然留在。本机开发用 `compose.dev.yaml`，不要为了让入口先起来而把数据库端口映射出去。
 
-公开 `curl|sh` / `irm` 入口是钉版本的薄启动脚本（`deploy/oneself-bootstrap.sh` / `.ps1`）：校验 `SHA256SUMS` 后下载本平台 CLI 二进制，Unix 在 stdin 不是终端时，把已打开的 stdout（否则 stderr）复制到二进制的 stdin，不新开 `/dev/tty`。宿主安装与运维只有一套实现：`apps/cli`（install / update / doctor / backup / restore）。它负责钉 `ONESELF_IMAGE`、校验 compose 包、入口互斥、`--yes`（同样校验 `PUBLIC_ORIGIN`），并在安装目录留下 `bin/oneself` 与只转调它的薄 launcher（`oneself.sh` / `oneself.ps1`，不含安装逻辑）。启动脚本只把自己的 Release 标签导出为 `ONESELF_BUNDLED_REF`；`ONESELF_REF` 只在用户事先显式设置时才传下去。CLI 未显式指定时拿 `.oneself-release` 的 `ref=` 和 `ONESELF_BUNDLED_REF` 比，已装更新就不往回同步；`install` 与 `update` 走同一条同步路径。`oneself-compose.tar.gz` 只含 `compose.yaml`、`.env.example`、`deploy/Caddyfile`，不再带 shell 安装器；直接运行 `bin/oneself update` 只刷新已钉镜像，换版本要重跑新 Release 的启动脚本。Linux musl/Alpine 用 `oneself-linux-*-musl`；某个 Release 没有该资产时启动脚本直接失败，等带 musl 资产的 Release，不回退到 shell。Release 先上传资产再 push 镜像；Bun 只用官方 `oven-sh/setup-bun`。不安装入口程序，不映射数据库端口，也不从主机名推断 `PUBLIC_ORIGIN`。这不是第二套部署，也不负责给 Agent 写凭据。契约见 `openspec/changes/host-install-cli/`。
+公开 `curl|sh` / `irm` 入口是钉版本的薄启动脚本（`deploy/oneself-bootstrap.sh` / `.ps1`）：校验 `SHA256SUMS` 后下载本平台 CLI 二进制，Unix 在 stdin 不是终端时，把已打开的 stdout（否则 stderr）复制到二进制的 stdin，不新开 `/dev/tty`。宿主安装与运维只有一套实现：`apps/cli`（install / update / doctor / backup / restore）。已安装的 backup / restore 不需要仓库脚本 `scripts/transfer-cli.ts`。它负责钉 `ONESELF_IMAGE`、校验 compose 包、入口互斥、`--yes`（同样校验 `PUBLIC_ORIGIN`），并在安装目录留下 `bin/oneself` 与只转调它的薄 launcher（`oneself.sh` / `oneself.ps1`，不含安装逻辑）。启动脚本只把自己的 Release 标签导出为 `ONESELF_BUNDLED_REF`；`ONESELF_REF` 只在用户事先显式设置时才传下去。CLI 未显式指定时拿 `.oneself-release` 的 `ref=` 和 `ONESELF_BUNDLED_REF` 比，已装更新就不往回同步；`install` 与 `update` 走同一条同步路径。`oneself-compose.tar.gz` 只含 `compose.yaml`、`.env.example`、`deploy/Caddyfile`，不再带 shell 安装器；直接运行 `bin/oneself update` 只刷新已钉镜像，换版本要重跑新 Release 的启动脚本。Linux musl/Alpine 用 `oneself-linux-*-musl`；某个 Release 没有该资产时启动脚本直接失败，等带 musl 资产的 Release，不回退到 shell。Release 先上传资产再 push 镜像；Bun 只用官方 `oven-sh/setup-bun`。不安装入口程序，不映射数据库端口，也不从主机名推断 `PUBLIC_ORIGIN`。这不是第二套部署，也不负责给 Agent 写凭据。契约见 `openspec/changes/host-install-cli/`。
 
 ---
 
@@ -363,7 +363,7 @@ GET  /.well-known/agent-skills/index.json
 | POST | `/pcp/v1/search` | `search`。JSON `{q, source?, limit?, cursor?}` |
 | POST | `/pcp/v1/query` | `query`。JSON `{source?, type?, tag?, updated_after?, updated_before?, limit?, cursor?}` |
 
-`search` 的每条结果是 `{source, slug, type, title, snippet}`，`snippet` 最多 140 字。`query` 的每条结果是 `{source, slug, type, title, updated_at}`。`limit` 默认 20，最大 50。公开搜索使用同一个 `search` 结果形状。
+`search` 对 `type`、标题、正文和 frontmatter 字符串做连续子串匹配，不用 `to_tsvector('simple')`，也不把 `chunks` 当被搜文档。每条结果是 `{source, slug, type, title, snippet}`，`snippet` 最多 140 字。`query` 的每条结果是 `{source, slug, type, title, updated_at}`。`limit` 默认 20，最大 50。公开搜索使用同一个 `search` 结果形状。
 
 结构写操作都要求该 source 的写权限，并回写原文：
 
