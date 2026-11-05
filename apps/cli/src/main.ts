@@ -21,7 +21,7 @@ function printHelp(): void {
   安装目录里的 oneself.sh / oneself.ps1 只是转调 bin/oneself 的薄 launcher。
 
   install   交互式配置并启动
-  update    按 .env 镜像拉取并重启
+  update    核对 GitHub 最新正式版，较新则升级并重启；已是最新时只刷新已钉镜像
   doctor    只检查，不改配置，不重启
   backup    用安装目录的 compose.yaml 导出 format 1 档案
   restore   用安装目录的 compose.yaml 导入 format 1 档案

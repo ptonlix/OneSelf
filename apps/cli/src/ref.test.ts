@@ -7,6 +7,7 @@ import {
   installerBundledRef,
   planAfterResolve,
   planBundleSync,
+  planUpdateSync,
   refNewer,
   refOk,
 } from "./ref.ts";
@@ -97,6 +98,37 @@ test("user-forced ONESELF_REF may downgrade", () => {
   });
   assert.equal(
     planBundleSync({ current: "v1.2.0", forced: "v1.2.0", bundled: undefined }).kind,
+    "skip",
+  );
+});
+
+test("direct update follows latest and still refuses an older installer", () => {
+  assert.deepEqual(planUpdateSync({ current: "v0.4.7", forced: undefined, bundled: undefined }), {
+    kind: "sync",
+    target: "latest",
+    forced: false,
+  });
+  assert.equal(
+    planUpdateSync({ current: "v0.5.0", forced: undefined, bundled: "v0.4.7" }).kind,
+    "keep-newer",
+  );
+  assert.equal(
+    planUpdateSync({ current: "v0.5.0", forced: "v0.5.0", bundled: undefined }).kind,
+    "skip",
+  );
+});
+
+test("newer bundled tag stays on that tag instead of latest", () => {
+  assert.deepEqual(planUpdateSync({ current: "v1.2.0", forced: undefined, bundled: "v1.3.0" }), {
+    kind: "sync",
+    target: "v1.3.0",
+    forced: false,
+  });
+});
+
+test("same bundled tag skips instead of following latest", () => {
+  assert.equal(
+    planUpdateSync({ current: "v1.2.3", forced: undefined, bundled: "v1.2.3" }).kind,
     "skip",
   );
 });

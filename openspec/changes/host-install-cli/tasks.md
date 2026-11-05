@@ -20,7 +20,7 @@
 - [x] 2.6 `refNewer`：预发布早于同号正式版（`ref.test.ts`）
 - [x] 2.7 `--yes` 下环境变量同样过校验（`PUBLIC_ORIGIN`、`APP_DOMAIN`）；`install.test.ts`
 - [x] 2.8 完成提示按平台给出 update 命令（Windows 不再写 `oneself.sh`）
-- [ ] 2.9 编译后的 `bin/oneself` 自身不带 Release 标签：直接运行 `bin/oneself update` 只刷新已钉镜像，不会同步安装文件；升级需重跑新 Release 的安装命令
+- [x] 2.9 直接运行 `bin/oneself update`（没有 `ONESELF_REF` 也没有 `ONESELF_BUNDLED_REF`）走 `planUpdateSync`：解析 GitHub 最新正式版，比已装版本新才同步安装文件并改钉 `ONESELF_IMAGE`；解析结果相同或更旧则不降级，只刷新已钉镜像；查询失败在 `docker compose pull` 之前停下。更旧的 `ONESELF_BUNDLED_REF` 不得降级；用户显式 `ONESELF_REF` 仍可强制（含降级）。`install` 调用 `maybeSyncBundle` 时不跟 latest
 
 ## 3. musl 与文档
 

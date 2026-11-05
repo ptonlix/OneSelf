@@ -115,9 +115,9 @@ npx skills add https://your-origin -a <agent> -s oneself -y
 
 - Commands: `bin/oneself update | doctor | backup | restore`
 - `backup` / `restore` run in the install directory with its `compose.yaml`; they do not need a checkout or `scripts/transfer-cli.ts`
-- `update` only pulls the pinned image and restarts; `doctor` only checks
-- Upgrade: re-run a newer Release's install command; passwords are kept
-- An older Release never downgrades an install; set `ONESELF_REF=v1.2.3` to force a version
+- `update` checks the latest stable GitHub Release. A newer tag is installed and pinned; if already current, it only refreshes that image. `doctor` only checks
+- `update` can move `.oneself-release` and `ONESELF_IMAGE`, but replacing the CLI binary still requires re-running the Release install command.
+- Passwords are kept. An older Release's install command never downgrades; set `ONESELF_REF=v1.2.3` to force a version
 
 **Implementation**
 

@@ -26,11 +26,8 @@ export async function runUpdate(options: UpdateOptions): Promise<void> {
   p.log.step(`${pc.bold("安装路径")}  ${pc.cyan(root)}`);
   await requireInstalledLayout(root);
 
-  // When launched by a newer Release installer (bootstrap exports
-  // ONESELF_BUNDLED_REF) or with a user-forced ONESELF_REF, re-extract the compose bundle first. Never downgrades unless
-  // ONESELF_REF is set explicitly. Running bin/oneself directly has no bundled
-  // tag, so it only refreshes the pinned image.
-  await maybeSyncBundle(root, options.dryRun);
+  // Direct update passes followLatest; install must not.
+  const synced = await maybeSyncBundle(root, options.dryRun, true);
 
   await pinImageFromRelease(root, options.dryRun, (msg) => {
     p.log.info(msg);
@@ -70,5 +67,5 @@ export async function runUpdate(options: UpdateOptions): Promise<void> {
   const binary = await persistCliBinary(root);
   // Replaces full-shell launchers left by older releases with the thin ones.
   await installLaunchers(root);
-  p.outro(formatUpdateSummary(root, binary));
+  p.outro(formatUpdateSummary(root, binary, process.platform, synced.checkedLatest));
 }

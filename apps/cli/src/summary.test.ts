@@ -75,9 +75,16 @@ test("install summary falls back to launcher update without a binary", () => {
   assert.ok(out.includes(`${root}/oneself.sh update`));
 });
 
-test("update summary leads with success", () => {
+test("update summary leads with success and does not claim an unchecked GitHub lookup", () => {
   const out = plain(formatUpdateSummary(root, undefined, "linux"));
   assert.match(out.split("\n")[0] ?? "", /^✓ OneSelf 已更新/);
+  assert.match(out, /不覆盖口令/);
+  assert.doesNotMatch(out, /已核对 GitHub/);
+});
+
+test("update summary claims a GitHub check only when it happened", () => {
+  const out = plain(formatUpdateSummary(root, undefined, "linux", true));
+  assert.match(out, /已核对 GitHub 最新正式版/);
   assert.match(out, /不覆盖口令/);
 });
 

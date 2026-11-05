@@ -7,7 +7,7 @@
 3. **先资产后镜像。** 编二进制与上传 Release 失败时不 push Docker Hub，避免 Hub 有标签而 GitHub 资产残缺。
 4. **musl 可选。** Bun 的 `bun-linux-*-musl` 目标失败时跳过，不阻断 glibc 资产；bootstrap 在 Alpine 上优先请求 `*-musl`。
 5. **仿冒 Action 零容忍。** 只允许 `oven-sh/setup-bun`。
-6. **「这份安装器的标签」和「用户强制的标签」分开传。** 启动脚本的 Release 标签只作为 `ONESELF_BUNDLED_REF` 下传；`ONESELF_REF` 保留给用户显式覆盖。CLI 的同步判断是纯函数（`apps/cli/src/ref.ts` `planBundleSync` / `planAfterResolve`）：未强制时已装版本更新就不动；`latest` 解析成具体标签后再比一次。这样旧 Release 的命令不会把站降回去，而 `ONESELF_REF=v旧版` 仍可显式回退。
+6. **「这份安装器的标签」和「用户强制的标签」分开传。** 启动脚本的 Release 标签只作为 `ONESELF_BUNDLED_REF` 下传；`ONESELF_REF` 保留给用户显式覆盖。CLI 的同步判断是纯函数（`apps/cli/src/ref.ts` `planBundleSync` / `planAfterResolve`）：未强制时已装版本更新就不动；`latest` 解析成具体标签后再比一次。这样旧 Release 的命令不会把站降回去，而 `ONESELF_REF=v旧版` 仍可显式回退。直接运行 `oneself update` 且两边都没有标签时，同步判断改用 `planUpdateSync`：解析 GitHub 最新正式版，比已装版本新才同步。
 7. **Windows 启动脚本按 `iex` 语境写。** 全部逻辑在子作用域里跑，`finally` 还原环境变量；不 `exit`，用 `throw`；用 `Start-Process -NoNewWindow -Wait -PassThru` 取退出码，并按 CommandLineToArgvW 规则给参数加引号。标准输入本身被重定向且没有 `--yes` 时，启动前就给出明确提示。
 8. **`update` 与 `install` 共用同步路径。** `runUpdate` 先 `maybeSyncBundle` 再 pull/up。
 9. **只有一套实现。** 不再维护完整 shell / PowerShell 安装器：两套逻辑已经在降级、`refNewer`、`--yes` 上漂移过。启动脚本只做选资产、校验、交接；安装目录里的 `oneself.sh` / `oneself.ps1` 由 CLI 写出（`apps/cli/src/launchers.ts`），只设 `ONESELF_DIR` 并 `exec bin/oneself`。复制自身二进制时走临时文件 + rename，且跳过「复制到自己」，以便 `bin/oneself update` / `~/.local/bin/oneself` 自更新不截断正在运行的文件。
