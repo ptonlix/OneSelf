@@ -303,8 +303,8 @@ pnpm test             # Unit and in-process API tests (no Compose needed)
 pnpm test:smoke       # Closed-loop smoke test on the running compose.dev.yaml services, separate DB and bucket
 pnpm boundaries       # Package dependency direction only
 pnpm db:migrate       # Apply migrations to DATABASE_URL from .env without starting the app
-pnpm data:export -- --out oneself-export --stopped
-pnpm data:import -- --from oneself-export.tar.gz --stopped
+pnpm data:export --out oneself-export --stopped
+pnpm data:import --from oneself-export.tar.gz --stopped
 pnpm dev              # Build the admin UI and built-in public page, then start the app
 ```
 

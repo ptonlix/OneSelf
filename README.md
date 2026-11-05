@@ -289,8 +289,8 @@ pnpm test             # 单元与进程内接口测试（不需要 Compose）
 pnpm test:smoke       # 闭环冒烟：复用已启动的 compose.dev.yaml
 pnpm boundaries       # 包依赖方向
 pnpm db:migrate       # 只迁移，不启动应用
-pnpm data:export -- --out oneself-export --stopped
-pnpm data:import -- --from oneself-export.tar.gz --stopped
+pnpm data:export --out oneself-export --stopped
+pnpm data:import --from oneself-export.tar.gz --stopped
 pnpm dev              # 构建管理端和内置公开页，再启动应用
 ```
 
