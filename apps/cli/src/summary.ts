@@ -94,7 +94,7 @@ export function formatInstallSummary(summary: InstallSummary): string {
 
 /**
  * Message for the final `p.outro` after `oneself update`.
- * `checkedLatest` is true only when this run resolved GitHub /releases/latest.
+ * `checkedLatest` is true only when this run resolved latest.
  */
 export function formatUpdateSummary(
   root: string,
@@ -102,9 +102,7 @@ export function formatUpdateSummary(
   platform: NodeJS.Platform = process.platform,
   checkedLatest = false,
 ): string {
-  const detail = checkedLatest
-    ? "已核对 GitHub 最新正式版；不覆盖口令。已是最新时只刷新已钉镜像"
-    : "不覆盖口令";
+  const detail = checkedLatest ? "不覆盖口令。没有新版本时，只重新拉取当前镜像" : "不覆盖口令";
   return [
     pc.green(pc.bold("✓ OneSelf 已更新")),
     `${HEAD}${pc.dim(detail)}`,
