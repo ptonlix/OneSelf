@@ -19,7 +19,10 @@ function redirect(location: string | undefined, status = 302): Promise<Response>
 
 it("reads an absolute or relative release redirect", () => {
   expect(
-    tagFromReleaseLocation("https://github.com/ptonlix/OneSelf/releases/tag/v1.2.3", "ptonlix/OneSelf"),
+    tagFromReleaseLocation(
+      "https://github.com/ptonlix/OneSelf/releases/tag/v1.2.3",
+      "ptonlix/OneSelf",
+    ),
   ).toBe("v1.2.3");
   expect(tagFromReleaseLocation("/releases/tag/v1.2.3", "ptonlix/OneSelf")).toBe("v1.2.3");
   expect(tagFromReleaseLocation("/ptonlix/OneSelf/releases/tag/v1.2.3", "ptonlix/OneSelf")).toBe(
@@ -29,13 +32,22 @@ it("reads an absolute or relative release redirect", () => {
 
 it("rejects another host, another repo, or a non-version tag", () => {
   expect(
-    tagFromReleaseLocation("https://example.com/ptonlix/OneSelf/releases/tag/v1.2.3", "ptonlix/OneSelf"),
+    tagFromReleaseLocation(
+      "https://example.com/ptonlix/OneSelf/releases/tag/v1.2.3",
+      "ptonlix/OneSelf",
+    ),
   ).toBeUndefined();
   expect(
-    tagFromReleaseLocation("https://github.com/other/OneSelf/releases/tag/v1.2.3", "ptonlix/OneSelf"),
+    tagFromReleaseLocation(
+      "https://github.com/other/OneSelf/releases/tag/v1.2.3",
+      "ptonlix/OneSelf",
+    ),
   ).toBeUndefined();
   expect(
-    tagFromReleaseLocation("https://github.com/ptonlix/OneSelf/releases/tag/latest", "ptonlix/OneSelf"),
+    tagFromReleaseLocation(
+      "https://github.com/ptonlix/OneSelf/releases/tag/latest",
+      "ptonlix/OneSelf",
+    ),
   ).toBeUndefined();
   expect(tagFromReleaseLocation("", "ptonlix/OneSelf")).toBeUndefined();
 });
@@ -48,7 +60,7 @@ it("resolves latest from the github.com redirect and not the API", async () => {
   }) as typeof fetch;
   await expect(resolveTag("latest")).resolves.toBe("v1.2.3");
   expect(urls).toEqual(["https://github.com/ptonlix/OneSelf/releases/latest"]);
-  expect(urls.some((url) => url.includes("api.github.com"))).toBe(false);
+  expect(new URL(urls[0] ?? "").hostname).toBe("github.com");
 });
 
 it("uses ONESELF_REPO and does not fall back when the redirect is missing", async () => {

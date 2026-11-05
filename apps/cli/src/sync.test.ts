@@ -149,8 +149,8 @@ it("followLatest lookup failure rejects before compose pull", async () => {
   );
   expect(urls).toHaveLength(1);
   expect(urls[0] ?? "").toBe("https://github.com/ptonlix/OneSelf/releases/latest");
-  expect(urls.some((url) => url.includes("api.github.com"))).toBe(false);
-  expect(urls.some((url) => url.includes("/releases/download/"))).toBe(false);
+  expect(new URL(urls[0] ?? "").hostname).toBe("github.com");
+  expect(urls.some((url) => new URL(url).pathname.includes("/releases/download/"))).toBe(false);
 });
 
 it("resolved latest same or older does not downgrade", async () => {
