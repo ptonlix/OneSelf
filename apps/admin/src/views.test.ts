@@ -737,9 +737,15 @@ describe("overview", () => {
         }),
       ),
     );
-    const next = elements(RecordsView(recordsProps({ tab: "deleted", onDeletedPage: loadDeleted, data: { ...overviewData, deletedSources: ready(deleted) } }))).find(
-      (element) => element.type === "button" && textOf(element) === "下一页",
-    );
+    const next = elements(
+      RecordsView(
+        recordsProps({
+          tab: "deleted",
+          onDeletedPage: loadDeleted,
+          data: { ...overviewData, deletedSources: ready(deleted) },
+        }),
+      ),
+    ).find((element) => element.type === "button" && textOf(element) === "下一页");
     next?.props.onClick?.();
     expect(section(markup, "已删除目录")).toContain("分页");
     expect(section(markup, "已删除目录")).toContain("old-notes");

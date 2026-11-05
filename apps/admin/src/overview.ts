@@ -172,11 +172,7 @@ export function RecordsView(props: RecordsProps): ReactElement {
         null,
         h("div", { className: "kicker teal" }, "Records"),
         h("h1", null, "资料"),
-        h(
-          "p",
-          { className: "lede" },
-          "删除目录、恢复 30 天内删掉的目录，并查看最近写入。",
-        ),
+        h("p", { className: "lede" }, "删除目录、恢复 30 天内删掉的目录，并查看最近写入。"),
       ),
     ),
     h(
