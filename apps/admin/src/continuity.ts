@@ -21,7 +21,7 @@ export function connectCommand(origin: string): string {
 }
 
 /** Next query/deleted-source cursor. A full page is not the total. */
-export function nextCursor(offset: number, pageLength: number, limit = PAGE_SIZE): string | null {
+function nextCursor(offset: number, pageLength: number, limit = PAGE_SIZE): string | null {
   if (pageLength < limit) return null;
   return String(offset + limit);
 }
@@ -109,7 +109,7 @@ export function directoryActions(input: {
   });
 }
 
-export function restoreActions(input: {
+function restoreActions(input: {
   readonly id: string;
   readonly armed: boolean;
   readonly pending: boolean;

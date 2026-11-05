@@ -40,7 +40,7 @@ export type TransferOptions = {
   readonly passthrough: readonly string[];
 };
 
-export type ComposeIo = {
+type ComposeIo = {
   readonly io: RemoteIO;
   close(): Promise<void>;
 };
@@ -59,7 +59,7 @@ export type TransferDeps = {
 export const EXPORT_EXCLUSION_SUMMARY =
   "Sessions, device codes, PUBLIC_ORIGIN, and storage credentials were not exported.";
 
-export function exportSummary(archive: string, manifest: Manifest): readonly string[] {
+function exportSummary(archive: string, manifest: Manifest): readonly string[] {
   return [
     `wrote ${path.resolve(archive)} (${String(manifest.objects.count)} objects, ${String(manifest.objects.bytes)} bytes)`,
     "The bundle contains password hashes and key hashes. Do not commit it.",
@@ -79,7 +79,7 @@ export function startAppArgs(): readonly string[] {
   return ["start", "app"];
 }
 
-export function startAppCommand(composeFile: string): string {
+function startAppCommand(composeFile: string): string {
   return `docker ${composeArgs(composeFile, [...startAppArgs()]).join(" ")}`;
 }
 
