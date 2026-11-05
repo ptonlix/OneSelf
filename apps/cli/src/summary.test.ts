@@ -82,9 +82,9 @@ test("update summary leads with success and does not claim an unchecked GitHub l
   assert.doesNotMatch(out, /已核对 GitHub/);
 });
 
-test("update summary claims a GitHub check only when it happened", () => {
+test("update summary explains a no-op pull only after a latest check", () => {
   const out = plain(formatUpdateSummary(root, undefined, "linux", true));
-  assert.match(out, /已核对 GitHub 最新正式版/);
+  assert.match(out, /没有新版本时，只重新拉取当前镜像/);
   assert.match(out, /不覆盖口令/);
 });
 
