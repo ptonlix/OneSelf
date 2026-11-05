@@ -23,6 +23,14 @@
 - MCP 使用官方 TypeScript SDK，同进程 Streamable HTTP，路径 `POST /mcp`。工具从操作注册表生成，不另起 MCP 进程。
 - 不新增依赖，除非任务明确要求。
 
+## 通用技能的边界
+
+同名开发技能可以读，但不能改写上面的约束：
+
+- `hono` 只约束服务端路由。页面继续用 React。
+- `drizzle-best-practices` 里的 MySQL、SQLite、Prisma 迁移和 `drizzle-zod` 生成表校验，不适用于本仓库。Zod 只解析接口入参和 frontmatter。
+- `vercel-composition-patterns` 只用于 React 组件结构。部署不走 Vercel，页面不用 Next.js App Router。
+
 ## 代码放哪里
 
 ```text

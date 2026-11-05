@@ -280,6 +280,45 @@ describe("admin overview client", () => {
     ]);
   });
 
+  it("reads the connect origin from skills.oneself and ignores a spoofed host", async () => {
+    const { transport, seen } = scripted([
+      {
+        status: 200,
+        body: {
+          host: "http://evil.example",
+          openapi: "http://evil.example/openapi.json",
+          skills: { oneself: "http://127.0.0.1:3000/skills/oneself/SKILL.md" },
+        },
+      },
+    ]);
+    await expect(createAdminClient(transport).readConnectOrigin()).resolves.toBe(
+      "http://127.0.0.1:3000",
+    );
+    expect(seen).toEqual([{ method: "GET", path: "/.well-known/pcp", anonymous: true }]);
+  });
+
+  it("requests the next query page with cursor when the first page is full", async () => {
+    const page = (slug: string) => ({
+      source: "notes",
+      slug,
+      type: "note",
+      title: slug,
+      updated_at: "2026-10-20T00:00:00.000Z",
+    });
+    const { transport, seen } = scripted([
+      { status: 200, body: Array.from({ length: 20 }, (_, index) => page(`p${String(index)}`)) },
+      { status: 200, body: [page("last")] },
+    ]);
+    const client = createAdminClient(transport);
+    const first = await client.queryPages();
+    expect(first).toHaveLength(20);
+    const second = await client.queryPages("20");
+    expect(second.map((row) => row.slug)).toEqual(["last"]);
+    expect(seen).toEqual([
+      { method: "POST", path: "/pcp/v1/query", json: { limit: 20 } },
+      { method: "POST", path: "/pcp/v1/query", json: { limit: 20, cursor: "20" } },
+    ]);
+  });
   it("reads public pages without the owner cookie", async () => {
     const { fetchImpl, calls } = browserCalls([]);
     await createAdminClient(browserTransport(fetchImpl)).listPublicPages();

@@ -94,12 +94,14 @@ powershell -c "irm https://github.com/ptonlix/OneSelf/releases/latest/download/o
 The installer prompts for the public origin and ingress, then starts the services. Then:
 
 1. Open the printed `PUBLIC_ORIGIN` (home page)
-2. Sign in at `/admin` and change the password
-3. Tell your agent to install the Skill (replace the origin with the printed `PUBLIC_ORIGIN`, and `<agent>` with the agent name):
+2. Give this command to the agent you are talking to (replace `<agent>` with its name):
 
 ```bash
 npx skills add https://your-origin -a <agent> -s oneself -y
 ```
+
+3. With no credential, the agent requests a device code. Sign in at `/admin`, then approve it at `/admin/device`.
+4. An API key is for a script or a long-lived key, not the first conversational connect.
 
 **Install options**
 
@@ -112,6 +114,7 @@ npx skills add https://your-origin -a <agent> -s oneself -y
 **Operations**
 
 - Commands: `bin/oneself update | doctor | backup | restore`
+- `backup` / `restore` run in the install directory with its `compose.yaml`; they do not need a checkout or `scripts/transfer-cli.ts`
 - `update` only pulls the pinned image and restarts; `doctor` only checks
 - Upgrade: re-run a newer Release's install command; passwords are kept
 - An older Release never downgrades an install; set `ONESELF_REF=v1.2.3` to force a version

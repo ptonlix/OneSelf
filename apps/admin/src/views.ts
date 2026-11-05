@@ -28,20 +28,23 @@ import type { AdminRoute } from "./routes";
 import { Sky } from "./sky";
 import type { ApiKeyRequest, GrantFlag, SiteActivation, SourceDraft } from "./types";
 
-type Section = "home" | "device" | "api-key" | "site" | "password";
+type Section = "home" | "records" | "device" | "api-key" | "site" | "password";
 
 const NAV: readonly {
   group: string;
   items: readonly {
     section: Section;
     label: string;
-    icon: "home" | "device" | "key" | "globe" | "lock";
+    icon: "home" | "records" | "device" | "key" | "globe" | "lock";
     route: AdminRoute;
   }[];
 }[] = [
   {
     group: "总览",
-    items: [{ section: "home", label: "概览", icon: "home", route: { name: "home" } }],
+    items: [
+      { section: "home", label: "概览", icon: "home", route: { name: "home" } },
+      { section: "records", label: "资料", icon: "records", route: { name: "records" } },
+    ],
   },
   {
     group: "授权",
@@ -67,6 +70,8 @@ const NAV: readonly {
 
 function sectionFor(route: AdminRoute): Section {
   switch (route.name) {
+    case "records":
+      return "records";
     case "device":
       return "device";
     case "api-key-new":
@@ -84,6 +89,8 @@ function sectionFor(route: AdminRoute): Section {
 
 function crumbFor(route: AdminRoute): string {
   switch (route.name) {
+    case "records":
+      return "资料";
     case "device":
       return "批准设备码";
     case "api-key-new":

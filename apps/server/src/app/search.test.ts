@@ -49,4 +49,27 @@ describe("search", () => {
     ]);
     expect(searchPages(state, owner, { q: "Ledger", limit: 20, offset: 0 }, false)).toEqual([]);
   });
+
+  it("matches contiguous Chinese text in a title or body and ignores chunk-only text", () => {
+    const state = emptyDomainState();
+    state.sources = [{ id: "notes", deletedAt: null }];
+    state.pages = [
+      page({
+        slug: "city",
+        title: "去上海",
+        body: "普通正文",
+        chunks: [{ ordinal: 0, body: "只在块里" }],
+      }),
+    ];
+    expect(searchPages(state, owner, { q: "上海", limit: 20, offset: 0 }, false)).toEqual([
+      {
+        source: "notes",
+        slug: "city",
+        type: "ledger",
+        title: "去上海",
+        snippet: "去上海",
+      },
+    ]);
+    expect(searchPages(state, owner, { q: "只在块里", limit: 20, offset: 0 }, false)).toEqual([]);
+  });
 });

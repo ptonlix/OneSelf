@@ -118,7 +118,6 @@ const schemaMd = {
     indexes: [
       { name: "pages_source_type_idx", method: "btree" },
       { name: "pages_frontmatter_idx", method: "gin" },
-      { name: "pages_title_body_search_idx", method: "gin" },
     ],
     unique: [],
   },
@@ -513,6 +512,7 @@ it("appends one initial migration whose columns match schema.md", () => {
     "0000_initial.sql",
     "0001_oauth_refresh_reuse.sql",
     "0002_oauth_unrestricted_data.sql",
+    "0003_drop_unused_search_index.sql",
   ]);
 
   const journal = JSON.parse(
@@ -523,6 +523,7 @@ it("appends one initial migration whose columns match schema.md", () => {
     "0000_initial",
     "0001_oauth_refresh_reuse",
     "0002_oauth_unrestricted_data",
+    "0003_drop_unused_search_index",
   ]);
 
   const sqlText = readFileSync(join(migrationsDirectory, "0000_initial.sql"), "utf8");
@@ -586,6 +587,13 @@ it("appends one initial migration whose columns match schema.md", () => {
   expect(sqlText).toContain(
     `CREATE INDEX "pages_title_body_search_idx" ON "pages" USING gin (to_tsvector('simple', "title" || ' ' || "body"))`,
   );
+  const dropped = readFileSync(
+    join(migrationsDirectory, "0003_drop_unused_search_index.sql"),
+    "utf8",
+  );
+  expect(dropped).toBe('DROP INDEX "pages_title_body_search_idx";\n');
+  expect(dropped.toLowerCase()).not.toContain("create extension");
+  expect(sqlText.toLowerCase()).not.toContain("pg_trgm");
   expect(sqlText).toContain(`"visibility" text DEFAULT 'private' NOT NULL`);
   expect(sqlText).toContain(`"hidden_by_source" boolean DEFAULT false NOT NULL`);
   expect(sqlText).toContain(`"deleted_at" timestamp with time zone`);

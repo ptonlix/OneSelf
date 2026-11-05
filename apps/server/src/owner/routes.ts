@@ -1,5 +1,6 @@
 import type { Hono } from "hono";
 
+import { parseDeletedSourceQuery } from "../app/deleted-sources.ts";
 import { isRecord, parseGrants, rateLimited, readJson, sendError, sendJson } from "../app/json.ts";
 import { parseOperation } from "../app/schemas.ts";
 import type { OauthGrantView, Runtime } from "../app/runtime.ts";
@@ -133,6 +134,19 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
       return sendError(result.error, result.message);
     }
     return sendJson({});
+  });
+
+  app.get("/admin/deleted-sources", async (c) => {
+    if (!wantsJson(c.req.raw)) {
+      return adminPage(runtime, c);
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const query = parseDeletedSourceQuery(c.req.query("limit"), c.req.query("cursor"));
+    const result = await runtime.listDeletedSources(actor, query);
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    return sendJson(result.value);
   });
 
   app.get("/admin/oauth-grants", async (c) => {

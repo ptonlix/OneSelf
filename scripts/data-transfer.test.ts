@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -321,6 +321,55 @@ it("packs a bundle as tar.gz and rejects entries outside the bundle", async () =
   const manifest = await readFile(path.join(extracted, "manifest.json"), "utf8");
   expect(manifest).toContain('"format": 1');
   await expect(packBundle(bundle, archive)).rejects.toThrow("refusing to overwrite");
+  await rm(directory, { recursive: true, force: true });
+});
+
+it("fails a journal mismatch before restore writes", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "oneself-export-"));
+  const bundle = path.join(directory, "bundle");
+  await exportBundle(new MemoryRemote(), bundle, {
+    stopped: true,
+    journal,
+    now: "2026-04-08T00:00:00.000Z",
+  });
+  const target = new MemoryRemote();
+  const first = journal[0];
+  if (first === undefined) throw new Error("fixture missing");
+  await expect(
+    importBundle(target, bundle, {
+      stopped: true,
+      replace: true,
+      journal: [{ ...first, hash: "ee".repeat(32) }],
+      now: "2026-04-08T00:00:00.000Z",
+    }),
+  ).rejects.toThrow(/does not match/);
+  expect(target.calls).not.toContain("restore");
+  expect(target.calls).not.toContain("truncate");
+  await rm(directory, { recursive: true, force: true });
+});
+
+it("keeps the owner table in the bundle and does not pack .env", async () => {
+  expect(DATA_TABLES).toContain("owners");
+  const directory = await mkdtemp(path.join(tmpdir(), "oneself-export-"));
+  const bundle = path.join(directory, "bundle");
+  const archive = path.join(directory, "bundle.tar.gz");
+  await writeFile(path.join(directory, ".env"), "PUBLIC_ORIGIN=http://secret.example\n");
+  const source = new MemoryRemote();
+  source.tableCounts = counts({ owners: 1 });
+  const exported = await exportBundle(source, bundle, {
+    stopped: true,
+    journal,
+    now: "2026-04-08T00:00:00.000Z",
+  });
+  expect(exported.tables.owners).toBe(1);
+  await packBundle(bundle, archive);
+  if (process.platform !== "win32") {
+    const info = await stat(archive);
+    expect(info.mode & 0o777).toBe(0o600);
+  }
+  const listing = await tar(["-tzf", archive]);
+  expect(listing).not.toContain(".env");
+  expect(listing).toContain("manifest.json");
   await rm(directory, { recursive: true, force: true });
 });
 

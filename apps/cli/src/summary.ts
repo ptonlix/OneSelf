@@ -80,6 +80,8 @@ export function formatInstallSummary(summary: InstallSummary): string {
     ...section("管理端", [pc.cyan(`${origin}/admin`)]),
     ...section("接入 Agent", [
       pc.cyan(`npx skills add ${origin} -a <agent> -s oneself -y`),
+      "Agent 会申请设备码，到 /admin/device 批准。",
+      pc.dim("API Key 只给脚本或长期密钥，不是第一步。"),
       pc.dim(`发现地址 ${origin}/.well-known/pcp`),
     ]),
     ...section("运维", opsLines(binary, root, summary.launchers, platform)),

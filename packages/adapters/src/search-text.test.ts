@@ -20,4 +20,17 @@ describe("pageSearchTextClause", () => {
   it("returns no clause for an empty query", () => {
     expect(pageSearchTextClause("")).toBeUndefined();
   });
+
+  it("matches 上海 as a contiguous substring and does not search chunks or simple tsvector", () => {
+    const clause = pageSearchTextClause("上海");
+    expect(clause).toBeDefined();
+    if (clause === undefined) return;
+    const query = new PgDialect().sqlToQuery(clause);
+    expect(query.sql).toContain("LIKE");
+    expect(query.sql.toLowerCase()).not.toContain("to_tsvector");
+    expect(query.sql).not.toContain("chunks");
+    expect(query.params).toContain("%上海%");
+    expect(query.sql).toContain('"pages"."title"');
+    expect(query.sql).toContain('"pages"."body"');
+  });
 });

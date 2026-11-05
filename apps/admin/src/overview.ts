@@ -3,6 +3,16 @@
 import { createElement, type ReactElement, type ReactNode } from "react";
 import { Icon, SourceOrbit, type OrbitSource } from "./icons";
 import {
+  connectCommand,
+  deletedRows,
+  directoryActions,
+  hasNextPage,
+  pageControls,
+  pageSlice,
+  recentRows,
+  type RecordsTab,
+} from "./continuity";
+import {
   chip,
   formatTime,
   grantChips,
@@ -16,7 +26,14 @@ import {
   SiteReleaseNotice,
 } from "./parts";
 import type { AdminRoute } from "./routes";
-import type { ApiKeySummary, OauthGrantView, SiteList, SourceStatus } from "./types";
+import type {
+  ApiKeySummary,
+  DeletedSource,
+  OauthGrantView,
+  QueryPage,
+  SiteList,
+  SourceStatus,
+} from "./types";
 
 type Panel<T> =
   | { readonly state: "loading" }
@@ -34,6 +51,9 @@ export interface OverviewData {
   apiKeys: Panel<ApiKeySummary[]>;
   sites: Panel<SiteList>;
   grants: Panel<OauthGrantView[]>;
+  deletedSources: Panel<DeletedSource[]>;
+  recent: Panel<QueryPage[]>;
+  connectOrigin: Panel<string>;
 }
 
 export const LOADING_OVERVIEW: OverviewData = {
@@ -42,6 +62,9 @@ export const LOADING_OVERVIEW: OverviewData = {
   apiKeys: { state: "loading" },
   sites: { state: "loading" },
   grants: { state: "loading" },
+  deletedSources: { state: "loading" },
+  recent: { state: "loading" },
+  connectOrigin: { state: "loading" },
 };
 
 /** Status reads run at most this many at a time. */
@@ -86,6 +109,28 @@ export interface OverviewProps {
   onRevokeGrant: (id: string) => void;
 }
 
+export interface RecordsProps {
+  data: Pick<OverviewData, "sources" | "deletedSources" | "recent">;
+  directoryMessage: string | null;
+  armedDelete: string | null;
+  armedRestore: string | null;
+  directoryPending: boolean;
+  tab: RecordsTab;
+  onTab: (tab: RecordsTab) => void;
+  directoryPage: number;
+  deletedPage: number;
+  recentPage: number;
+  deletedHasMore: boolean;
+  recentHasMore: boolean;
+  onDirectoryPage: (page: number) => void;
+  onDeletedPage: (page: number) => void;
+  onRecentPage: (page: number) => void;
+  onArmDelete: (id: string | null) => void;
+  onDeleteSource: (id: string) => void;
+  onArmRestore: (id: string | null) => void;
+  onRestoreSource: (id: string) => void;
+}
+
 export function HomeView(props: OverviewProps): ReactElement {
   return h(
     "section",
@@ -102,9 +147,195 @@ export function HomeView(props: OverviewProps): ReactElement {
       ),
     ),
     orbitCard(props.data),
+    connectPanel(props),
     quickCards(props.onNavigate),
     h("div", { className: "g2" }, keyPanel(props), sitePanel(props.data.sites)),
     grantPanel(props),
+  );
+}
+
+const RECORD_TABS: readonly { readonly id: RecordsTab; readonly label: string }[] = [
+  { id: "directories", label: "目录" },
+  { id: "deleted", label: "已删除目录" },
+  { id: "recent", label: "最近写入" },
+];
+
+export function RecordsView(props: RecordsProps): ReactElement {
+  return h(
+    "section",
+    { className: "page records" },
+    h(
+      "header",
+      { className: "ph-head" },
+      h(
+        "div",
+        null,
+        h("div", { className: "kicker teal" }, "Records"),
+        h("h1", null, "资料"),
+        h(
+          "p",
+          { className: "lede" },
+          "删除目录、恢复 30 天内删掉的目录，并查看最近写入。",
+        ),
+      ),
+    ),
+    h(
+      "div",
+      { className: "rec-tabs", role: "tablist", "aria-label": "资料分类" },
+      ...RECORD_TABS.map((tab) =>
+        h(
+          "button",
+          {
+            key: tab.id,
+            type: "button",
+            className: "rec-tab",
+            role: "tab",
+            "aria-selected": props.tab === tab.id,
+            onClick: () => {
+              props.onTab(tab.id);
+            },
+          },
+          tab.label,
+        ),
+      ),
+    ),
+    recordsList(props),
+  );
+}
+
+function recordsList(props: RecordsProps): ReactElement {
+  if (props.tab === "deleted") return deletedList(props);
+  if (props.tab === "recent") return recentList(props);
+  return directoryList(props);
+}
+
+function directoryList(props: RecordsProps): ReactElement {
+  return h(
+    "section",
+    { className: "card", "aria-label": "目录" },
+    h(
+      "div",
+      { className: "card-h" },
+      h("h3", null, "目录"),
+      h("span", { className: "cap" }, "删除需要再确认一次"),
+    ),
+    message(props.directoryMessage),
+    panelState(props.data.sources, (rows) => {
+      const page = pageSlice(rows, props.directoryPage);
+      return h(
+        "div",
+        null,
+        page.length === 0
+          ? h("p", { className: "card-b body-s" }, "还没有目录。")
+          : h(
+              "ul",
+              { className: "list" },
+              ...page.map((row) =>
+                h(
+                  "li",
+                  { key: `dir-${row.id}`, className: "li" },
+                  h("div", { className: "li-main" }, h("div", { className: "t" }, row.id)),
+                  directoryActions({
+                    id: row.id,
+                    armed: props.armedDelete === row.id,
+                    pending: props.directoryPending,
+                    onArm: props.onArmDelete,
+                    onDelete: props.onDeleteSource,
+                  }),
+                ),
+              ),
+            ),
+        pageControls({
+          page: props.directoryPage,
+          hasNext: hasNextPage(rows.length, props.directoryPage),
+          onPage: props.onDirectoryPage,
+        }),
+      );
+    }),
+  );
+}
+
+function deletedList(props: RecordsProps): ReactElement {
+  return h(
+    "section",
+    { className: "card", "aria-label": "已删除目录" },
+    h(
+      "div",
+      { className: "card-h" },
+      h("h3", null, "已删除目录"),
+      h("span", { className: "cap" }, "30 天内可恢复"),
+    ),
+    panelState(props.data.deletedSources, (rows) =>
+      h(
+        "div",
+        null,
+        rows.length === 0
+          ? h("p", { className: "card-b body-s" }, "没有可恢复的目录。")
+          : deletedRows(
+              rows,
+              props.armedRestore,
+              props.directoryPending,
+              props.onArmRestore,
+              props.onRestoreSource,
+            ),
+        pageControls({
+          page: props.deletedPage,
+          hasNext: props.deletedHasMore,
+          onPage: props.onDeletedPage,
+        }),
+      ),
+    ),
+  );
+}
+
+function recentList(props: RecordsProps): ReactElement {
+  return h(
+    "section",
+    { className: "card", "aria-label": "最近写入" },
+    h(
+      "div",
+      { className: "card-h" },
+      h("h3", null, "最近写入"),
+      h("span", { className: "cap" }, "只读，不含正文"),
+    ),
+    panelState(props.data.recent, (rows) =>
+      h(
+        "div",
+        null,
+        rows.length === 0
+          ? h("p", { className: "card-b body-s" }, "还没有写入。")
+          : recentRows(rows),
+        pageControls({
+          page: props.recentPage,
+          hasNext: props.recentHasMore,
+          onPage: props.onRecentPage,
+        }),
+      ),
+    ),
+  );
+}
+
+function connectPanel(props: OverviewProps): ReactElement | null {
+  const keys = props.data.apiKeys;
+  const grants = props.data.grants;
+  if (keys.state !== "ready" || grants.state !== "ready") return null;
+  const activeKey = keys.value.some((key) => key.revoked_at === null);
+  const approved = grants.value.some((grant) => grant.revoked_at === null);
+  if (activeKey || approved) return null;
+  return h(
+    "section",
+    { className: "card", "aria-label": "接入" },
+    h("div", { className: "card-h" }, h("h3", null, "接入 Agent")),
+    panelState(props.data.connectOrigin, (origin) =>
+      h(
+        "div",
+        { className: "card-b" },
+        h("p", { className: "body-s" }, "把这条命令交给正在对话的 Agent。它会申请设备码。"),
+        h("p", { className: "mono" }, connectCommand(origin)),
+        h("p", { className: "body-s" }, "到 /admin/device 批准设备码。"),
+        h("p", { className: "body-s" }, "API Key 只给脚本或长期密钥，不是第一次对话的接入方式。"),
+      ),
+    ),
   );
 }
 
