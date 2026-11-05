@@ -58,7 +58,7 @@ After a successful `install` or `update` with a CLI binary at `<root>/bin/onesel
 
 ### Requirement: No silent downgrade
 
-`install` and `update` in the CLI MUST share one bundle-sync path. Without a user-set `ONESELF_REF`, the CLI MUST compare the installed `.oneself-release` `ref=` with `ONESELF_BUNDLED_REF` and MUST NOT re-extract the bundle or re-pin `ONESELF_IMAGE` when the installed ref is newer. `ONESELF_BUNDLED_REF` MUST NOT be treated as a forced ref. A user-set `ONESELF_REF` MAY force a sync to any tag, including an older one. When neither is present (e.g. running `bin/oneself` or `./oneself.sh` directly), `update` MUST only refresh the already-pinned image; moving to a newer version requires re-running a newer Release's bootstrap.
+`install` and `update` in the CLI MUST share one bundle-sync path. Without a user-set `ONESELF_REF`, the CLI MUST compare the installed `.oneself-release` `ref=` with `ONESELF_BUNDLED_REF` and MUST NOT re-extract the bundle or re-pin `ONESELF_IMAGE` when the installed ref is newer. `ONESELF_BUNDLED_REF` MUST NOT be treated as a forced ref. A user-set `ONESELF_REF` MAY force a sync to any tag, including an older one. When neither is present, `install` MUST leave the installed ref alone. `update` MUST resolve GitHub's latest stable release and sync to it when that tag is newer than `.oneself-release`. If it is the same or older, `update` MUST NOT downgrade and MUST only refresh the already-pinned image. A lookup failure MUST stop `update` before `docker compose pull`.
 
 Version comparison: `MAJ.MIN.PAT` numerically; a release is newer than any prerelease of the same version; two prereleases compare as plain strings; `latest` or malformed refs are not comparable.
 
@@ -71,6 +71,21 @@ Version comparison: `MAJ.MIN.PAT` numerically; a release is newer than any prere
 
 - **WHEN** `.oneself-release` has `ref=v1.2.3-rc.1` and the user runs the `v1.2.3` Release command
 - **THEN** the bundle syncs to `v1.2.3`
+
+#### Scenario: No refs and a newer GitHub tag syncs
+
+- **WHEN** neither `ONESELF_REF` nor `ONESELF_BUNDLED_REF` is set, `.oneself-release` is older than GitHub's latest stable tag, and the user runs `oneself update`
+- **THEN** install files sync to that tag and `ONESELF_IMAGE` is re-pinned
+
+#### Scenario: Resolved tag same or older does not downgrade
+
+- **WHEN** neither `ONESELF_REF` nor `ONESELF_BUNDLED_REF` is set and the resolved GitHub latest tag is the same as or older than `.oneself-release`
+- **THEN** `oneself update` does not downgrade install files or `ONESELF_IMAGE`, and only refreshes the already-pinned image
+
+#### Scenario: Lookup failure stops before pull
+
+- **WHEN** `oneself update` cannot resolve GitHub's latest stable release
+- **THEN** it stops before `docker compose pull`
 
 ### Requirement: Non-interactive and ingress safety
 

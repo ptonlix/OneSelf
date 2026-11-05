@@ -27,9 +27,11 @@ function updateCommand(root: string, platform: NodeJS.Platform = process.platfor
 
 /** One-line upgrade hint for the completion summary. */
 function upgradeHint(platform: NodeJS.Platform = process.platform): string {
-  return platform === "win32"
-    ? "升级：在 PowerShell 重跑新 Release 的 irm … | iex，口令保留"
-    : "升级：重跑新 Release 的 curl … | sh，口令保留";
+  const replaceBinary =
+    platform === "win32"
+      ? "更换 CLI 二进制仍需在 PowerShell 重跑 Release 的 irm … | iex"
+      : "更换 CLI 二进制仍需重跑 Release 的 curl … | sh";
+  return `升级：oneself update 可改 .oneself-release 与 ONESELF_IMAGE；${replaceBinary}，口令保留`;
 }
 
 /** Platform-correct update/upgrade hints for the completion summary. */
@@ -90,16 +92,23 @@ export function formatInstallSummary(summary: InstallSummary): string {
   ].join("\n");
 }
 
-/** Message for the final `p.outro` after `oneself update`. */
+/**
+ * Message for the final `p.outro` after `oneself update`.
+ * `checkedLatest` is true only when this run resolved GitHub /releases/latest.
+ */
 export function formatUpdateSummary(
   root: string,
   binary: InstallBinaryResult | undefined,
   platform: NodeJS.Platform = process.platform,
+  checkedLatest = false,
 ): string {
+  const detail = checkedLatest
+    ? "已核对 GitHub 最新正式版；不覆盖口令。已是最新时只刷新已钉镜像"
+    : "不覆盖口令";
   return [
     pc.green(pc.bold("✓ OneSelf 已更新")),
-    `${HEAD}${pc.dim("按当前 .env 的镜像拉取并重启；不覆盖口令")}`,
-    `${HEAD}${pc.dim("· 换版本：重跑对应 Release 的安装命令")}`,
+    `${HEAD}${pc.dim(detail)}`,
+    `${HEAD}${pc.dim("· 旧 Release 的安装命令不会把已装版本降回去")}`,
     ...section("运维", opsLines(binary, root, false, platform)),
   ].join("\n");
 }

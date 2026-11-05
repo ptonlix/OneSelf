@@ -8,6 +8,7 @@ import {
   installerBundledRef,
   planAfterResolve,
   planBundleSync,
+  planUpdateSync,
   refOk,
   type SyncPlan,
 } from "./ref.ts";
@@ -46,19 +47,50 @@ export async function readInstalledRef(root: string): Promise<string> {
   }
 }
 
-function warnKeep(plan: Extract<SyncPlan, { kind: "keep-newer" }>): void {
+type BundleSyncResult = SyncPlan & { readonly checkedLatest: boolean };
+
+/** “安装器” only when the compared tag is the concrete ONESELF_BUNDLED_REF. */
+function warnKeep(
+  plan: Extract<SyncPlan, { kind: "keep-newer" }>,
+  bundledRef: string | undefined,
+): void {
+  const fromInstaller =
+    bundledRef !== undefined && bundledRef !== "latest" && plan.bundled === bundledRef;
+  const compared = fromInstaller
+    ? `比这份安装器的 ${plan.bundled} 新`
+    : `比 GitHub 最新正式版 ${plan.bundled} 新`;
   p.log.warn(
-    `已安装 ${plan.current}，比这份安装器的 ${plan.bundled} 新。不往回同步。要强制换版本，请显式设置 ONESELF_REF。`,
+    `已安装 ${plan.current}，${compared}。不往回同步。要强制换版本，请显式设置 ONESELF_REF。`,
   );
 }
 
+function finish(plan: SyncPlan, checkedLatest: boolean): BundleSyncResult {
+  switch (plan.kind) {
+    case "skip":
+      return { kind: "skip", checkedLatest };
+    case "keep-newer":
+      return {
+        kind: "keep-newer",
+        current: plan.current,
+        bundled: plan.bundled,
+        checkedLatest,
+      };
+    case "sync":
+      return { kind: "sync", target: plan.target, forced: plan.forced, checkedLatest };
+  }
+}
+
 /**
- * Re-extract the compose bundle for an existing install when the launching
- * installer is newer (or the user forced ONESELF_REF). ONESELF_BUNDLED_REF exported by the
- * bootstrap is *never* treated as a forced ref; only a user-set ONESELF_REF is.
+ * Re-extract the compose bundle when a newer installer tag, a user-set ONESELF_REF,
+ * or (`followLatest`) a newer GitHub latest tag says so. ONESELF_BUNDLED_REF is never
+ * a forced ref. Install must leave `followLatest` false.
  */
-export async function maybeSyncBundle(root: string, dryRun: boolean): Promise<SyncPlan> {
-  if (await isSourceCheckout(root)) return { kind: "skip" };
+export async function maybeSyncBundle(
+  root: string,
+  dryRun: boolean,
+  followLatest = false,
+): Promise<BundleSyncResult> {
+  if (await isSourceCheckout(root)) return finish({ kind: "skip" }, false);
   const forced = forcedRef();
   const bundled = installerBundledRef();
   for (const [name, value] of [
@@ -70,24 +102,27 @@ export async function maybeSyncBundle(root: string, dryRun: boolean): Promise<Sy
     }
   }
   const current = await readInstalledRef(root);
-  let plan = planBundleSync({ current, forced, bundled });
+  let plan = followLatest
+    ? planUpdateSync({ current, forced, bundled })
+    : planBundleSync({ current, forced, bundled });
   if (plan.kind === "keep-newer") {
-    warnKeep(plan);
-    return plan;
+    warnKeep(plan, bundled);
+    return finish(plan, false);
   }
-  if (plan.kind === "skip") return plan;
+  if (plan.kind === "skip") return finish(plan, false);
 
+  const checkedLatest = plan.target === "latest";
   const resolved = await resolveTag(plan.target);
   plan = planAfterResolve({ current, resolved, forced: plan.forced });
   if (plan.kind === "keep-newer") {
-    warnKeep(plan);
-    return plan;
+    warnKeep(plan, bundled);
+    return finish(plan, checkedLatest);
   }
-  if (plan.kind === "skip") return plan;
+  if (plan.kind === "skip") return finish(plan, checkedLatest);
 
   const why = plan.forced ? "（ONESELF_REF 指定）" : "";
   p.log.info(`安装文件从 ${current || "未记录"} 换到 ${plan.target}${why}。不覆盖 .env。`);
-  if (dryRun) return plan;
+  if (dryRun) return finish(plan, checkedLatest);
   await fetchComposeBundle(root, plan.target);
-  return plan;
+  return finish(plan, checkedLatest);
 }

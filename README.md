@@ -115,9 +115,9 @@ npx skills add https://你的站点 -a <agent> -s oneself -y
 
 - 命令：`bin/oneself update | doctor | backup | restore`
 - `backup` / `restore` 在安装目录用 `compose.yaml` 完成，不需要检出仓库或 `scripts/transfer-cli.ts`
-- `update` 只按已钉版本拉镜像并重启；`doctor` 只检查
-- 升级：重跑新 Release 的安装命令，口令保留
-- 不会被旧 Release 降级；确要换旧版设 `ONESELF_REF=v1.2.3`
+- `update` 核对 GitHub 最新正式版；较新则升级并钉住该镜像，已是最新时只刷新已钉镜像。`doctor` 只检查
+- `update` 可改 `.oneself-release` 和 `ONESELF_IMAGE`，但更换 CLI 二进制仍需重跑 Release 安装命令。
+- 口令保留。旧 Release 的安装命令不会降级；确要换旧版设 `ONESELF_REF=v1.2.3`
 
 **实现**
 

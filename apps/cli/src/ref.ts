@@ -70,6 +70,7 @@ export type SyncPlan =
  *   bundled tag and never move backwards.
  * - No forced ref and no bundled tag → leave files alone.
  * `target` may still be `latest`; the caller resolves it and calls `planAfterResolve`.
+ * `oneself update` uses `planUpdateSync` instead, so a direct run follows GitHub latest.
  */
 export function planBundleSync(input: {
   readonly current: string;
@@ -87,6 +88,20 @@ export function planBundleSync(input: {
   }
   if (current !== "" && current === bundled) return { kind: "skip" };
   return { kind: "sync", target: bundled, forced: false };
+}
+
+/**
+ * `oneself update` with no installer tag and no ONESELF_REF follows GitHub latest.
+ * An older bundled installer still cannot downgrade. A user-set ONESELF_REF still can.
+ */
+export function planUpdateSync(input: {
+  readonly current: string;
+  readonly forced: string | undefined;
+  readonly bundled: string | undefined;
+}): SyncPlan {
+  const planned = planBundleSync(input);
+  if (planned.kind !== "skip" || input.forced || input.bundled) return planned;
+  return { kind: "sync", target: "latest", forced: false };
 }
 
 /** Second check once `latest` has been resolved to a concrete tag. */

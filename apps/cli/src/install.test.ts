@@ -34,6 +34,13 @@ test("completion hints are platform-correct", () => {
   const unix = updateHints("/home/a/.local/share/oneself", "linux").join("\n");
   assert.match(unix, /\/home\/a\/\.local\/share\/oneself\/oneself\.sh update/);
   assert.doesNotMatch(unix, /ps1/);
+  for (const hints of [win, unix]) {
+    assert.match(hints, /\.oneself-release/);
+    assert.match(hints, /ONESELF_IMAGE/);
+    assert.match(hints, /CLI 二进制/);
+  }
+  assert.match(win, /irm … \| iex/);
+  assert.match(unix, /curl … \| sh/);
 });
 
 test("--yes picks local ingress unless .env or COMPOSE_PROFILES says otherwise", () => {
