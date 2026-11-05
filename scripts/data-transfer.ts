@@ -329,8 +329,8 @@ export function parseTransferArgs(argv: readonly string[]): ParsedArgs {
   const [command, ...rest] = argv;
   if (command !== "export" && command !== "import") {
     throw new TransferError(
-      "usage: data:export -- --out <file> --stopped [--via host|compose] [--compose <file>]\n" +
-        "       data:import -- --from <file.tar.gz> --stopped [--replace] [--via host|compose] [--compose <file>]",
+      "usage: data:export --out <file> --stopped [--via host|compose] [--compose <file>]\n" +
+        "       data:import --from <file.tar.gz> --stopped [--replace] [--via host|compose] [--compose <file>]",
     );
   }
   let directory: string | undefined;

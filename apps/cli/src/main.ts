@@ -15,8 +15,8 @@ function printHelp(): void {
   oneself install [--dir <路径>] [--dry-run] [--yes]
   oneself update  [--dir <路径>] [--dry-run]
   oneself doctor  [--dir <路径>]
-  oneself backup  [--dir <路径>] [--dry-run] -- --out <file> [--stopped] […]
-  oneself restore [--dir <路径>] [--dry-run] -- --from <file.tar.gz> [--stopped] [--replace] […]
+  oneself backup  [--dir <路径>] [--dry-run] --out <file> [--stopped] […]
+  oneself restore [--dir <路径>] [--dry-run] --from <file.tar.gz> [--stopped] [--replace] […]
   公开 curl|sh / irm|iex 只下载并校验本二进制再交给它（Unix 把已打开的终端描述符复制到 stdin，不新开 /dev/tty）。
   安装目录里的 oneself.sh / oneself.ps1 只是转调 bin/oneself 的薄 launcher。
 
