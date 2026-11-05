@@ -17,6 +17,17 @@ function redirect(location: string | undefined, status = 302): Promise<Response>
   return Promise.resolve(new Response(null, { status, headers }));
 }
 
+function requestUrl(input: Parameters<typeof fetch>[0]): string {
+  if (typeof input === "string") return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+function stubFetch(impl: (url: string) => Promise<Response>): typeof fetch {
+  const fetchImpl: typeof fetch = (input) => impl(requestUrl(input));
+  return fetchImpl;
+}
+
 it("reads an absolute or relative release redirect", () => {
   expect(
     tagFromReleaseLocation(
@@ -54,10 +65,10 @@ it("rejects another host, another repo, or a non-version tag", () => {
 
 it("resolves latest from the github.com redirect and not the API", async () => {
   const urls: string[] = [];
-  globalThis.fetch = (async (input) => {
-    urls.push(String(input));
+  globalThis.fetch = stubFetch(async (url) => {
+    urls.push(url);
     return redirect("https://github.com/ptonlix/OneSelf/releases/tag/v1.2.3");
-  }) as typeof fetch;
+  });
   await expect(resolveTag("latest")).resolves.toBe("v1.2.3");
   expect(urls).toEqual(["https://github.com/ptonlix/OneSelf/releases/latest"]);
   expect(new URL(urls[0] ?? "").hostname).toBe("github.com");
@@ -66,20 +77,20 @@ it("resolves latest from the github.com redirect and not the API", async () => {
 it("uses ONESELF_REPO and does not fall back when the redirect is missing", async () => {
   process.env.ONESELF_REPO = "example/oneself";
   const urls: string[] = [];
-  globalThis.fetch = (async (input) => {
-    urls.push(String(input));
+  globalThis.fetch = stubFetch(async (url) => {
+    urls.push(url);
     return redirect(undefined, 404);
-  }) as typeof fetch;
+  });
   await expect(resolveTag("latest")).rejects.toThrow(/无法读取 GitHub Release（HTTP 404）/);
   expect(urls).toEqual(["https://github.com/example/oneself/releases/latest"]);
 });
 
 it("does not look up a concrete ref", async () => {
   let fetches = 0;
-  globalThis.fetch = (async () => {
+  globalThis.fetch = stubFetch(async () => {
     fetches += 1;
     return redirect("https://github.com/ptonlix/OneSelf/releases/tag/v9.9.9");
-  }) as typeof fetch;
+  });
   await expect(resolveTag("v1.2.3")).resolves.toBe("v1.2.3");
   expect(fetches).toBe(0);
 });
