@@ -12,7 +12,42 @@ import { readEnvFile, writeEnvValue } from "./env-file.ts";
 import { forcedRef, installerBundledRef, refOk } from "./ref.ts";
 
 const execFileAsync = promisify(execFile);
-const REPO = process.env.ONESELF_REPO ?? "ptonlix/OneSelf";
+
+function releaseRepo(): string {
+  return process.env.ONESELF_REPO ?? "ptonlix/OneSelf";
+}
+
+/** Tag from a github.com `/releases/latest` Location, or undefined if it is not that repo's version tag. */
+export function tagFromReleaseLocation(location: string, repo: string): string | undefined {
+  const trimmed = location.trim();
+  if (!trimmed) return undefined;
+  let pathname: string;
+  if (trimmed.startsWith("/")) {
+    pathname = trimmed.split(/[?#]/)[0] ?? "";
+  } else {
+    let url: URL;
+    try {
+      url = new URL(trimmed);
+    } catch {
+      return undefined;
+    }
+    if (url.protocol !== "https:" || url.hostname !== "github.com") return undefined;
+    pathname = url.pathname;
+  }
+  const owned = `/${repo}/releases/tag/`;
+  const bare = "/releases/tag/";
+  let tag = "";
+  if (pathname.startsWith(owned)) tag = pathname.slice(owned.length);
+  else if (pathname.startsWith(bare)) tag = pathname.slice(bare.length);
+  else return undefined;
+  try {
+    tag = decodeURIComponent(tag);
+  } catch {
+    return undefined;
+  }
+  if (!tag || tag.includes("/") || tag === "latest" || !refOk(tag)) return undefined;
+  return tag;
+}
 
 /**
  * Ref to download for a fresh layout: user-forced ONESELF_REF, else the tag the
@@ -27,18 +62,18 @@ export async function resolveTag(ref: string): Promise<string> {
     throw new Error("ONESELF_REF 只能是 latest 或 v1.2.3 这种版本标签");
   }
   if (ref !== "latest") return ref;
-  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
-    headers: { Accept: "application/vnd.github+json" },
+  const repo = releaseRepo();
+  const res = await fetch(`https://github.com/${repo}/releases/latest`, {
+    method: "HEAD",
+    redirect: "manual",
   });
-  if (!res.ok) {
+  const location = res.headers.get("location");
+  if (!location) {
     throw new Error(`无法读取 GitHub Release（HTTP ${res.status}）`);
   }
-  const body = (await res.json()) as { tag_name?: string };
-  if (!body.tag_name) throw new Error("无法解析最新 Release 标签");
-  if (body.tag_name === "latest" || !refOk(body.tag_name)) {
-    throw new Error(`Release 标签 ${body.tag_name} 不是版本号`);
-  }
-  return body.tag_name;
+  const tag = tagFromReleaseLocation(location, repo);
+  if (!tag) throw new Error("无法解析最新 Release 标签");
+  return tag;
 }
 
 async function sha256File(file: string): Promise<string> {
@@ -81,7 +116,7 @@ export async function fetchComposeBundle(
   ref: string = bundledRef(),
 ): Promise<string> {
   const tag = await resolveTag(ref);
-  const base = `https://github.com/${REPO}/releases/download/${tag}`;
+  const base = `https://github.com/${releaseRepo()}/releases/download/${tag}`;
   const tmp = await mkdtemp(path.join(tmpdir(), "oneself-"));
   const tgz = path.join(tmp, "oneself-compose.tar.gz");
   const sums = path.join(tmp, "SHA256SUMS");

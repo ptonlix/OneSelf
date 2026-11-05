@@ -46,8 +46,13 @@ function httpError(status: number): Promise<Response> {
   return Promise.resolve(new Response("no", { status }));
 }
 
-function okJson(body: unknown): Promise<Response> {
-  return Promise.resolve(Response.json(body));
+function releaseRedirect(tag: string): Promise<Response> {
+  return Promise.resolve(
+    new Response(null, {
+      status: 302,
+      headers: { location: `https://github.com/ptonlix/OneSelf/releases/tag/${tag}` },
+    }),
+  );
 }
 
 async function withFetch(impl: typeof fetch, run: () => Promise<void>): Promise<void> {
@@ -143,14 +148,15 @@ it("followLatest lookup failure rejects before compose pull", async () => {
     },
   );
   expect(urls).toHaveLength(1);
-  expect(urls[0] ?? "").toMatch(/\/releases\/latest$/);
+  expect(urls[0] ?? "").toBe("https://github.com/ptonlix/OneSelf/releases/latest");
+  expect(urls.some((url) => url.includes("api.github.com"))).toBe(false);
   expect(urls.some((url) => url.includes("/releases/download/"))).toBe(false);
 });
 
 it("resolved latest same or older does not downgrade", async () => {
   installed("v1.3.0");
   await withFetch(
-    () => okJson({ tag_name: "v1.2.0" }),
+    () => releaseRedirect("v1.2.0"),
     async () => {
       const older = await maybeSyncBundle(dir, true, true);
       expect(older.kind).toBe("keep-newer");
@@ -163,7 +169,7 @@ it("resolved latest same or older does not downgrade", async () => {
   expect(text).not.toMatch(/安装器/);
 
   await withFetch(
-    () => okJson({ tag_name: "v1.3.0" }),
+    () => releaseRedirect("v1.3.0"),
     async () => {
       const same = await maybeSyncBundle(dir, true, true);
       expect(same.kind).toBe("skip");
