@@ -502,7 +502,7 @@ function recordsProps(change: Partial<RecordsProps> = {}): RecordsProps {
   };
 }
 
-type Node = ReactElement<{ children?: ReactNode; onClick?: () => void }>;
+type Node = ReactElement<{ children?: ReactNode; onClick?: () => void; disabled?: boolean }>;
 
 function elements(node: ReactNode): Node[] {
   if (Array.isArray(node)) return node.flatMap((child: ReactNode) => elements(child));
