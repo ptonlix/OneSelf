@@ -136,6 +136,18 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     return sendJson({});
   });
 
+  app.get("/admin/graph", async (c) => {
+    if (!wantsJson(c.req.raw)) {
+      return adminPage(runtime, c);
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const result = await runtime.adminGraph(actor);
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    return sendJson(result.value);
+  });
+
   app.get("/admin/deleted-sources", async (c) => {
     if (!wantsJson(c.req.raw)) {
       return adminPage(runtime, c);

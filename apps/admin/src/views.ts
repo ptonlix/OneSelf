@@ -1,4 +1,4 @@
-import { createElement, type ReactElement, type ReactNode } from "react";
+import { createElement, useState, type ReactElement, type ReactNode } from "react";
 import { readInputChecked, readInputValue } from "./browser";
 import { createApiKeyBody } from "./forms";
 import { Icon, LoginOrbit, OrbitMark } from "./icons";
@@ -26,7 +26,13 @@ import {
 } from "./parts";
 import type { AdminRoute } from "./routes";
 import { Sky } from "./sky";
-import type { ApiKeyRequest, GrantFlag, SiteActivation, SourceDraft } from "./types";
+import type {
+  ApiKeyRequest,
+  GrantFlag,
+  OauthGrantView,
+  SiteActivation,
+  SourceDraft,
+} from "./types";
 
 type Section = "home" | "records" | "device" | "api-key" | "site" | "password";
 
@@ -35,14 +41,14 @@ const NAV: readonly {
   items: readonly {
     section: Section;
     label: string;
-    icon: "home" | "records" | "device" | "key" | "globe" | "lock";
+    icon: "star" | "records" | "device" | "key" | "globe" | "lock";
     route: AdminRoute;
   }[];
 }[] = [
   {
     group: "总览",
     items: [
-      { section: "home", label: "概览", icon: "home", route: { name: "home" } },
+      { section: "home", label: "星图", icon: "star", route: { name: "home" } },
       { section: "records", label: "资料", icon: "records", route: { name: "records" } },
     ],
   },
@@ -104,7 +110,7 @@ function crumbFor(route: AdminRoute): string {
     case "password":
       return "修改密码";
     default:
-      return "概览";
+      return "星图";
   }
 }
 
@@ -120,12 +126,25 @@ export function Shell(props: {
   onNavigate: (route: AdminRoute) => void;
   onLogout: () => void;
   children: ReactNode;
+  navCollapsed?: boolean;
+  onToggleNav?: () => void;
 }): ReactElement {
+  const [storedCollapsed, setStoredCollapsed] = useState(false);
+  const collapsed = props.navCollapsed ?? storedCollapsed;
+  const toggleNav = (): void => {
+    props.onToggleNav?.();
+    if (props.navCollapsed === undefined) setStoredCollapsed((value) => !value);
+  };
   if (!props.showNav) return h("main", { className: "auth" }, props.children);
   const current = sectionFor(props.route);
+  const sky = props.route.name === "home";
   return h(
     "div",
-    { className: "app" },
+    {
+      className: ["app", sky ? "sky-home" : "", collapsed ? "nav-collapsed" : ""]
+        .filter((name) => name !== "")
+        .join(" "),
+    },
     h(
       "aside",
       { className: "side" },
@@ -133,7 +152,18 @@ export function Shell(props: {
         "div",
         { className: "side-brand" },
         createElement(OrbitMark, { prefix: "side-mark", size: 30 }),
-        h("div", null, h("b", null, "OneSelf"), h("small", { className: "mono" }, props.host)),
+        h("div", { className: "side-name" }, h("b", null, "OneSelf")),
+        h(
+          "button",
+          {
+            className: "side-fold",
+            type: "button",
+            "aria-label": collapsed ? "展开菜单" : "收起菜单",
+            "aria-expanded": collapsed ? "false" : "true",
+            onClick: toggleNav,
+          },
+          createElement(Icon, { name: "chevron", size: 16 }),
+        ),
       ),
       h(
         "nav",
@@ -489,7 +519,7 @@ function summaryRows(
   ]);
 }
 
-const DEVICE_REVOKE_HINT = "之后可在概览的「已批准设备」里单独作废这条授权，下一次请求即失效。";
+const DEVICE_REVOKE_HINT = "之后可在本页的「已批准设备」里单独作废这条授权，下一次请求即失效。";
 
 export function DeviceApprovalView(props: {
   userCode: string;
@@ -505,6 +535,11 @@ export function DeviceApprovalView(props: {
   onSiteWrite: (value: boolean) => void;
   onToggle: (id: string, flag: GrantFlag, value: boolean) => void;
   onSubmit: () => void;
+  grants?: readonly OauthGrantView[];
+  armedGrant?: string | null;
+  grantPending?: boolean;
+  onArmGrant?: (id: string) => void;
+  onRevokeGrant?: (id: string) => void;
 }): ReactElement {
   if (props.done) {
     return h(
@@ -521,6 +556,7 @@ export function DeviceApprovalView(props: {
         createElement(Icon, { name: "info", size: 16 }),
         h("div", null, DEVICE_REVOKE_HINT),
       ),
+      approvedDevices(props),
     );
   }
   return h(
@@ -610,7 +646,62 @@ export function DeviceApprovalView(props: {
         ),
         h("p", { className: "cap" }, DEVICE_REVOKE_HINT),
       ),
+      approvedDevices(props),
     ),
+  );
+}
+
+function approvedDevices(props: {
+  grants?: readonly OauthGrantView[];
+  armedGrant?: string | null;
+  grantPending?: boolean;
+  onArmGrant?: (id: string) => void;
+  onRevokeGrant?: (id: string) => void;
+}): ReactElement {
+  const grants = props.grants ?? [];
+  return h(
+    "section",
+    { className: "card", "aria-label": "已批准设备" },
+    h("div", { className: "card-h" }, h("h3", null, "已批准设备")),
+    grants.length === 0
+      ? h("p", { className: "card-b body-s" }, "还没有批准过设备。")
+      : h(
+          "ul",
+          { className: "list" },
+          ...grants.map((grant) =>
+            h(
+              "li",
+              { key: grant.id, className: "li" },
+              h("div", { className: "t mono" }, grant.id),
+              grant.revoked_at === null
+                ? props.armedGrant === grant.id
+                  ? h(
+                      "button",
+                      {
+                        className: "btn btn-sm btn-danger",
+                        type: "button",
+                        disabled: props.grantPending === true,
+                        onClick: () => {
+                          props.onRevokeGrant?.(grant.id);
+                        },
+                      },
+                      "确认作废",
+                    )
+                  : h(
+                      "button",
+                      {
+                        className: "btn btn-sm btn-danger",
+                        type: "button",
+                        onClick: () => {
+                          props.onArmGrant?.(grant.id);
+                        },
+                      },
+                      "作废",
+                    )
+                : null,
+            ),
+          ),
+        ),
   );
 }
 

@@ -3,6 +3,7 @@ import type {
   ApiKeyRequest,
   ApiKeySummary,
   CreateApiKeyBody,
+  AdminGraph,
   DeletedSource,
   DeviceApprovalBody,
   LoginResult,
@@ -94,7 +95,10 @@ export interface AdminClient {
   listOauthGrants(): Promise<OauthGrantView[]>;
   revokeOauthGrant(id: string): Promise<void>;
   listDeletedSources(cursor?: string): Promise<DeletedSource[]>;
+  readGraph(): Promise<AdminGraph>;
+  readPage(source: string, slug: string): Promise<{ markdown: string }>;
   deleteSource(id: string): Promise<void>;
+  deletePage(source: string, slug: string): Promise<void>;
   restoreSource(id: string): Promise<void>;
   queryPages(cursor?: string): Promise<QueryPage[]>;
   readConnectOrigin(): Promise<string>;
@@ -212,10 +216,27 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
         await send(transport, { method: "GET", path: `/admin/deleted-sources${query}` }),
       );
     },
+    async readGraph() {
+      return parseGraph(await send(transport, { method: "GET", path: "/admin/graph" }));
+    },
+    async readPage(source, slug) {
+      return parsePageMarkdown(
+        await send(transport, {
+          method: "GET",
+          path: `/pcp/v1/pages/${encodeURIComponent(source)}/${encodeURIComponent(slug)}`,
+        }),
+      );
+    },
     async deleteSource(id) {
       await send(transport, {
         method: "DELETE",
         path: `/pcp/v1/sources/${encodeURIComponent(id)}`,
+      });
+    },
+    async deletePage(source, slug) {
+      await send(transport, {
+        method: "DELETE",
+        path: `/pcp/v1/pages/${encodeURIComponent(source)}/${encodeURIComponent(slug)}`,
       });
     },
     async restoreSource(id) {
@@ -567,6 +588,68 @@ export function originFromDiscovery(body: unknown): string {
     throw new ParseError("发现文档无法识别");
   }
   return origin;
+}
+
+function parsePageMarkdown(body: unknown): { markdown: string } {
+  if (!isRecord(body) || typeof body.markdown !== "string") throw new ParseError("页无法识别");
+  return { markdown: body.markdown };
+}
+
+function parseGraph(body: unknown): AdminGraph {
+  if (
+    !isRecord(body) ||
+    !Array.isArray(body.sources) ||
+    !Array.isArray(body.pages) ||
+    !Array.isArray(body.links)
+  ) {
+    throw new ParseError("星图无法识别");
+  }
+  if ("markdown" in body || "body" in body) throw new ParseError("星图不能包含正文");
+  return {
+    truncated: body.truncated === true,
+    sources: body.sources.map((item) => {
+      if (!isRecord(item) || typeof item.id !== "string" || typeof item.page_count !== "number") {
+        throw new ParseError("星图无法识别");
+      }
+      return { id: item.id, page_count: item.page_count };
+    }),
+    pages: body.pages.map((item) => {
+      if (
+        !isRecord(item) ||
+        typeof item.source !== "string" ||
+        typeof item.slug !== "string" ||
+        typeof item.type !== "string" ||
+        typeof item.title !== "string" ||
+        (item.visibility !== "public" && item.visibility !== "private") ||
+        typeof item.updated_at !== "string" ||
+        typeof item.file_count !== "number" ||
+        !Array.isArray(item.media_types)
+      ) {
+        throw new ParseError("星图无法识别");
+      }
+      return {
+        source: item.source,
+        slug: item.slug,
+        type: item.type,
+        title: item.title,
+        visibility: item.visibility,
+        updated_at: item.updated_at,
+        file_count: item.file_count,
+        media_types: item.media_types.filter((type): type is string => typeof type === "string"),
+      };
+    }),
+    links: body.links.map((item) => {
+      if (!isRecord(item) || typeof item.broken !== "boolean") throw new ParseError("星图无法识别");
+      return { from: parseEnd(item.from), to: parseEnd(item.to), broken: item.broken };
+    }),
+  };
+}
+
+function parseEnd(value: unknown): { source: string; slug: string } {
+  if (!isRecord(value) || typeof value.source !== "string" || typeof value.slug !== "string") {
+    throw new ParseError("星图无法识别");
+  }
+  return { source: value.source, slug: value.slug };
 }
 
 function parseDeletedSources(body: unknown): DeletedSource[] {
