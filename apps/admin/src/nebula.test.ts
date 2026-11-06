@@ -46,6 +46,7 @@ function home(extra: Partial<Parameters<typeof NebulaHome>[0]> = {}) {
     pending: false,
     onArm: () => undefined,
     onDelete: () => undefined,
+    onVisibility: () => undefined,
     pageMarkdown: null,
     pageLoading: false,
     connectOrigin: "http://127.0.0.1:3000",
@@ -68,6 +69,18 @@ function press(node: ReactNode, label: string): void {
   if (typeof props.children === "string" && props.children.includes(label)) props.onClick?.();
   const children = Array.isArray(props.children) ? props.children : [props.children];
   for (const child of children) press(child as ReactNode, label);
+}
+
+function pressLabel(node: ReactNode, label: string): void {
+  if (!isValidElement(node)) return;
+  const props = node.props as {
+    children?: ReactNode;
+    onClick?: () => void;
+    "aria-label"?: string;
+  };
+  if (props["aria-label"] === label) props.onClick?.();
+  const children = Array.isArray(props.children) ? props.children : [props.children];
+  for (const child of children) pressLabel(child as ReactNode, label);
 }
 
 describe("nebula home", () => {
@@ -147,6 +160,47 @@ describe("nebula home", () => {
     expect(markup).toContain("2018 年到 2024 年");
     expect(markup).toContain("网关项目");
     expect(markup).not.toContain("title: 现居上海");
+    expect(markup).not.toContain("<textarea");
+  });
+
+  it("does not change visibility until the second click", () => {
+    const onVisibility = vi.fn();
+    const onArm = vi.fn();
+    const selected = { selection: { kind: "page" as const, key: "health/now" } };
+    pressLabel(home({ ...selected, onArm, onVisibility }), "修改可见性");
+    expect(onVisibility).not.toHaveBeenCalled();
+    expect(onArm).toHaveBeenCalledWith("visibility:health/now");
+    const opened = html(home({ ...selected, armed: "visibility:health/now", onVisibility }));
+    expect(opened).toContain('role="dialog"');
+    expect(opened).toContain("改为公开");
+    expect(opened).toContain("立刻匿名可读");
+    expect(opened).toContain("站点包");
+    expect(opened).toContain("不必重新上线");
+    expect(opened).not.toContain("<textarea");
+    press(home({ ...selected, armed: "visibility:health/now", onVisibility }), "确认");
+    expect(onVisibility).toHaveBeenCalledWith("health", "now", "public");
+    const cancel = vi.fn();
+    press(home({ ...selected, armed: "visibility:health/now", onArm: cancel }), "取消");
+    expect(cancel).toHaveBeenCalledWith(null);
+    const directory = html(home({ selection: { kind: "source", id: "health" } }));
+    expect(directory).not.toContain("修改可见性");
+  });
+
+  it("names the next public read before hiding a page", () => {
+    const page = graph.pages[0];
+    if (page === undefined) throw new Error("missing page");
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        graph: {
+          ...graph,
+          pages: [{ ...page, visibility: "public" }],
+        },
+        armed: "visibility:health/now",
+      }),
+    );
+    expect(markup).toContain("下一次公开读取不再返回这一页和这些原件");
+    expect(markup).toContain("站点包里已有的副本还在");
     expect(markup).not.toContain("<textarea");
   });
 

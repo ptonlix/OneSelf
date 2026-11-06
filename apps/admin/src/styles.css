@@ -1346,6 +1346,65 @@ h3 {
   color: var(--fg-3);
   font-size: 13px;
 }
+.dock-kicker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 18px 0 0;
+  color: var(--fg-3);
+  font-size: 13px;
+}
+.dock-vis-edit {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+.dock-vis-edit:hover {
+  color: var(--fg);
+  background: rgb(255 255 255 / 0.06);
+}
+.vis-modal {
+  position: fixed;
+  z-index: 30;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 0.46);
+}
+.vis-card {
+  width: min(420px, calc(100% - 48px));
+  padding: 22px 22px 18px;
+  border: 1px solid var(--hair);
+  border-radius: 16px;
+  background: rgb(12 14 28 / 0.98);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.45);
+}
+.vis-card h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 560;
+}
+.vis-card p {
+  margin: 10px 0 0;
+  color: var(--fg-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.vis-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.vis-actions .btn {
+  margin-top: 0;
+}
 .nebula-prose {
   margin-top: 28px;
   max-width: 36em;

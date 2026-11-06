@@ -174,6 +174,27 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     return sendJson(body);
   });
 
+  app.post("/admin/pages/:source/:slug/visibility", async (c) => {
+    if (!originAllowed(c.req.raw, runtime.origin)) {
+      return sendError("forbidden", "origin is not allowed");
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const visibility = readVisibilityChoice(await readBody(c.req.raw));
+    if (visibility === null) {
+      return sendError("invalid", "visibility must be public or private");
+    }
+    const result = await runtime.setPageVisibility(
+      actor,
+      c.req.param("source"),
+      c.req.param("slug"),
+      visibility,
+    );
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    return sendJson(result.value);
+  });
+
   app.post("/admin/oauth-grants/:id/revoke", async (c) => {
     if (!originAllowed(c.req.raw, runtime.origin)) {
       return sendError("forbidden", "origin is not allowed");
@@ -205,6 +226,11 @@ function clearCookie(secure: boolean): string {
     parts.push("Secure");
   }
   return parts.join("; ");
+}
+
+function readVisibilityChoice(body: unknown): "public" | "private" | null {
+  if (!isRecord(body)) return null;
+  return body.visibility === "public" || body.visibility === "private" ? body.visibility : null;
 }
 
 async function readBody(request: Request): Promise<unknown> {

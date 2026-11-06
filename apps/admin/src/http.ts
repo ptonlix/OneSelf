@@ -99,6 +99,11 @@ export interface AdminClient {
   readPage(source: string, slug: string): Promise<{ markdown: string }>;
   deleteSource(id: string): Promise<void>;
   deletePage(source: string, slug: string): Promise<void>;
+  setPageVisibility(
+    source: string,
+    slug: string,
+    visibility: "public" | "private",
+  ): Promise<{ source: string; slug: string; visibility: "public" | "private" }>;
   restoreSource(id: string): Promise<void>;
   queryPages(cursor?: string): Promise<QueryPage[]>;
   readConnectOrigin(): Promise<string>;
@@ -238,6 +243,15 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
         method: "DELETE",
         path: `/pcp/v1/pages/${encodeURIComponent(source)}/${encodeURIComponent(slug)}`,
       });
+    },
+    async setPageVisibility(source, slug, visibility) {
+      return parseVisibilityWrite(
+        await send(transport, {
+          method: "POST",
+          path: `/admin/pages/${encodeURIComponent(source)}/${encodeURIComponent(slug)}/visibility`,
+          json: { visibility },
+        }),
+      );
     },
     async restoreSource(id) {
       await send(transport, {
@@ -588,6 +602,25 @@ export function originFromDiscovery(body: unknown): string {
     throw new ParseError("发现文档无法识别");
   }
   return origin;
+}
+
+function parseVisibilityWrite(body: unknown): {
+  source: string;
+  slug: string;
+  visibility: "public" | "private";
+} {
+  if (!isRecord(body)) throw new ParseError("可见性无法识别");
+  for (const key of Object.keys(body)) {
+    if (/token|refresh|\bkey\b|key_hash/i.test(key)) throw new ParseError("可见性无法识别");
+  }
+  if (
+    typeof body.source !== "string" ||
+    typeof body.slug !== "string" ||
+    (body.visibility !== "public" && body.visibility !== "private")
+  ) {
+    throw new ParseError("可见性无法识别");
+  }
+  return { source: body.source, slug: body.slug, visibility: body.visibility };
 }
 
 function parsePageMarkdown(body: unknown): { markdown: string } {

@@ -33,6 +33,7 @@ export function NebulaHome(props: {
   readonly pending: boolean;
   readonly onArm: (id: string | null) => void;
   readonly onDelete: (id: string) => void;
+  readonly onVisibility: (source: string, slug: string, visibility: "public" | "private") => void;
   readonly pageMarkdown: string | null;
   readonly pageLoading: boolean;
   readonly connectOrigin: string | null;
@@ -168,6 +169,7 @@ export function NebulaHome(props: {
         )
       : null,
     dock(props),
+    visibilityDialog(props),
   );
 }
 
@@ -178,6 +180,7 @@ function dock(props: {
   pending: boolean;
   onArm: (id: string | null) => void;
   onDelete: (id: string) => void;
+  onVisibility: (source: string, slug: string, visibility: "public" | "private") => void;
   onSelect: (selection: NebulaSelection) => void;
   pageMarkdown: string | null;
   pageLoading: boolean;
@@ -223,7 +226,7 @@ function dock(props: {
   return drawer(
     "页",
     props,
-    h("p", { className: "dock-quiet" }, page.visibility === "public" ? "公开" : "私有"),
+    visibilityMark(page, props),
     h("h2", null, page.title),
     h("p", { className: "mono dock-path" }, pageKey(page)),
     prose(props),
@@ -362,6 +365,92 @@ function linkList(
             },
             linkKey(end),
           ),
+        ),
+      ),
+    ),
+  );
+}
+
+function visibilityMark(
+  page: GraphPage,
+  props: {
+    pending: boolean;
+    onArm: (id: string | null) => void;
+  },
+): ReactElement {
+  return h(
+    "div",
+    { className: "dock-kicker" },
+    page.visibility === "public" ? "公开" : "私有",
+    h(
+      "button",
+      {
+        className: "dock-vis-edit",
+        type: "button",
+        "aria-label": "修改可见性",
+        disabled: props.pending,
+        onClick: () => {
+          props.onArm(`visibility:${pageKey(page)}`);
+        },
+      },
+      createElement(Icon, { name: "pencil", size: 13 }),
+    ),
+  );
+}
+
+function visibilityDialog(props: {
+  graph: AdminGraph | null;
+  armed: string | null;
+  pending: boolean;
+  onArm: (id: string | null) => void;
+  onVisibility: (source: string, slug: string, visibility: "public" | "private") => void;
+}): ReactElement | null {
+  if (props.graph === null || props.armed === null || !props.armed.startsWith("visibility:")) {
+    return null;
+  }
+  const key = props.armed.slice("visibility:".length);
+  const page = props.graph.pages.find((item) => pageKey(item) === key);
+  if (page === undefined) return null;
+  const next = page.visibility === "public" ? "private" : "public";
+  const title = next === "private" ? "改为私有" : "改为公开";
+  const note =
+    next === "public"
+      ? "这一页和挂接的原件会立刻匿名可读。已打进站点包的副本收不回，不必重新上线。"
+      : "下一次公开读取不再返回这一页和这些原件。站点包里已有的副本还在。";
+  return h(
+    "div",
+    { className: "vis-modal", role: "presentation" },
+    h(
+      "div",
+      { className: "vis-card", role: "dialog", "aria-modal": "true", "aria-label": title },
+      h("h2", null, title),
+      h("p", null, note),
+      h(
+        "div",
+        { className: "vis-actions" },
+        h(
+          "button",
+          {
+            className: "btn btn-sm btn-ghost",
+            type: "button",
+            disabled: props.pending,
+            onClick: () => {
+              props.onArm(null);
+            },
+          },
+          "取消",
+        ),
+        h(
+          "button",
+          {
+            className: "btn btn-sm btn-orbit",
+            type: "button",
+            disabled: props.pending,
+            onClick: () => {
+              props.onVisibility(page.source, page.slug, next);
+            },
+          },
+          "确认",
         ),
       ),
     ),

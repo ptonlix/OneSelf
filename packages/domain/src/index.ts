@@ -30,6 +30,7 @@ export {
 
 export { projectMarkdown } from "./markdown.ts";
 export type { PageProjection, Visibility } from "./markdown.ts";
+export { setPageVisibility } from "./visibility.ts";
 
 export { parseFences } from "./fences.ts";
 export type { Fact, TimelineEntry } from "./fences.ts";

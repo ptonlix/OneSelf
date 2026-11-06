@@ -39,6 +39,7 @@ export function NebulaScreen(props: {
   const [pending, setPending] = useState(false);
   const [pageMarkdown, setPageMarkdown] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
+  const [pageEpoch, setPageEpoch] = useState(0);
   const [connectOrigin, setConnectOrigin] = useState<string | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [webgl] = useState(() => canUseWebGL());
@@ -118,7 +119,7 @@ export function NebulaScreen(props: {
     return () => {
       cancelled = true;
     };
-  }, [selection, props.client, props.onFailure]);
+  }, [selection, pageEpoch, props.client, props.onFailure]);
 
   useEffect(() => {
     if (!webgl || graph === null) return;
@@ -234,6 +235,21 @@ export function NebulaScreen(props: {
     onArm: setArmed,
     pageMarkdown,
     pageLoading,
+    onVisibility: (source, slug, visibility) => {
+      setPending(true);
+      void (async () => {
+        try {
+          await props.client.setPageVisibility(source, slug, visibility);
+          setArmed(null);
+          await reload();
+          setPageEpoch((epoch) => epoch + 1);
+        } catch (reason: unknown) {
+          setError(props.onFailure(reason));
+        } finally {
+          setPending(false);
+        }
+      })();
+    },
     onDelete: (id) => {
       setPending(true);
       void (async () => {

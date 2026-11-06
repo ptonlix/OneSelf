@@ -35,6 +35,7 @@ import {
   restorePage,
   revertPage,
   runHourlyMaintenance,
+  setPageVisibility as rewritePageVisibility,
   SITE_ACTIVATION_TTL_MS,
   sourcesAdd,
   sourcesDelete,
@@ -52,6 +53,7 @@ import {
   type PutPageInput,
   type SourceGrant,
   type TimelineEntry,
+  type Visibility,
 } from "@oneself/domain";
 import type { PostgresHandle, PostgresStore } from "@oneself/adapters";
 import type { MarkdownParser, ObjectStore } from "@oneself/ports";
@@ -1822,6 +1824,38 @@ export class Runtime {
       });
       const response = await this.#requireEngine().handle(request, "/token");
       return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+    });
+  }
+
+  setPageVisibility(
+    actor: Actor,
+    source: string,
+    slug: string,
+    visibility: Visibility,
+  ): Promise<DomainResult<{ source: string; slug: string; hash: string; visibility: Visibility }>> {
+    return this.exclusive(async () => {
+      const allowed = this.#ownerActor(actor);
+      if (!allowed.ok) return allowed;
+      const page = getPage(this.state, actor.credential, source, slug);
+      if (!page.ok) return page;
+      const rewritten = rewritePageVisibility(page.value.markdown, visibility);
+      if (!rewritten.ok) return rewritten;
+      if (rewritten.value === null) {
+        return ok({ source, slug, hash: page.value.hash, visibility });
+      }
+      const written = await this.#writeOne(actor, {
+        source,
+        slug,
+        markdown: rewritten.value,
+        hash: page.value.hash,
+      });
+      if (!written.ok) return written;
+      return ok({
+        source: written.value.source,
+        slug: written.value.slug,
+        hash: written.value.hash,
+        visibility,
+      });
     });
   }
 
