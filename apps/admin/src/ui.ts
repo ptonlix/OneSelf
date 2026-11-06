@@ -23,7 +23,7 @@ import {
 } from "./forms";
 import { hrefFor, parseAdminRoute, type AdminRoute } from "./routes";
 import { isPasswordGate, isUnauthorized, sessionFromProbeFailure, type Session } from "./session";
-import type { ApiKeyRequest, SiteActivation, SourceDraft } from "./types";
+import type { ApiKeyRequest, OauthGrantView, SiteActivation, SourceDraft } from "./types";
 import {
   pushBrowserPath,
   readBrowserLocation,
@@ -31,6 +31,7 @@ import {
   writeClipboard,
 } from "./browser";
 import { PAGE_SIZE, type RecordsTab } from "./continuity";
+import { NebulaScreen } from "./nebula-screen";
 import {
   countPublic,
   greetingFor,
@@ -195,6 +196,7 @@ function screenForRoute(
 ): ReactElement {
   switch (route.name) {
     case "home":
+      return createElement(NebulaScreen, { client, onFailure });
     case "login":
     case "unknown":
       return createElement(HomeScreen, { client, onFailure, onNavigate: go });
@@ -340,10 +342,29 @@ function DeviceScreen(props: {
   const [message, setMessage] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
+  const [grants, setGrants] = useState<OauthGrantView[]>([]);
+  const [armedGrant, setArmedGrant] = useState<string | null>(null);
+  const [grantPending, setGrantPending] = useState(false);
 
   useEffect(() => {
     setUserCode(props.userCode);
   }, [props.userCode]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadGrants = async (): Promise<void> => {
+      try {
+        const next = await props.client.listOauthGrants();
+        if (!cancelled) setGrants(next);
+      } catch (reason: unknown) {
+        if (!cancelled) setMessage(props.onFailure(reason));
+      }
+    };
+    void loadGrants();
+    return () => {
+      cancelled = true;
+    };
+  }, [props.client, props.onFailure, done]);
 
   useEffect(() => {
     let cancelled = false;
@@ -377,6 +398,24 @@ function DeviceScreen(props: {
     onSiteWrite: setSiteWrite,
     onToggle: (id, flag, value) => {
       setDrafts((current) => toggleDraft(current, id, flag, value));
+    },
+    grants,
+    armedGrant,
+    grantPending,
+    onArmGrant: setArmedGrant,
+    onRevokeGrant: (id) => {
+      setGrantPending(true);
+      void (async () => {
+        try {
+          await props.client.revokeOauthGrant(id);
+          setGrants(await props.client.listOauthGrants());
+        } catch (reason: unknown) {
+          setMessage(props.onFailure(reason));
+        } finally {
+          setArmedGrant(null);
+          setGrantPending(false);
+        }
+      })();
     },
     onSubmit: () => {
       const body = deviceApprovalBody({ userCode, unrestrictedData, siteWrite, drafts });

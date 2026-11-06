@@ -281,3 +281,45 @@ it("lists deleted directories for the owner session and pages past 20", async ()
   );
   await server.close();
 });
+
+it("reads the admin graph only for the owner and omits hidden pages", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  await addSource(server, cookie, "health");
+  expect(
+    (await putPage(server, cookie, "health", "note", markdown("see [[health/missing]]"))).status,
+  ).toBe(200);
+  const graph = await readJson(
+    await server.request("/admin/graph", {
+      headers: { accept: "application/json", cookie },
+    }),
+  );
+  expect(graph.pages).toEqual([
+    expect.objectContaining({ source: "health", slug: "note", title: "Note" }),
+  ]);
+  expect(graph.links).toEqual([
+    {
+      from: { source: "health", slug: "note" },
+      to: { source: "health", slug: "missing" },
+      broken: true,
+    },
+  ]);
+  expect(JSON.stringify(graph)).not.toContain("see [[");
+  const key = await issueApiKey(server, cookie, { label: "agent", unrestricted_data: true });
+  await expectError(
+    await server.request("/admin/graph", {
+      headers: { accept: "application/json", authorization: `ApiKey ${key.key}` },
+    }),
+    403,
+    "forbidden",
+  );
+  const token = await issueAccessToken(server, cookie, { unrestricted_data: true });
+  await expectError(
+    await server.request("/admin/graph", {
+      headers: { accept: "application/json", authorization: `Bearer ${token}` },
+    }),
+    403,
+    "forbidden",
+  );
+  await server.close();
+});

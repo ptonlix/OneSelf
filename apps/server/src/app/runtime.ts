@@ -74,6 +74,7 @@ import { hashesEqual, randomId, randomToken, sha256Bytes, sha256Hex } from "./id
 import { createMarkdownParser } from "./markdown-port.ts";
 import { agentSkillsIndex as agentSkillsIndexDocument, loadServedSkill } from "./skill-pack.ts";
 import { hashPassword, verifyPassword } from "./password.ts";
+import { buildAdminGraph, type AdminGraph } from "./admin-graph.ts";
 import { deletedSourcePage } from "./deleted-sources.ts";
 import { buildSnippet, parseLimit, parseOffset, searchPages, visiblePages } from "./search.ts";
 import {
@@ -1821,6 +1822,20 @@ export class Runtime {
       });
       const response = await this.#requireEngine().handle(request, "/token");
       return { status: response.status, body: (await response.json()) as Record<string, unknown> };
+    });
+  }
+
+  adminGraph(actor: Actor): Promise<DomainResult<AdminGraph>> {
+    return this.exclusive(async () => {
+      const allowed = this.#ownerActor(actor);
+      if (!allowed.ok) return allowed;
+      return ok(
+        buildAdminGraph({
+          sources: this.state.sources,
+          pages: this.state.pages,
+          files: this.state.files,
+        }),
+      );
     });
   }
 

@@ -133,3 +133,26 @@ export interface QueryPage {
   title: string;
   updated_at: string;
 }
+
+interface GraphEnd {
+  source: string;
+  slug: string;
+}
+
+export interface GraphPage {
+  source: string;
+  slug: string;
+  type: string;
+  title: string;
+  visibility: "public" | "private";
+  updated_at: string;
+  file_count: number;
+  media_types: string[];
+}
+
+export interface AdminGraph {
+  sources: { id: string; page_count: number }[];
+  pages: GraphPage[];
+  links: { from: GraphEnd; to: GraphEnd; broken: boolean }[];
+  truncated: boolean;
+}

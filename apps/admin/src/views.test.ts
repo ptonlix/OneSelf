@@ -202,9 +202,13 @@ describe("admin shell", () => {
         children: "body",
       }),
     );
-    for (const label of ["概览", "资料", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
+    for (const label of ["星图", "资料", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
       expect(markup).toContain(`>${label}<`);
     }
+    expect(markup).toContain("收起菜单");
+    expect(markup).not.toContain("me.example.com");
+    expect(markup).not.toContain(">收起<");
+    expect(markup.indexOf(">星图<")).toBeLessThan(markup.indexOf(">资料<"));
     expect(markup.match(/class="nav-i/g)).toHaveLength(6);
     expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
     expect(markup).toMatch(/<a[^>]*class="nav-i on"[^>]*aria-current="page"[^>]*>.*?API Key/);
@@ -225,6 +229,26 @@ describe("admin shell", () => {
     );
     expect(markup).not.toContain("nav-i");
     expect(markup).toContain("body");
+  });
+
+  it("hides the sidebar when collapsed so the page can fill the screen", () => {
+    const markup = html(
+      createElement(Shell, {
+        showNav: true,
+        route: { name: "home" },
+        host: "me.example.com",
+        onNavigate: noop,
+        onLogout: noop,
+        navCollapsed: true,
+        children: "sky",
+      }),
+    );
+    expect(markup).toContain("nav-collapsed");
+    expect(markup).toContain("sky-home");
+    expect(markup).toContain("展开菜单");
+    expect(markup).toContain("nav-i");
+    expect(markup).not.toContain("me.example.com");
+    expect(markup).not.toContain(">菜单<");
   });
 });
 
@@ -394,7 +418,7 @@ describe("device approval hint", () => {
   });
 
   it("says the grant can be revoked from the overview", () => {
-    const hint = "之后可在概览的「已批准设备」里单独作废这条授权，下一次请求即失效";
+    const hint = "之后可在本页的「已批准设备」里单独作废这条授权，下一次请求即失效";
     const markup = deviceView(false);
     expect(markup).toContain(hint);
     expect(markup.indexOf(hint)).toBeGreaterThan(markup.indexOf(">确认<"));
