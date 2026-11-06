@@ -92,7 +92,8 @@ export function parseFences(
       timeline.push(entry.value);
       continue;
     }
-    const itemStart = /^- ([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(line);
+    // Value is trimmed below. Do not put \s* before (.*): the two overlap and CodeQL treats that as ReDoS.
+    const itemStart = /^- ([A-Za-z_][A-Za-z0-9_]*):(.*)$/.exec(line);
     if (itemStart) {
       const flushed = flush();
       if (!flushed.ok) {
@@ -107,7 +108,7 @@ export function parseFences(
       current = recorded.value;
       continue;
     }
-    const continuation = /^ {2,}([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/.exec(line);
+    const continuation = /^ {2,}([A-Za-z_][A-Za-z0-9_]*):(.*)$/.exec(line);
     if (!continuation || current === null) {
       return fail("invalid", "Facts fence could not be parsed");
     }

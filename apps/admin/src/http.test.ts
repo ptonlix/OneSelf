@@ -406,4 +406,33 @@ describe("admin overview client", () => {
       await expect(call(createAdminClient(transport))).rejects.toBeInstanceOf(ParseError);
     }
   });
+
+  it("sets page visibility with the owner cookie and rejects key material", async () => {
+    const { fetchImpl, calls } = browserCalls({
+      source: "notes",
+      slug: "shanghai",
+      hash: "abc",
+      visibility: "public",
+    });
+    await expect(
+      createAdminClient(browserTransport(fetchImpl)).setPageVisibility(
+        "notes",
+        "shanghai",
+        "public",
+      ),
+    ).resolves.toEqual({ source: "notes", slug: "shanghai", visibility: "public" });
+    expect(calls[0]?.input).toBe("/admin/pages/notes/shanghai/visibility");
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.credentials).toBe("include");
+    expect(calls[0]?.init.body).toBe(JSON.stringify({ visibility: "public" }));
+    const { transport } = scripted([
+      {
+        status: 200,
+        body: { source: "notes", slug: "shanghai", visibility: "public", key: "osk_x" },
+      },
+    ]);
+    await expect(
+      createAdminClient(transport).setPageVisibility("notes", "shanghai", "public"),
+    ).rejects.toBeInstanceOf(ParseError);
+  });
 });
