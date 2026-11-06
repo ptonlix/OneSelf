@@ -28,9 +28,7 @@ export function setPageVisibility(
   const nextLines =
     index === -1
       ? [...lines, `visibility: ${visibility}`]
-      : lines.map((line, lineIndex) =>
-          lineIndex === index ? `visibility: ${visibility}` : line,
-        );
+      : lines.map((line, lineIndex) => (lineIndex === index ? `visibility: ${visibility}` : line));
   const open = markdown.startsWith("---\r\n") ? "---\r\n" : "---\n";
   const yamlStart = open.length;
   const yamlEnd = yamlStart + split.yaml.length;
