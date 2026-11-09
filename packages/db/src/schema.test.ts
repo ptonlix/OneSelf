@@ -568,9 +568,9 @@ it("appends one initial migration whose columns match schema.md", () => {
     { name: "refresh_expires_at", sqlType: "timestamp with time zone", notNull: false },
     { name: "deleted_at", sqlType: "timestamp with time zone", notNull: false },
   );
-  expect(readFileSync(join(migrationsDirectory, "0005_oauth_grant_deleted_at.sql"), "utf8")).toContain(
-    'ADD COLUMN "deleted_at" timestamp with time zone',
-  );
+  expect(
+    readFileSync(join(migrationsDirectory, "0005_oauth_grant_deleted_at.sql"), "utf8"),
+  ).toContain('ADD COLUMN "deleted_at" timestamp with time zone');
   const identity = readFileSync(join(migrationsDirectory, "0004_oauth_grant_identity.sql"), "utf8");
   expect(identity).toContain('ADD COLUMN "label" text');
   expect(identity).toContain('ADD COLUMN "last_used_at" timestamp with time zone');

@@ -626,9 +626,9 @@ it("deletes an active grant and a revoked history row", async () => {
     }),
   );
   expect(after.oauth_grants).toEqual([]);
-  expect(server.runtime.oauthGrants().some((grant) => grant.id === id && grant.deletedAt !== null)).toBe(
-    true,
-  );
+  expect(
+    server.runtime.oauthGrants().some((grant) => grant.id === id && grant.deletedAt !== null),
+  ).toBe(true);
   await expectError(
     await server.request("/pcp/v1/whoami", { headers: { authorization: `Bearer ${token}` } }),
     401,
