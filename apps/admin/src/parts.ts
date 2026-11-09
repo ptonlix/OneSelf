@@ -301,11 +301,11 @@ export function statusLabel(status: string): string {
 }
 
 /** Shortened grant id for lists; the full id stays in the title attribute. */
-export function shortId(id: string): string {
+function shortId(id: string): string {
   return id.length <= 12 ? id : `${id.slice(0, 6)}…${id.slice(-4)}`;
 }
 
-export function grantTitle(grant: { id: string; label: string | null }): string {
+function grantTitle(grant: { id: string; label: string | null }): string {
   return grant.label ?? shortId(grant.id);
 }
 
