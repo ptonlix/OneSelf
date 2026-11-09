@@ -166,6 +166,7 @@ export async function issueAccessToken(
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      label: "agent",
       unrestricted_data: input.unrestricted_data ?? false,
       site_write: input.site_write ?? false,
       sources: input.sources ?? [],

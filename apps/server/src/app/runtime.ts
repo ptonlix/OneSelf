@@ -123,12 +123,12 @@ export type Actor = {
 };
 
 /**
- * The owner-visible shape of one OAuth grant: exactly these six fields, never token hashes or
- * refresh payloads. `GET /admin/oauth-grants` returns `{ oauth_grants: OauthGrantView[] }`; the
- * admin client parses the same six fields into its own `OauthGrantView`.
+ * The owner-visible shape of one OAuth grant. Never token hashes or refresh payloads.
+ * `expires_at` is the current refresh token's expiry, not a payload field.
  */
 export type OauthGrantView = {
   readonly id: string;
+  readonly label: string | null;
   readonly site_write: boolean;
   readonly unrestricted_data: boolean;
   readonly sources: readonly {
@@ -138,6 +138,8 @@ export type OauthGrantView = {
     readonly visibility: boolean;
   }[];
   readonly created_at: string;
+  readonly last_used_at: string | null;
+  readonly expires_at: string | null;
   readonly revoked_at: string | null;
 };
 
@@ -1727,14 +1729,23 @@ export class Runtime {
           if (patch.refreshTokenPayload !== undefined) {
             grant.refreshTokenPayload = patch.refreshTokenPayload;
           }
+          if (patch.refreshExpiresAt !== undefined) {
+            grant.refreshExpiresAt = patch.refreshExpiresAt;
+          }
           if (patch.revokedAt !== undefined) {
             grant.revokedAt = patch.revokedAt;
+          }
+          if (patch.deletedAt !== undefined) {
+            grant.deletedAt = patch.deletedAt;
           }
           await this.#store?.updateOauthGrant(id, {
             refresh_token_hash: grant.refreshTokenHash,
             rotated_refresh_hashes: grant.rotatedRefreshHashes,
             refresh_token_payload: grant.refreshTokenPayload,
+            refresh_expires_at:
+              grant.refreshExpiresAt === null ? null : new Date(grant.refreshExpiresAt),
             revoked_at: grant.revokedAt === null ? null : new Date(grant.revokedAt),
+            deleted_at: grant.deletedAt === null ? null : new Date(grant.deletedAt),
           });
         },
       });
@@ -1767,6 +1778,7 @@ export class Runtime {
     actor: Actor,
     input: {
       userCode: string;
+      label: string;
       unrestrictedData: boolean;
       siteWrite: boolean;
       sources: SourceGrant[];
@@ -1778,6 +1790,7 @@ export class Runtime {
         return allowed;
       }
       const approved = await this.#requireEngine().approveDevice(input.userCode, {
+        label: input.label,
         siteWrite: input.siteWrite,
         unrestrictedData: input.unrestrictedData,
         sources: input.unrestrictedData ? [] : input.sources,
@@ -1898,15 +1911,18 @@ export class Runtime {
       if (!allowed.ok) {
         return allowed;
       }
-      // Copy the six owner-visible fields one by one; token hashes and refresh payloads stay inside.
-      const grants = [...this.#grants].sort((left, right) =>
-        left.createdAt === right.createdAt
-          ? left.id.localeCompare(right.id)
-          : left.createdAt.localeCompare(right.createdAt),
-      );
+      // Copy only owner-visible fields; token hashes and refresh payloads stay inside.
+      const grants = this.#grants
+        .filter((grant) => grant.deletedAt === null)
+        .sort((left, right) =>
+          left.createdAt === right.createdAt
+            ? left.id.localeCompare(right.id)
+            : left.createdAt.localeCompare(right.createdAt),
+        );
       return ok({
         oauth_grants: grants.map((grant): OauthGrantView => ({
           id: grant.id,
+          label: grant.label,
           site_write: grant.siteWrite,
           unrestricted_data: grant.unrestrictedData,
           sources: grant.sources.map((source) => ({
@@ -1916,6 +1932,11 @@ export class Runtime {
             visibility: source.visibility,
           })),
           created_at: grant.createdAt,
+          last_used_at: grant.lastUsedAt,
+          expires_at:
+            grant.revokedAt !== null || grant.refreshTokenHash === null
+              ? null
+              : grant.refreshExpiresAt,
           revoked_at: grant.revokedAt,
         })),
       });
@@ -1930,6 +1951,20 @@ export class Runtime {
       }
       const revoked = await this.#requireEngine().revoke(id);
       if (!revoked) {
+        return fail("not_found", "grant not found");
+      }
+      return ok({ id });
+    });
+  }
+
+  deleteOauthGrant(actor: Actor, id: string): Promise<DomainResult<{ id: string }>> {
+    return this.exclusive(async () => {
+      const allowed = this.#ownerActor(actor);
+      if (!allowed.ok) {
+        return allowed;
+      }
+      const removed = await this.#requireEngine().remove(id);
+      if (!removed) {
         return fail("not_found", "grant not found");
       }
       return ok({ id });
@@ -2153,6 +2188,7 @@ export class Runtime {
     if (grant === null) {
       return { credential: { kind: "anonymous" }, mustChangePassword: false, sessionId: null };
     }
+    await this.#touchOauthGrant(grant.id);
     return {
       credential: {
         kind: "oauth",
@@ -2163,6 +2199,16 @@ export class Runtime {
       mustChangePassword: false,
       sessionId: null,
     };
+  }
+
+  async #touchOauthGrant(id: string): Promise<void> {
+    const grant = this.#grants.find((item) => item.id === id);
+    if (grant === undefined || grant.revokedAt !== null) {
+      return;
+    }
+    const lastUsedAt = this.clock.iso();
+    grant.lastUsedAt = lastUsedAt;
+    await this.#store?.updateOauthGrant(id, { last_used_at: new Date(lastUsedAt) });
   }
 
   #requireEngine(): OauthEngine {
@@ -2317,13 +2363,17 @@ function searchableSources(
 function persistedGrant(grant: OauthGrantRecord): PersistedGrant {
   return {
     id: grant.id,
+    label: grant.label,
     siteWrite: grant.siteWrite,
     unrestrictedData: grant.unrestrictedData,
     sources: grant.sources.map((source) => ({ ...source })),
     refreshTokenHash: grant.refreshTokenHash,
     rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
     refreshTokenPayload: grant.refreshTokenPayload,
+    refreshExpiresAt: grant.refreshExpiresAt,
+    lastUsedAt: grant.lastUsedAt,
     revokedAt: grant.revokedAt,
+    deletedAt: grant.deletedAt,
     createdAt: grant.createdAt,
   };
 }
@@ -2331,12 +2381,16 @@ function persistedGrant(grant: OauthGrantRecord): PersistedGrant {
 function grantRecord(grant: PersistedGrant): OauthGrantRecord {
   return {
     id: grant.id,
+    label: grant.label,
     siteWrite: grant.siteWrite,
     unrestrictedData: grant.unrestrictedData,
     sources: grant.sources.map((source) => ({ ...source })),
     refreshTokenHash: grant.refreshTokenHash,
     rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
     refreshTokenPayload: grant.refreshTokenPayload,
+    refreshExpiresAt: grant.refreshExpiresAt,
+    lastUsedAt: grant.lastUsedAt,
+    deletedAt: grant.deletedAt,
     revokedAt: grant.revokedAt,
     createdAt: grant.createdAt,
     accessTokens: [],

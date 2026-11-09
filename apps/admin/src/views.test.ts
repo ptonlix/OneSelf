@@ -409,6 +409,7 @@ describe("device approval hint", () => {
       }),
     );
     expect(markup).toContain("全部数据权限");
+    expect(markup).toContain("标签");
     expect(markup).toContain("目录列表不会写入批准");
     expect(markup).toContain("site:write");
     expect(markup).toContain("不创建 API Key");
@@ -462,18 +463,24 @@ const overviewData: OverviewData = {
   grants: ready([
     {
       id: "grant_live_0001",
+      label: "claude",
       site_write: true,
       unrestricted_data: true,
       sources: [],
       created_at: "2026-05-03T00:00:00Z",
+      last_used_at: null,
+      expires_at: null,
       revoked_at: null,
     },
     {
       id: "grant_gone_0002",
+      label: null,
       site_write: false,
       unrestricted_data: false,
       sources: [{ id: "profile", read: true, write: false, visibility: false }],
       created_at: "2026-05-01T00:00:00Z",
+      last_used_at: "2026-05-02T00:00:00Z",
+      expires_at: null,
       revoked_at: "2026-05-04T00:00:00Z",
     },
   ]),
@@ -497,6 +504,9 @@ function overviewProps(change: Partial<OverviewProps> = {}): OverviewProps {
     onRevokeKey: noop,
     onArmGrant: noop,
     onRevokeGrant: noop,
+    armedGrantDelete: null,
+    onArmGrantDelete: noop,
+    onDeleteGrant: noop,
     ...change,
   };
 }
@@ -617,7 +627,7 @@ describe("overview", () => {
     expect(markup).toContain("notes：读取失败");
     expect(section(markup, "API Key")).toContain("读取失败：服务暂时不可用");
     expect(section(markup, "站点")).toContain("/_preview/public-page/");
-    expect(section(markup, "已批准设备")).toContain("grant_…0001");
+    expect(section(markup, "已批准设备")).toContain("claude");
     expect(markup).not.toContain("已删除目录");
     expect(markup).not.toContain("最近写入");
   });
@@ -792,9 +802,16 @@ describe("approved devices", () => {
     const panel = section(html(tree), "已批准设备");
     expect(panel).not.toMatch(/token|refresh|hash/i);
     expect(panel).toContain("site:write");
+    expect(textOf(row(tree, "grant_live_0001"))).toContain("claude");
+    expect(textOf(row(tree, "grant_live_0001"))).toContain("从未");
+    expect(textOf(row(tree, "grant_live_0001"))).toContain("尚未换到令牌");
     expect(textOf(row(tree, "grant_live_0001"))).toContain("全部数据");
-    expect(textOf(row(tree, "grant_gone_0002"))).not.toContain("全部数据");
-    expect(buttons(row(tree, "grant_gone_0002"))).toHaveLength(0);
+    expect(textOf(row(tree, "grant_gone_0002"))).toContain("grant_…0002");
+    expect(textOf(row(tree, "grant_gone_0002"))).toContain("最近使用");
+    expect(textOf(row(tree, "grant_gone_0002"))).not.toContain("刷新到期");
+    expect(buttons(row(tree, "grant_gone_0002")).map((element) => textOf(element))).toEqual([
+      "删除",
+    ]);
     expect(textOf(row(tree, "grant_gone_0002"))).toContain("revoked");
   });
 
@@ -812,6 +829,31 @@ describe("approved devices", () => {
       "确认作废",
     );
     expect(onRevokeGrant).toHaveBeenCalledWith("grant_live_0001");
+  });
+
+  it("deletes a revoked grant only on the second click", () => {
+    const onArmGrantDelete = vi.fn();
+    const onDeleteGrant = vi.fn();
+    press(
+      row(HomeView(overviewProps({ onArmGrantDelete, onDeleteGrant })), "grant_gone_0002"),
+      "删除",
+    );
+    expect(onArmGrantDelete).toHaveBeenCalledWith("grant_gone_0002");
+    expect(onDeleteGrant).not.toHaveBeenCalled();
+    press(
+      row(
+        HomeView(
+          overviewProps({
+            armedGrantDelete: "grant_gone_0002",
+            onArmGrantDelete,
+            onDeleteGrant,
+          }),
+        ),
+        "grant_gone_0002",
+      ),
+      "确认删除",
+    );
+    expect(onDeleteGrant).toHaveBeenCalledWith("grant_gone_0002");
   });
 });
 

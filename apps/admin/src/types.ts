@@ -61,6 +61,7 @@ export interface CreateApiKeyBody {
 
 export interface DeviceApprovalBody {
   user_code: string;
+  label: string;
   unrestricted_data: boolean;
   site_write: boolean;
   sources: SourceGrant[];
@@ -114,10 +115,13 @@ export interface PublicPageSummary {
 /** One row of `GET /admin/oauth-grants`; mirrors the server's `OauthGrantView` field for field. */
 export interface OauthGrantView {
   id: string;
+  label: string | null;
   site_write: boolean;
   unrestricted_data: boolean;
   sources: SourceGrant[];
   created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
   revoked_at: string | null;
 }
 

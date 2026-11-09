@@ -15,13 +15,14 @@ import {
 import {
   chip,
   formatTime,
+  grantActivity,
   grantChips,
+  grantHeading,
   h,
   iconOrb,
   message,
   navLink,
   previewPath,
-  shortId,
   shortRelease,
   SiteReleaseNotice,
 } from "./parts";
@@ -107,6 +108,9 @@ export interface OverviewProps {
   onRevokeKey: (id: string) => void;
   onArmGrant: (id: string | null) => void;
   onRevokeGrant: (id: string) => void;
+  armedGrantDelete: string | null;
+  onArmGrantDelete: (id: string | null) => void;
+  onDeleteGrant: (id: string) => void;
 }
 
 export interface RecordsProps {
@@ -498,6 +502,57 @@ function formCode(form: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function deleteControls(input: {
+  id: string;
+  armed: boolean;
+  pending: boolean;
+  onArm: (id: string | null) => void;
+  onDelete: (id: string) => void;
+}): ReactElement {
+  if (!input.armed) {
+    return h(
+      "button",
+      {
+        className: "btn btn-sm btn-ghost",
+        type: "button",
+        disabled: input.pending,
+        onClick: () => {
+          input.onArm(input.id);
+        },
+      },
+      "删除",
+    );
+  }
+  return h(
+    "span",
+    { className: "row confirm" },
+    h(
+      "button",
+      {
+        className: "btn btn-sm btn-danger",
+        type: "button",
+        disabled: input.pending,
+        onClick: () => {
+          input.onDelete(input.id);
+        },
+      },
+      "确认删除",
+    ),
+    h(
+      "button",
+      {
+        className: "btn btn-sm btn-ghost",
+        type: "button",
+        disabled: input.pending,
+        onClick: () => {
+          input.onArm(null);
+        },
+      },
+      "取消",
+    ),
+  );
+}
+
 function revokeControls(input: {
   id: string;
   armed: boolean;
@@ -677,7 +732,7 @@ function grantPanel(props: OverviewProps): ReactElement {
       "div",
       { className: "card-h" },
       h("h3", null, "已批准设备"),
-      h("span", { className: "cap" }, "设备码授权 · 没有名称，按批准时间区分"),
+      h("span", { className: "cap" }, "按标签区分。删除会移出列表"),
     ),
     message(props.grantMessage),
     panelState(props.data.grants, (grants) =>
@@ -694,23 +749,8 @@ function grantPanel(props: OverviewProps): ReactElement {
                 h(
                   "div",
                   { className: "li-main" },
-                  h("div", { className: "t mono", title: grant.id }, shortId(grant.id)),
-                  h(
-                    "div",
-                    { className: "s" },
-                    grant.revoked_at === null
-                      ? `批准于 ${formatTime(grant.created_at)}`
-                      : `批准于 ${formatTime(grant.created_at)} · 作废于 ${formatTime(grant.revoked_at)}`,
-                  ),
-                ),
-                h(
-                  "div",
-                  { className: "row chips" },
-                  ...grantChips({
-                    sources: grant.sources,
-                    siteWrite: grant.site_write,
-                    unrestrictedData: grant.unrestricted_data,
-                  }),
+                  grantHeading(grant),
+                  h("div", { className: "s" }, grantActivity(grant)),
                 ),
                 grant.revoked_at === null
                   ? revokeControls({
@@ -721,6 +761,13 @@ function grantPanel(props: OverviewProps): ReactElement {
                       onRevoke: props.onRevokeGrant,
                     })
                   : chip("revoked", "danger"),
+                deleteControls({
+                  id: grant.id,
+                  armed: props.armedGrantDelete === grant.id,
+                  pending: props.grantPending,
+                  onArm: props.onArmGrantDelete,
+                  onDelete: props.onDeleteGrant,
+                }),
               ),
             ),
           ),

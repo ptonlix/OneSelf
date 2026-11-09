@@ -94,6 +94,7 @@ export interface AdminClient {
   listPublicPages(): Promise<PublicPageSummary[]>;
   listOauthGrants(): Promise<OauthGrantView[]>;
   revokeOauthGrant(id: string): Promise<void>;
+  deleteOauthGrant(id: string): Promise<void>;
   listDeletedSources(cursor?: string): Promise<DeletedSource[]>;
   readGraph(): Promise<AdminGraph>;
   readPage(source: string, slug: string): Promise<{ markdown: string }>;
@@ -281,6 +282,14 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
         json: {},
       });
       rejectKeyField(response, "作废响应不能包含密钥");
+    },
+    async deleteOauthGrant(id) {
+      const response = await send(transport, {
+        method: "POST",
+        path: `/admin/oauth-grants/${encodeURIComponent(id)}/delete`,
+        json: {},
+      });
+      rejectKeyField(response, "删除响应不能包含密钥");
     },
   };
 }
@@ -547,7 +556,10 @@ function parsePublicPages(body: unknown): PublicPageSummary[] {
 
 const GRANT_FIELDS = [
   "created_at",
+  "expires_at",
   "id",
+  "label",
+  "last_used_at",
   "revoked_at",
   "site_write",
   "sources",
@@ -570,19 +582,25 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
       [...fields].sort().some((field, index) => field !== GRANT_FIELDS[index]) ||
       typeof item.id !== "string" ||
       item.id === "" ||
+      !nullableString(item.label) ||
       typeof item.site_write !== "boolean" ||
       typeof item.unrestricted_data !== "boolean" ||
       typeof item.created_at !== "string" ||
+      !nullableString(item.last_used_at) ||
+      !nullableString(item.expires_at) ||
       !nullableString(item.revoked_at)
     ) {
       throw new ParseError("设备授权无法识别");
     }
     return {
       id: item.id,
+      label: item.label,
       site_write: item.site_write,
       unrestricted_data: item.unrestricted_data,
       sources: parseGrants(item.sources),
       created_at: item.created_at,
+      last_used_at: item.last_used_at,
+      expires_at: item.expires_at,
       revoked_at: item.revoked_at,
     };
   });

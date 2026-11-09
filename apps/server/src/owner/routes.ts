@@ -124,8 +124,13 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     if (sources === null) {
       return sendError("invalid", "sources are invalid");
     }
+    const label = approved.label.trim();
+    if (label.length === 0 || label.length > 80) {
+      return sendError("invalid", "device approval is invalid");
+    }
     const result = await runtime.approveDevice(actor, {
       userCode: approved.user_code,
+      label,
       unrestrictedData: approved.unrestricted_data,
       siteWrite: approved.site_write,
       sources,
@@ -201,6 +206,18 @@ export function mountOwner(app: Hono, runtime: Runtime): void {
     }
     const actor = await runtime.authenticate(c.req.raw);
     const result = await runtime.revokeOauthGrant(actor, c.req.param("id"));
+    if (!result.ok) {
+      return sendError(result.error, result.message);
+    }
+    return sendJson(result.value);
+  });
+
+  app.post("/admin/oauth-grants/:id/delete", async (c) => {
+    if (!originAllowed(c.req.raw, runtime.origin)) {
+      return sendError("forbidden", "origin is not allowed");
+    }
+    const actor = await runtime.authenticate(c.req.raw);
+    const result = await runtime.deleteOauthGrant(actor, c.req.param("id"));
     if (!result.ok) {
       return sendError(result.error, result.message);
     }

@@ -29,6 +29,20 @@
       "when": 1792800000000,
       "tag": "0003_drop_unused_search_index",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792886400000,
+      "tag": "0004_oauth_grant_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792972800000,
+      "tag": "0005_oauth_grant_deleted_at",
+      "breakpoints": true
     }
   ]
 }

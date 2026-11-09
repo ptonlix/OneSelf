@@ -6,7 +6,9 @@ import {
   chip,
   formatRemaining,
   formatTime,
+  grantActivity,
   grantChips,
+  grantHeading,
   grantRows,
   h,
   InfoTip,
@@ -523,6 +525,7 @@ const DEVICE_REVOKE_HINT = "之后可在本页的「已批准设备」里单独�
 
 export function DeviceApprovalView(props: {
   userCode: string;
+  label?: string;
   unrestrictedData: boolean;
   siteWrite: boolean;
   drafts: readonly SourceDraft[];
@@ -531,6 +534,7 @@ export function DeviceApprovalView(props: {
   done: boolean;
   directoriesReady: boolean;
   onUserCode: (value: string) => void;
+  onLabel?: (value: string) => void;
   onUnrestricted: (value: boolean) => void;
   onSiteWrite: (value: boolean) => void;
   onToggle: (id: string, flag: GrantFlag, value: boolean) => void;
@@ -540,6 +544,9 @@ export function DeviceApprovalView(props: {
   grantPending?: boolean;
   onArmGrant?: (id: string) => void;
   onRevokeGrant?: (id: string) => void;
+  armedGrantDelete?: string | null;
+  onArmGrantDelete?: (id: string | null) => void;
+  onDeleteGrant?: (id: string) => void;
 }): ReactElement {
   if (props.done) {
     return h(
@@ -602,6 +609,24 @@ export function DeviceApprovalView(props: {
             }),
           ),
           h("p", { className: "body-s" }, "核对它和 Agent 终端里显示的用户码一致。"),
+          h(
+            "label",
+            { className: "field" },
+            h("span", null, "标签"),
+            h("input", {
+              className: "input",
+              name: "label",
+              type: "text",
+              autoComplete: "off",
+              maxLength: 80,
+              value: props.label ?? "",
+              placeholder: "例如 Claude · 这台电脑",
+              onChange: (event: { currentTarget: EventTarget | null }) => {
+                props.onLabel?.(readInputValue(event.currentTarget));
+              },
+            }),
+          ),
+          h("p", { className: "body-s" }, "用这个名字分辨这一次批准。Agent 不能修改。"),
         ),
         h(
           "section",
@@ -640,7 +665,11 @@ export function DeviceApprovalView(props: {
           {
             className: "btn btn-lg btn-orbit wide",
             type: "submit",
-            disabled: props.pending || !props.directoriesReady || props.userCode.trim() === "",
+            disabled:
+              props.pending ||
+              !props.directoriesReady ||
+              props.userCode.trim() === "" ||
+              (props.label ?? "").trim() === "",
           },
           "确认",
         ),
@@ -657,6 +686,9 @@ function approvedDevices(props: {
   grantPending?: boolean;
   onArmGrant?: (id: string) => void;
   onRevokeGrant?: (id: string) => void;
+  armedGrantDelete?: string | null;
+  onArmGrantDelete?: (id: string | null) => void;
+  onDeleteGrant?: (id: string) => void;
 }): ReactElement {
   const grants = props.grants ?? [];
   return h(
@@ -672,7 +704,12 @@ function approvedDevices(props: {
             h(
               "li",
               { key: grant.id, className: "li" },
-              h("div", { className: "t mono" }, grant.id),
+              h(
+                "div",
+                { className: "li-main" },
+                grantHeading(grant),
+                h("div", { className: "s" }, grantActivity(grant)),
+              ),
               grant.revoked_at === null
                 ? props.armedGrant === grant.id
                   ? h(
@@ -699,6 +736,30 @@ function approvedDevices(props: {
                       "作废",
                     )
                 : null,
+              props.armedGrantDelete === grant.id
+                ? h(
+                    "button",
+                    {
+                      className: "btn btn-sm btn-danger",
+                      type: "button",
+                      disabled: props.grantPending === true,
+                      onClick: () => {
+                        props.onDeleteGrant?.(grant.id);
+                      },
+                    },
+                    "确认删除",
+                  )
+                : h(
+                    "button",
+                    {
+                      className: "btn btn-sm btn-ghost",
+                      type: "button",
+                      onClick: () => {
+                        props.onArmGrantDelete?.(grant.id);
+                      },
+                    },
+                    "删除",
+                  ),
             ),
           ),
         ),
