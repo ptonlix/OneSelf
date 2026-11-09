@@ -301,8 +301,49 @@ export function statusLabel(status: string): string {
 }
 
 /** Shortened grant id for lists; the full id stays in the title attribute. */
-export function shortId(id: string): string {
+function shortId(id: string): string {
   return id.length <= 12 ? id : `${id.slice(0, 6)}…${id.slice(-4)}`;
+}
+
+function grantTitle(grant: { id: string; label: string | null }): string {
+  return grant.label ?? shortId(grant.id);
+}
+
+export function grantHeading(grant: {
+  id: string;
+  label: string | null;
+  site_write: boolean;
+  unrestricted_data: boolean;
+  sources: Parameters<typeof grantChips>[0]["sources"];
+}): ReactElement {
+  return h(
+    "div",
+    { className: "t with-tags", title: grant.id },
+    h("span", { className: grant.label === null ? "mono" : undefined }, grantTitle(grant)),
+    h(
+      "span",
+      { className: "row chips inline" },
+      ...grantChips({
+        sources: grant.sources,
+        siteWrite: grant.site_write,
+        unrestrictedData: grant.unrestricted_data,
+      }),
+    ),
+  );
+}
+
+export function grantActivity(grant: {
+  created_at: string;
+  last_used_at: string | null;
+  expires_at: string | null;
+  revoked_at: string | null;
+}): string {
+  const used = grant.last_used_at === null ? "从未" : formatTime(grant.last_used_at);
+  if (grant.revoked_at !== null) {
+    return `最近使用 ${used} · 批准于 ${formatTime(grant.created_at)} · 作废于 ${formatTime(grant.revoked_at)}`;
+  }
+  const expiry = grant.expires_at === null ? "尚未换到令牌" : formatTime(grant.expires_at);
+  return `最近使用 ${used} · 批准于 ${formatTime(grant.created_at)} · 刷新到期 ${expiry}`;
 }
 
 /** Shortened release id (`rel_0b09c4…a85b`); `public-page` stays as it is. */

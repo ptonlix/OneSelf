@@ -42,12 +42,14 @@ export function createApiKeyBody(input: {
 
 export function deviceApprovalBody(input: {
   userCode: string;
+  label: string;
   unrestrictedData: boolean;
   siteWrite: boolean;
   drafts: readonly SourceDraft[];
 }): DeviceApprovalBody {
   return {
     user_code: input.userCode.trim(),
+    label: input.label.trim(),
     unrestricted_data: input.unrestrictedData,
     site_write: input.siteWrite,
     sources: input.unrestrictedData ? [] : selectedGrants(input.drafts),

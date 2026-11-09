@@ -138,6 +138,7 @@ it("revokes a reused refresh token after the grant is reloaded", async () => {
         headers: jsonHeaders({ cookie }),
         body: JSON.stringify({
           user_code: device.user_code,
+          label: "agent",
           unrestricted_data: false,
           site_write: false,
           sources: [],
@@ -202,6 +203,7 @@ it("lets the owner revoke one oauth grant", async () => {
         headers: jsonHeaders({ cookie }),
         body: JSON.stringify({
           user_code: device.user_code,
+          label: "agent",
           unrestricted_data: false,
           site_write: false,
           sources: [],
@@ -258,6 +260,7 @@ it("lists oauth grants to the owner without any token material", async () => {
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      label: "agent",
       unrestricted_data: false,
       site_write: true,
       sources,
@@ -294,16 +297,22 @@ it("lists oauth grants to the owner without any token material", async () => {
   const grant = body.oauth_grants[0];
   const fields: readonly (keyof OauthGrantView)[] = [
     "created_at",
+    "expires_at",
     "id",
+    "label",
+    "last_used_at",
     "revoked_at",
     "site_write",
     "sources",
     "unrestricted_data",
   ];
   expect(Object.keys(grant ?? {}).sort()).toEqual(fields);
+  expect(grant?.label).toBe("agent");
   expect(grant?.site_write).toBe(true);
   expect(grant?.unrestricted_data).toBe(false);
   expect(grant?.sources).toEqual(sources);
+  expect(grant?.last_used_at).toBeNull();
+  expect(typeof grant?.expires_at).toBe("string");
   expect(grant?.revoked_at).toBeNull();
   expect(grant?.id).toBe(server.runtime.oauthGrants()[0]?.id);
 
@@ -484,6 +493,7 @@ it("reloads unrestricted device data and keeps an older grant restricted", async
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      label: "agent",
       unrestricted_data: true,
       site_write: false,
       sources: [{ id: "notes", read: true, write: true, visibility: true }],
@@ -530,6 +540,7 @@ async function deviceRefresh(server: Awaited<ReturnType<typeof boot>>): Promise<
         headers: jsonHeaders({ cookie }),
         body: JSON.stringify({
           user_code: device.user_code,
+          label: "agent",
           unrestricted_data: false,
           site_write: false,
           sources: [],
@@ -566,22 +577,30 @@ function grantBacking(
 } {
   const grants: Array<{
     id: string;
+    label: string | null;
     site_write: boolean;
     unrestricted_data?: boolean;
     sources: OauthGrantInsert["sources"];
     refresh_token_hash: string | null;
     rotated_refresh_hashes: unknown;
     refresh_token_payload: unknown;
+    refresh_expires_at: Date | null;
+    last_used_at: Date | null;
+    deleted_at: Date | null;
     revoked_at: Date | null;
     created_at: Date;
   }> = seed.map((row) => ({
     id: row.id,
+    label: null,
     site_write: row.site_write,
     unrestricted_data: row.unrestricted_data,
     sources: row.sources,
     refresh_token_hash: null,
     rotated_refresh_hashes: [],
     refresh_token_payload: null,
+    refresh_expires_at: null,
+    last_used_at: null,
+    deleted_at: null,
     revoked_at: null,
     created_at: row.created_at,
   }));
@@ -602,12 +621,16 @@ function grantBacking(
           });
           grants.push({
             id: row.id,
+            label: row.label ?? null,
             site_write: row.site_write,
             unrestricted_data: row.unrestricted_data ?? false,
             sources: row.sources,
             refresh_token_hash: row.refresh_token_hash ?? null,
             rotated_refresh_hashes: row.rotated_refresh_hashes ?? [],
             refresh_token_payload: row.refresh_token_payload ?? null,
+            refresh_expires_at: row.refresh_expires_at ?? null,
+            last_used_at: row.last_used_at ?? null,
+            deleted_at: row.deleted_at ?? null,
             revoked_at: row.revoked_at ?? null,
             created_at: row.created_at,
           });
@@ -630,6 +653,15 @@ function grantBacking(
             }
             if (patch.refresh_token_payload !== undefined) {
               grant.refresh_token_payload = patch.refresh_token_payload;
+            }
+            if (patch.refresh_expires_at !== undefined) {
+              grant.refresh_expires_at = patch.refresh_expires_at;
+            }
+            if (patch.last_used_at !== undefined) {
+              grant.last_used_at = patch.last_used_at;
+            }
+            if (patch.deleted_at !== undefined) {
+              grant.deleted_at = patch.deleted_at;
             }
             if (patch.revoked_at !== undefined) {
               grant.revoked_at = patch.revoked_at;

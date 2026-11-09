@@ -397,6 +397,10 @@ const schemaMd = {
       { name: "refresh_token_payload", sqlType: "jsonb", notNull: false, primaryKey: false },
       timestamptz("revoked_at", false),
       timestamptz("created_at", true),
+      text("label", false),
+      timestamptz("last_used_at", false),
+      timestamptz("refresh_expires_at", false),
+      timestamptz("deleted_at", false),
     ],
     checks: [
       "oauth_grants_sources_array",
@@ -513,6 +517,8 @@ it("appends one initial migration whose columns match schema.md", () => {
     "0001_oauth_refresh_reuse.sql",
     "0002_oauth_unrestricted_data.sql",
     "0003_drop_unused_search_index.sql",
+    "0004_oauth_grant_identity.sql",
+    "0005_oauth_grant_deleted_at.sql",
   ]);
 
   const journal = JSON.parse(
@@ -524,6 +530,8 @@ it("appends one initial migration whose columns match schema.md", () => {
     "0001_oauth_refresh_reuse",
     "0002_oauth_unrestricted_data",
     "0003_drop_unused_search_index",
+    "0004_oauth_grant_identity",
+    "0005_oauth_grant_deleted_at",
   ]);
 
   const sqlText = readFileSync(join(migrationsDirectory, "0000_initial.sql"), "utf8");
@@ -554,6 +562,19 @@ it("appends one initial migration whose columns match schema.md", () => {
     "utf8",
   );
   expect(unrestricted).toContain('ADD COLUMN "unrestricted_data" boolean DEFAULT false NOT NULL');
+  altered.push(
+    { name: "label", sqlType: "text", notNull: false },
+    { name: "last_used_at", sqlType: "timestamp with time zone", notNull: false },
+    { name: "refresh_expires_at", sqlType: "timestamp with time zone", notNull: false },
+    { name: "deleted_at", sqlType: "timestamp with time zone", notNull: false },
+  );
+  expect(
+    readFileSync(join(migrationsDirectory, "0005_oauth_grant_deleted_at.sql"), "utf8"),
+  ).toContain('ADD COLUMN "deleted_at" timestamp with time zone');
+  const identity = readFileSync(join(migrationsDirectory, "0004_oauth_grant_identity.sql"), "utf8");
+  expect(identity).toContain('ADD COLUMN "label" text');
+  expect(identity).toContain('ADD COLUMN "last_used_at" timestamp with time zone');
+  expect(identity).toContain('ADD COLUMN "refresh_expires_at" timestamp with time zone');
 
   for (const [name, spec] of Object.entries(schemaMd)) {
     expect(

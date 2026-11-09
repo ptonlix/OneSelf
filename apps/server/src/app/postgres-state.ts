@@ -60,13 +60,17 @@ export type AccessTokenRecord = {
 
 export type OauthGrantRecord = {
   id: string;
+  label: string | null;
   siteWrite: boolean;
   unrestrictedData: boolean;
   sources: SourceGrant[];
   refreshTokenHash: string | null;
   rotatedRefreshHashes: string[];
   refreshTokenPayload: Record<string, unknown> | null;
+  refreshExpiresAt: string | null;
+  lastUsedAt: string | null;
   revokedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
   accessTokens: AccessTokenRecord[];
 };
@@ -247,13 +251,17 @@ export async function loadProjection(
     })),
     grants: grantRows.map((grant) => ({
       id: grant.id,
+      label: grant.label ?? null,
       siteWrite: grant.site_write,
       unrestrictedData: grant.unrestricted_data,
       sources: copyGrants(grant.sources),
       refreshTokenHash: grant.refresh_token_hash,
       rotatedRefreshHashes: stringList(grant.rotated_refresh_hashes),
       refreshTokenPayload: recordOrNull(grant.refresh_token_payload),
+      refreshExpiresAt: grant.refresh_expires_at === null ? null : iso(grant.refresh_expires_at),
+      lastUsedAt: grant.last_used_at === null ? null : iso(grant.last_used_at),
       revokedAt: grant.revoked_at === null ? null : iso(grant.revoked_at),
+      deletedAt: grant.deleted_at === null ? null : iso(grant.deleted_at),
       createdAt: iso(grant.created_at),
       accessTokens: [],
     })),
@@ -511,12 +519,16 @@ export function apiKeyRequestInsert(record: ApiKeyRequestRecord): ApiKeyRequestI
 export function oauthGrantInsert(record: OauthGrantRecord): OauthGrantInsert {
   return {
     id: record.id,
+    label: record.label,
     site_write: record.siteWrite,
     unrestricted_data: record.unrestrictedData,
     sources: copyGrants(record.sources),
     refresh_token_hash: record.refreshTokenHash,
     rotated_refresh_hashes: record.rotatedRefreshHashes,
     refresh_token_payload: record.refreshTokenPayload,
+    refresh_expires_at: dateOrNull(record.refreshExpiresAt),
+    last_used_at: dateOrNull(record.lastUsedAt),
+    deleted_at: dateOrNull(record.deletedAt),
     revoked_at: dateOrNull(record.revokedAt),
     created_at: new Date(record.createdAt),
   };

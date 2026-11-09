@@ -65,6 +65,7 @@ it("shows an API key once and does not let OAuth manage keys", async () => {
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      label: "agent",
       unrestricted_data: false,
       site_write: false,
       sources: [],
@@ -259,6 +260,35 @@ it("leaves another key and an OAuth grant working after one key is revoked", asy
   await server.close();
 });
 
+it("does not approve a device when the label is missing, blank, or too long", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  const base = {
+    user_code: device.user_code,
+    unrestricted_data: false,
+    site_write: false,
+    sources: [],
+  };
+  for (const label of [undefined, "   ", "a".repeat(81)]) {
+    const body = label === undefined ? base : { ...base, label };
+    const rejected = await server.request("/admin/device", {
+      method: "POST",
+      headers: jsonHeaders({ cookie }),
+      body: JSON.stringify(body),
+    });
+    await expectError(rejected, 400, "invalid");
+  }
+  expect(server.runtime.oauthGrants()).toEqual([]);
+  await server.close();
+});
+
 it("does not approve a device when unrestricted_data is missing", async () => {
   const server = await boot();
   const cookie = await owner(server);
@@ -305,6 +335,7 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
     headers: jsonHeaders({ cookie }),
     body: JSON.stringify({
       user_code: device.user_code,
+      label: "  agent  ",
       unrestricted_data: true,
       site_write: false,
       sources: ignored,
@@ -367,7 +398,7 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
     oauth_grants: { unrestricted_data: boolean; sources: unknown[] }[];
   };
   expect(grantBody.oauth_grants).toEqual([
-    expect.objectContaining({ unrestricted_data: true, sources: [] }),
+    expect.objectContaining({ label: "agent", unrestricted_data: true, sources: [] }),
   ]);
 
   const restricted = await issueAccessToken(server, cookie, {
@@ -402,5 +433,255 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
     unrestricted_data: true,
     sources: [{ id: "notes", read: true, write: true, visibility: true }],
   });
+  await server.close();
+});
+
+it("keeps last use when a grant is refreshed or revoked", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  expect(
+    (
+      await server.request("/admin/device", {
+        method: "POST",
+        headers: jsonHeaders({ cookie }),
+        body: JSON.stringify({
+          user_code: device.user_code,
+          label: "claude",
+          unrestricted_data: true,
+          site_write: false,
+          sources: [],
+        }),
+      })
+    ).status,
+  ).toBe(200);
+  const list = () =>
+    server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", cookie },
+    });
+  const fresh = await readJson(await list());
+  expect(fresh.oauth_grants).toEqual([
+    expect.objectContaining({ label: "claude", last_used_at: null, expires_at: null }),
+  ]);
+  const token = await readJson(
+    await server.request("/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: String(device.device_code),
+      }),
+    }),
+  );
+  const issued = (await readJson(await list())).oauth_grants as {
+    id: string;
+    expires_at: string;
+    last_used_at: string | null;
+  }[];
+  expect(issued[0]?.last_used_at).toBeNull();
+  expect(typeof issued[0]?.expires_at).toBe("string");
+  expect(
+    (
+      await server.request("/pcp/v1/whoami", {
+        headers: { authorization: `Bearer ${String(token.access_token)}` },
+      })
+    ).status,
+  ).toBe(200);
+  const used = (await readJson(await list())).oauth_grants as {
+    id: string;
+    expires_at: string;
+    last_used_at: string;
+  }[];
+  expect(typeof used[0]?.last_used_at).toBe("string");
+  const refreshed = await readJson(
+    await server.request("/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: String(token.refresh_token),
+      }),
+    }),
+  );
+  expect(typeof refreshed.access_token).toBe("string");
+  const afterRefresh = (await readJson(await list())).oauth_grants as {
+    expires_at: string;
+    last_used_at: string;
+  }[];
+  expect(afterRefresh[0]?.last_used_at).toBe(used[0]?.last_used_at);
+  expect(Date.parse(String(afterRefresh[0]?.expires_at))).toBeGreaterThan(
+    Date.parse(String(issued[0]?.expires_at)),
+  );
+  expect(
+    (
+      await server.request(`/admin/oauth-grants/${String(used[0]?.id)}/revoke`, {
+        method: "POST",
+        headers: jsonHeaders({ cookie }),
+        body: "{}",
+      })
+    ).status,
+  ).toBe(200);
+  const after = await readJson(await list());
+  const revokedGrant = (
+    after.oauth_grants as { last_used_at: string; expires_at: null; revoked_at: string }[]
+  )[0];
+  expect(revokedGrant?.last_used_at).toBe(used[0]?.last_used_at);
+  expect(revokedGrant?.expires_at).toBeNull();
+  expect(typeof revokedGrant?.revoked_at).toBe("string");
+  expect(JSON.stringify(after)).not.toMatch(/token|refresh|hash/i);
+  await server.close();
+});
+
+it("honors the stored refresh expiry after a restart", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const device = await readJson(
+    await server.request("/oauth/device/auth", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+  expect(
+    (
+      await server.request("/admin/device", {
+        method: "POST",
+        headers: jsonHeaders({ cookie }),
+        body: JSON.stringify({
+          user_code: device.user_code,
+          label: "agent",
+          unrestricted_data: false,
+          site_write: false,
+          sources: [],
+        }),
+      })
+    ).status,
+  ).toBe(200);
+  const token = await readJson(
+    await server.request("/oauth/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:device_code",
+        device_code: String(device.device_code),
+      }),
+    }),
+  );
+  const refresh = String(token.refresh_token);
+  const snapshot = server.runtime.oauthGrants();
+  expect(snapshot[0]?.refreshExpiresAt).not.toBeNull();
+  await server.close();
+
+  const alive = await boot({ seedGrants: snapshot });
+  const still = await alive.request("/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
+  });
+  expect(still.status).toBe(200);
+  await alive.close();
+
+  const expired = await boot({
+    seedGrants: snapshot.map((grant) => ({
+      ...grant,
+      refreshExpiresAt: "2020-01-01T00:00:00.000Z",
+    })),
+  });
+  const dead = await expired.request("/oauth/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh }),
+  });
+  expect(dead.status).not.toBe(200);
+  await expired.close();
+});
+
+it("deletes an active grant and a revoked history row", async () => {
+  const server = await boot();
+  const cookie = await owner(server);
+  const token = await issueAccessToken(server, cookie, { unrestricted_data: true });
+  const listed = await readJson(
+    await server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", cookie },
+    }),
+  );
+  const grants = listed.oauth_grants as { id: string }[];
+  const id = grants[0]?.id;
+  expect(typeof id).toBe("string");
+  const removed = await server.request(`/admin/oauth-grants/${String(id)}/delete`, {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: "{}",
+  });
+  expect(removed.status).toBe(200);
+  const after = await readJson(
+    await server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", cookie },
+    }),
+  );
+  expect(after.oauth_grants).toEqual([]);
+  expect(
+    server.runtime.oauthGrants().some((grant) => grant.id === id && grant.deletedAt !== null),
+  ).toBe(true);
+  await expectError(
+    await server.request("/pcp/v1/whoami", { headers: { authorization: `Bearer ${token}` } }),
+    401,
+    "unauthorized",
+  );
+  const missing = await server.request("/admin/oauth-grants/missing/delete", {
+    method: "POST",
+    headers: jsonHeaders({ cookie }),
+    body: "{}",
+  });
+  await expectError(missing, 404, "not_found");
+  const key = await issueApiKey(server, cookie, { label: "agent", unrestricted_data: true });
+  await expectError(
+    await server.request(`/admin/oauth-grants/${String(id)}/delete`, {
+      method: "POST",
+      headers: jsonHeaders({ authorization: `ApiKey ${key.key}` }),
+      body: "{}",
+    }),
+    403,
+    "forbidden",
+  );
+
+  const again = await issueAccessToken(server, cookie, { unrestricted_data: false, sources: [] });
+  const second = await readJson(
+    await server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", cookie },
+    }),
+  );
+  const secondId = (second.oauth_grants as { id: string }[])[0]?.id;
+  expect(
+    (
+      await server.request(`/admin/oauth-grants/${String(secondId)}/revoke`, {
+        method: "POST",
+        headers: jsonHeaders({ cookie }),
+        body: "{}",
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await server.request(`/admin/oauth-grants/${String(secondId)}/delete`, {
+        method: "POST",
+        headers: jsonHeaders({ cookie }),
+        body: "{}",
+      })
+    ).status,
+  ).toBe(200);
+  const empty = await readJson(
+    await server.request("/admin/oauth-grants", {
+      headers: { accept: "application/json", cookie },
+    }),
+  );
+  expect(empty.oauth_grants).toEqual([]);
+  expect(again.length).toBeGreaterThan(0);
   await server.close();
 });

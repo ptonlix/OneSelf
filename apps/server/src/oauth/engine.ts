@@ -14,13 +14,17 @@ const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export type PersistedGrant = {
   id: string;
+  label: string | null;
   siteWrite: boolean;
   unrestrictedData: boolean;
   sources: SourceGrant[];
   refreshTokenHash: string | null;
   rotatedRefreshHashes: string[];
   refreshTokenPayload: Record<string, unknown> | null;
+  refreshExpiresAt: string | null;
+  lastUsedAt: string | null;
   revokedAt: string | null;
+  deletedAt: string | null;
   createdAt: string;
 };
 
@@ -28,7 +32,9 @@ export type GrantPatch = {
   refreshTokenHash?: string | null;
   rotatedRefreshHashes?: string[];
   refreshTokenPayload?: Record<string, unknown> | null;
+  refreshExpiresAt?: string | null;
   revokedAt?: string | null;
+  deletedAt?: string | null;
 };
 
 type TokenPayload = Record<string, unknown>;
@@ -74,7 +80,12 @@ export type OauthEngine = {
   handle(request: Request, path: "/device/auth" | "/token"): Promise<Response>;
   approveDevice(
     userCode: string,
-    input: { siteWrite: boolean; unrestrictedData: boolean; sources: SourceGrant[] },
+    input: {
+      label: string;
+      siteWrite: boolean;
+      unrestrictedData: boolean;
+      sources: SourceGrant[];
+    },
   ): Promise<"ok" | "not_found" | "expired" | "used">;
   issueAuthCode(input: {
     challenge: string;
@@ -84,6 +95,7 @@ export type OauthEngine = {
   }): Promise<{ code: string }>;
   grantForAccessToken(token: string): Promise<PersistedGrant | null>;
   revoke(id: string): Promise<boolean>;
+  remove(id: string): Promise<boolean>;
   sweep(nowMs: number): void;
   /** Deletes one refresh adapter row. Reuse still revokes from rotated hashes. */
   dropRefreshAdapter(token: string): void;
@@ -233,13 +245,17 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
       await code.save();
       const record: PersistedGrant = {
         id,
+        label: input.label,
         siteWrite: input.siteWrite,
         unrestrictedData: input.unrestrictedData,
         sources: input.sources.map((source) => ({ ...source })),
         refreshTokenHash: null,
         rotatedRefreshHashes: [],
         refreshTokenPayload: null,
+        refreshExpiresAt: null,
+        lastUsedAt: null,
         revokedAt: null,
+        deletedAt: null,
         createdAt: options.now(),
       };
       grants.set(id, record);
@@ -261,13 +277,17 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
       const value = await code.save();
       const record: PersistedGrant = {
         id,
+        label: null,
         siteWrite: input.siteWrite,
         unrestrictedData: false,
         sources: input.sources.map((source) => ({ ...source })),
         refreshTokenHash: null,
         rotatedRefreshHashes: [],
         refreshTokenPayload: null,
+        refreshExpiresAt: null,
+        lastUsedAt: null,
         revokedAt: null,
+        deletedAt: null,
         createdAt: options.now(),
       };
       grants.set(id, record);
@@ -280,7 +300,7 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
         return null;
       }
       const grant = grants.get(found.grantId);
-      if (grant === undefined || grant.revokedAt !== null) {
+      if (grant === undefined || grant.revokedAt !== null || grant.deletedAt !== null) {
         return null;
       }
       return grant;
@@ -292,6 +312,19 @@ export async function createOauthEngine(options: EngineOptions): Promise<OauthEn
       }
       await markRevoked(grants, id, options);
       destroyGrantTokens(memory, id);
+      return true;
+    },
+    async remove(id) {
+      const grant = grants.get(id);
+      if (grant === undefined || grant.deletedAt !== null) {
+        return false;
+      }
+      if (grant.revokedAt === null) {
+        await markRevoked(grants, id, options);
+      }
+      destroyGrantTokens(memory, id);
+      grant.deletedAt = options.now();
+      await options.updateGrant(id, { deletedAt: grant.deletedAt });
       return true;
     },
     sweep(nowMs) {
@@ -338,7 +371,7 @@ function createAdapter(
         const hash = sha256Hex(id);
         const stored = withoutSecret(payload);
         bucket.set(hash, { payload: stored, expiresAt, grantId, userCode: null });
-        await rememberRefresh(grants, options, hash, stored, grantId);
+        await rememberRefresh(grants, options, hash, stored, grantId, expiresAt);
         return;
       }
       bucket.set(id, { payload, expiresAt, grantId, userCode: null });
@@ -404,11 +437,13 @@ function createAdapter(
           if (grant.refreshTokenHash === key) {
             grant.refreshTokenHash = null;
             grant.refreshTokenPayload = null;
+            grant.refreshExpiresAt = null;
           }
           await options.updateGrant(grant.id, {
             rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
             refreshTokenHash: grant.refreshTokenHash,
             refreshTokenPayload: grant.refreshTokenPayload,
+            refreshExpiresAt: grant.refreshExpiresAt,
           });
         }
       }
@@ -440,6 +475,9 @@ function seed(
   const grantsBucket = bucketFor(memory, "Grant");
   const refresh = bucketFor(memory, "RefreshToken");
   for (const grant of grants.values()) {
+    if (grant.deletedAt !== null) {
+      continue;
+    }
     grantsBucket.set(grant.id, {
       payload: {
         jti: grant.id,
@@ -456,7 +494,7 @@ function seed(
     if (grant.refreshTokenHash !== null && grant.refreshTokenPayload !== null) {
       refresh.set(grant.refreshTokenHash, {
         payload: grant.refreshTokenPayload,
-        expiresAt: Date.now() + REFRESH_TTL_SECONDS * 1000,
+        expiresAt: storedRefreshExpiry(grant),
         grantId: grant.id,
         userCode: null,
       });
@@ -487,6 +525,7 @@ async function rememberRefresh(
   hash: string,
   payload: TokenPayload,
   grantId: string | null,
+  expiresAt: number,
 ): Promise<void> {
   if (grantId === null) {
     return;
@@ -502,11 +541,23 @@ async function rememberRefresh(
   }
   grant.refreshTokenHash = hash;
   grant.refreshTokenPayload = payload;
+  grant.refreshExpiresAt = new Date(expiresAt).toISOString();
   await options.updateGrant(grant.id, {
     refreshTokenHash: hash,
     rotatedRefreshHashes: [...grant.rotatedRefreshHashes],
     refreshTokenPayload: payload,
+    refreshExpiresAt: grant.refreshExpiresAt,
   });
+}
+
+function storedRefreshExpiry(grant: PersistedGrant): number {
+  if (grant.refreshExpiresAt !== null) {
+    const parsed = Date.parse(grant.refreshExpiresAt);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return Date.now() + REFRESH_TTL_SECONDS * 1000;
 }
 
 async function revokeRotatedRefresh(
@@ -550,10 +601,12 @@ async function markRevoked(
   grant.revokedAt = options.now();
   grant.refreshTokenHash = null;
   grant.refreshTokenPayload = null;
+  grant.refreshExpiresAt = null;
   await options.updateGrant(id, {
     revokedAt: grant.revokedAt,
     refreshTokenHash: null,
     refreshTokenPayload: null,
+    refreshExpiresAt: null,
   });
 }
 

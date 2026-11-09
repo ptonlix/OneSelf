@@ -113,6 +113,7 @@ describe("admin http client", () => {
     const { transport, seen } = scripted([{ status: 200, body: { key: "osk_nope" } }]);
     const body = {
       user_code: "WDJB-MJHT",
+      label: "laptop",
       unrestricted_data: false,
       site_write: false,
       sources: [{ id: "notes", read: true, write: false, visibility: false }],
@@ -210,10 +211,13 @@ const activeKey = {
 
 const grant = {
   id: "grant_1",
+  label: "laptop",
   site_write: false,
   unrestricted_data: false,
   sources: [{ id: "notes", read: true, write: false, visibility: false }],
   created_at: "2026-10-01T00:00:00Z",
+  last_used_at: null,
+  expires_at: null,
   revoked_at: null,
 };
 
@@ -277,6 +281,14 @@ describe("admin overview client", () => {
     expect(seen).toEqual([
       { method: "DELETE", path: "/pcp/v1/api-keys/key_1" },
       { method: "POST", path: "/admin/oauth-grants/grant%201/revoke", json: {} },
+    ]);
+  });
+
+  it("deletes a grant with the owner POST route", async () => {
+    const { transport, seen } = scripted([{ status: 200, body: { id: "grant 1" } }]);
+    await createAdminClient(transport).deleteOauthGrant("grant 1");
+    expect(seen).toEqual([
+      { method: "POST", path: "/admin/oauth-grants/grant%201/delete", json: {} },
     ]);
   });
 
@@ -381,7 +393,7 @@ describe("admin overview client", () => {
     delete missing.revoked_at;
     for (const body of [
       { oauth_grants: [missing] },
-      { oauth_grants: [{ ...grant, label: "laptop" }] },
+      { oauth_grants: [{ ...grant, note: "laptop" }] },
       { oauth_grants: [{ ...grant, site_write: "no" }] },
       { grants: [] },
       [],

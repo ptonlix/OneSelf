@@ -371,6 +371,10 @@ export const oauth_grants = pgTable(
     refresh_token_payload: jsonb("refresh_token_payload"),
     revoked_at: timestamptz("revoked_at"),
     created_at: timestamptz("created_at").notNull(),
+    label: text("label"),
+    last_used_at: timestamptz("last_used_at"),
+    refresh_expires_at: timestamptz("refresh_expires_at"),
+    deleted_at: timestamptz("deleted_at"),
   },
   (table) => [
     check("oauth_grants_sources_array", sql`jsonb_typeof(${table.sources}) = 'array'`),

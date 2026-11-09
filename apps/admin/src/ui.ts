@@ -335,6 +335,7 @@ function DeviceScreen(props: {
   onFailure: (reason: unknown) => string;
 }): ReactElement {
   const [userCode, setUserCode] = useState(props.userCode);
+  const [label, setLabel] = useState("");
   const [unrestrictedData, setUnrestrictedData] = useState(false);
   const [siteWrite, setSiteWrite] = useState(false);
   const [drafts, setDrafts] = useState<SourceDraft[]>([]);
@@ -344,6 +345,7 @@ function DeviceScreen(props: {
   const [done, setDone] = useState(false);
   const [grants, setGrants] = useState<OauthGrantView[]>([]);
   const [armedGrant, setArmedGrant] = useState<string | null>(null);
+  const [armedGrantDelete, setArmedGrantDelete] = useState<string | null>(null);
   const [grantPending, setGrantPending] = useState(false);
 
   useEffect(() => {
@@ -386,6 +388,7 @@ function DeviceScreen(props: {
 
   return createElement(DeviceApprovalView, {
     userCode,
+    label,
     unrestrictedData,
     siteWrite,
     drafts,
@@ -394,6 +397,7 @@ function DeviceScreen(props: {
     done,
     directoriesReady,
     onUserCode: setUserCode,
+    onLabel: setLabel,
     onUnrestricted: setUnrestrictedData,
     onSiteWrite: setSiteWrite,
     onToggle: (id, flag, value) => {
@@ -401,8 +405,13 @@ function DeviceScreen(props: {
     },
     grants,
     armedGrant,
+    armedGrantDelete,
     grantPending,
-    onArmGrant: setArmedGrant,
+    onArmGrant: (id) => {
+      setArmedGrant(id);
+      setArmedGrantDelete(null);
+    },
+    onArmGrantDelete: setArmedGrantDelete,
     onRevokeGrant: (id) => {
       setGrantPending(true);
       void (async () => {
@@ -417,14 +426,32 @@ function DeviceScreen(props: {
         }
       })();
     },
+    onDeleteGrant: (id) => {
+      setGrantPending(true);
+      void (async () => {
+        try {
+          await props.client.deleteOauthGrant(id);
+          setGrants(await props.client.listOauthGrants());
+        } catch (reason: unknown) {
+          setMessage(props.onFailure(reason));
+        } finally {
+          setArmedGrantDelete(null);
+          setGrantPending(false);
+        }
+      })();
+    },
     onSubmit: () => {
-      const body = deviceApprovalBody({ userCode, unrestrictedData, siteWrite, drafts });
+      const body = deviceApprovalBody({ userCode, label, unrestrictedData, siteWrite, drafts });
       if (!directoriesReady) {
         setMessage("目录还没有载入");
         return;
       }
       if (body.user_code === "") {
         setMessage("请填写用户码");
+        return;
+      }
+      if (body.label === "") {
+        setMessage("请填写标签");
         return;
       }
       setPending(true);
@@ -718,6 +745,7 @@ function HomeScreen(props: {
   const [data, setData] = useState<OverviewData>(LOADING_OVERVIEW);
   const [armedKey, setArmedKey] = useState<string | null>(null);
   const [armedGrant, setArmedGrant] = useState<string | null>(null);
+  const [armedGrantDelete, setArmedGrantDelete] = useState<string | null>(null);
   const [keyPending, setKeyPending] = useState(false);
   const [grantPending, setGrantPending] = useState(false);
   const [keyMessage, setKeyMessage] = useState<string | null>(null);
@@ -823,6 +851,7 @@ function HomeScreen(props: {
     greeting: greetingFor(new Date().getHours()),
     armedKey,
     armedGrant,
+    armedGrantDelete,
     keyPending,
     grantPending,
     keyMessage,
@@ -835,6 +864,28 @@ function HomeScreen(props: {
     onArmGrant: (id) => {
       setGrantMessage(null);
       setArmedGrant(id);
+      setArmedGrantDelete(null);
+    },
+    onArmGrantDelete: (id) => {
+      setGrantMessage(null);
+      setArmedGrantDelete(id);
+      setArmedGrant(null);
+    },
+    onDeleteGrant: (id) => {
+      setGrantPending(true);
+      setGrantMessage(null);
+      void (async () => {
+        let reload = true;
+        try {
+          await client.deleteOauthGrant(id);
+        } catch (reason: unknown) {
+          setGrantMessage(onFailure(reason));
+          reload = isCode(reason, "not_found");
+        }
+        setArmedGrantDelete(null);
+        setGrantPending(false);
+        if (reload) await loadGrants();
+      })();
     },
     onRevokeKey: (id) => {
       setKeyPending(true);

@@ -129,6 +129,9 @@ export type OauthGrantPatch = {
   readonly refresh_token_hash?: string | null;
   readonly rotated_refresh_hashes?: unknown;
   readonly refresh_token_payload?: unknown;
+  readonly refresh_expires_at?: Date | null;
+  readonly last_used_at?: Date | null;
+  readonly deleted_at?: Date | null;
   readonly revoked_at?: Date | null;
 };
 

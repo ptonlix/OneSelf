@@ -291,7 +291,7 @@ Markdown 的权威副本是对象，不是表里的正文。Postgres 不保存�
 | `owners` | 唯一所属人。登录名、密码哈希、是否必须改密 |
 | `api_keys` | 已生效密钥的哈希、标签、权限、作废时间、最近使用时间 |
 | `api_key_requests` | 待批准的密钥请求、要求的权限和过期时间 |
-| `oauth_grants` | 授权范围、是否全部数据权限、刷新令牌哈希、作废时间 |
+| `oauth_grants` | 授权范围、是否全部数据权限、所属人标签、刷新令牌哈希、当前刷新到期、最近使用、作废时间 |
 
 写入一页：
 
@@ -513,9 +513,9 @@ site_pointers 改指向这一行
 ### 8.4 Agent 通过设备码取得授权
 
 1. Agent 读 `/.well-known/pcp` 和 Skill。
-2. 设备码页面让所属人批准全部数据权限，或当时勾选的 source 三档，以及可选的 `site:write`。`POST /admin/device` 必须带 `unrestricted_data`；为真时忽略 `sources` 并存空数组。缺字段是 `invalid`，不批准。不创建 API Key。
+2. 设备码页面让所属人填写标签，并批准全部数据权限，或当时勾选的 source 三档，以及可选的 `site:write`。`POST /admin/device` 必须带 `unrestricted_data` 和 `label`；`unrestricted_data` 为真时忽略 `sources` 并存空数组。`label` 去掉首尾空白后必须是 1 到 80 个字符。缺字段、空标签或超长标签是 `invalid`，不批准。不创建 API Key。Agent 不能改这个标签。
 3. Agent 用 Bearer 令牌调用已批准的操作。申请上线只得到批准地址。
-4. 所属人撤销这一条授权后，refresh 立即失败。其他 Key 和其他授权仍可用。
+4. 所属人撤销这一条授权后，refresh 立即失败。其他 Key 和其他授权仍可用。`POST /admin/oauth-grants/{id}/delete` 软删除这条记录：仍有效时先作废，再写 `deleted_at`。行留在库里，列表不再返回它。
 
 ### 8.5 所属人生成 API Key
 

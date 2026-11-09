@@ -322,10 +322,13 @@ describe("device grants", () => {
       grants: [
         {
           id: "grant_live",
+          label: null,
           site_write: false,
           unrestricted_data: false,
           sources: [],
           created_at: "2026-01-01T00:00:00.000Z",
+          last_used_at: null,
+          expires_at: null,
           revoked_at: null,
         },
       ],
@@ -359,10 +362,13 @@ describe("device grants", () => {
       grants: [
         {
           id: "grant_live",
+          label: null,
           site_write: false,
           unrestricted_data: false,
           sources: [],
           created_at: "2026-01-01T00:00:00.000Z",
+          last_used_at: null,
+          expires_at: null,
           revoked_at: null,
         },
       ],

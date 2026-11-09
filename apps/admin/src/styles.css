@@ -684,6 +684,20 @@ h3 {
   justify-content: flex-end;
   max-width: 50%;
 }
+.li .t.with-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.li .t.with-tags .chips {
+  width: auto;
+  max-width: none;
+  order: 0;
+  justify-content: flex-start;
+  padding-left: 0;
+  gap: 6px;
+}
 .li.revoked .li-main {
   opacity: 0.55;
 }

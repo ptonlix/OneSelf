@@ -44,17 +44,20 @@ describe("approval payloads", () => {
   it("sends an empty source list when a device approval has unrestricted data", () => {
     const body = deviceApprovalBody({
       userCode: " WDJB-MJHT ",
+      label: "  laptop  ",
       unrestrictedData: true,
       siteWrite: true,
       drafts: toggleDraft(drafts, "notes", "read", true),
     });
     expect(body).toEqual({
       user_code: "WDJB-MJHT",
+      label: "laptop",
       unrestricted_data: true,
       site_write: true,
       sources: [],
     });
     expect([...Object.keys(body)].sort()).toEqual([
+      "label",
       "site_write",
       "sources",
       "unrestricted_data",
@@ -66,12 +69,14 @@ describe("approval payloads", () => {
   it("stores only the checked sources when a device approval is restricted", () => {
     const body = deviceApprovalBody({
       userCode: " WDJB-MJHT ",
+      label: "laptop",
       unrestrictedData: false,
       siteWrite: true,
       drafts,
     });
     expect(body).toEqual({
       user_code: "WDJB-MJHT",
+      label: "laptop",
       unrestricted_data: false,
       site_write: true,
       sources: [{ id: "work", read: true, write: false, visibility: true }],
