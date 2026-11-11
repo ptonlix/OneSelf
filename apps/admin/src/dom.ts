@@ -144,6 +144,93 @@ export function capturePointer(target: EventTarget | null, pointerId: number): v
   }
 }
 
+export function readPreviewDialogNodes(): {
+  sky: { inert: boolean } | null;
+  side: { inert: boolean } | null;
+  preview: { focus?: () => void } | null;
+  confirm: { focus?: () => void } | null;
+} {
+  return {
+    sky: readInert(".nebula-sky"),
+    side: readInert(".side"),
+    preview: readFocus(".nebula-dock"),
+    confirm: readFocus(".vis-card"),
+  };
+}
+
+export function applyPreviewDialog(input: {
+  readonly sky: { inert: boolean } | null;
+  readonly side: { inert: boolean } | null;
+  readonly preview: { focus?: () => void } | null;
+  readonly confirm: { focus?: () => void } | null;
+  readonly plan: { readonly inert: boolean; readonly focus: "preview" | "confirm" | null };
+}): void {
+  if (input.sky !== null) input.sky.inert = input.plan.inert;
+  if (input.side !== null) input.side.inert = input.plan.inert;
+  const target =
+    input.plan.focus === "confirm"
+      ? input.confirm
+      : input.plan.focus === "preview"
+        ? input.preview
+        : null;
+  if (target !== null && typeof target.focus === "function") target.focus();
+}
+
+export function releasePreviewInert(
+  sky: { inert: boolean } | null,
+  side: { inert: boolean } | null,
+): void {
+  if (sky !== null) sky.inert = false;
+  if (side !== null) side.inert = false;
+}
+
+type DialogKeyEvent = {
+  key?: unknown;
+  preventDefault?: () => void;
+  stopPropagation?: () => void;
+};
+
+export function bindKeyDown(listener: (event: DialogKeyEvent) => void): () => void {
+  const document = (globalThis as { document?: object }).document;
+  if (document === undefined) return () => undefined;
+  const add = (document as { addEventListener?: unknown }).addEventListener;
+  const remove = (document as { removeEventListener?: unknown }).removeEventListener;
+  if (typeof add !== "function" || typeof remove !== "function") return () => undefined;
+  const options = { capture: true };
+  const addEvent = add as (
+    type: string,
+    listener: (event: DialogKeyEvent) => void,
+    options: object,
+  ) => void;
+  const removeEvent = remove as (
+    type: string,
+    listener: (event: DialogKeyEvent) => void,
+    options: object,
+  ) => void;
+  addEvent.call(document, "keydown", listener, options);
+  return () => {
+    removeEvent.call(document, "keydown", listener, options);
+  };
+}
+
+function queryNode(selector: string): object | null {
+  const document = (globalThis as { document?: { querySelector?: unknown } }).document;
+  const query = document?.querySelector;
+  if (typeof query !== "function") return null;
+  const found = (query as (selector: string) => unknown).call(document, selector);
+  return found !== null && typeof found === "object" ? found : null;
+}
+
+function readInert(selector: string): { inert: boolean } | null {
+  const found = queryNode(selector);
+  if (found === null || !("inert" in found)) return null;
+  return found as { inert: boolean };
+}
+
+function readFocus(selector: string): { focus?: () => void } | null {
+  return queryNode(selector);
+}
+
 export function pointerOutside(target: EventTarget | null, x: number, y: number): boolean {
   if (target === null || typeof target !== "object" || !("getBoundingClientRect" in target))
     return false;

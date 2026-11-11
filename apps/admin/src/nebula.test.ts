@@ -2,7 +2,8 @@ import { isValidElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
-import { NebulaHome } from "./nebula-view";
+import { applyPreviewDialog, releasePreviewInert } from "./dom";
+import { NebulaHome, previewDialogPlan } from "./nebula-view";
 import { DeviceApprovalView } from "./views";
 import type { AdminGraph } from "./types";
 
@@ -69,6 +70,25 @@ function press(node: ReactNode, label: string): void {
   if (typeof props.children === "string" && props.children.includes(label)) props.onClick?.();
   const children = Array.isArray(props.children) ? props.children : [props.children];
   for (const child of children) press(child as ReactNode, label);
+}
+
+function clickOverlay(node: ReactNode, backdrop: boolean): void {
+  if (!isValidElement(node)) return;
+  const props = node.props as {
+    className?: string;
+    onClick?: (event: { target: EventTarget | null; currentTarget: EventTarget | null }) => void;
+    children?: ReactNode;
+  };
+  if (props.className === "nebula-modal") {
+    const current = {} as EventTarget;
+    props.onClick?.({
+      target: backdrop ? current : ({} as EventTarget),
+      currentTarget: current,
+    });
+    return;
+  }
+  const children = Array.isArray(props.children) ? props.children : [props.children];
+  for (const child of children) clickOverlay(child as ReactNode, backdrop);
 }
 
 function pressLabel(node: ReactNode, label: string): void {
@@ -146,21 +166,137 @@ describe("nebula home", () => {
     expect(onWheel).toHaveBeenCalledWith(expect.objectContaining({ ctrlKey: false, deltaY: 8 }));
   });
 
-  it("opens a right drawer and shows the page body without frontmatter", () => {
+  it("opens a centered preview and shows the page body without frontmatter", () => {
     const onSelect = vi.fn();
     press(home({ onSelect }), "现居上海");
     expect(onSelect).toHaveBeenCalledWith({ kind: "page", key: "health/now" });
-    const markup = html(
-      home({
-        selection: { kind: "page", key: "health/now" },
-        pageMarkdown: "---\ntitle: 现居上海\n---\n2018 年到 2024 年，做研发。\n\n- 网关项目\n",
-      }),
-    );
-    expect(markup).toContain("nebula-dock");
+    const selected = home({
+      onSelect,
+      selection: { kind: "page", key: "health/now" },
+      pageMarkdown: "---\ntitle: 现居上海\n---\n2018 年到 2024 年，做研发。\n\n- 网关项目\n",
+    });
+    const markup = html(selected);
+    expect(markup).toContain("nebula-modal");
+    expect(markup).toContain("nebula-read");
+    expect(markup).toContain('role="dialog"');
     expect(markup).toContain("2018 年到 2024 年");
     expect(markup).toContain("网关项目");
     expect(markup).not.toContain("title: 现居上海");
     expect(markup).not.toContain("<textarea");
+    clickOverlay(selected, true);
+    expect(onSelect).toHaveBeenCalledWith(null);
+    onSelect.mockClear();
+    clickOverlay(selected, false);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("previews quotes and tables instead of the markdown source", () => {
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown:
+          "---\ntitle: 日记\n---\n> 一句话：先补控制面。\n\n| 项目 | 结果 |\n| --- | --- |\n| OneSelf | 已发布 |\n\n## 今日概览\n",
+      }),
+    );
+    expect(markup).toContain("<blockquote");
+    expect(markup).toContain("一句话：先补控制面。");
+    expect(markup).not.toContain("> 一句话");
+    expect(markup).toContain("<table");
+    expect(markup).toContain("<th");
+    expect(markup).toContain("已发布");
+    expect(markup).not.toContain("| 项目 |");
+    expect(markup).toContain("今日概览");
+    expect(markup).not.toContain("<textarea");
+  });
+
+  it("keeps a single aria-modal while the visibility confirm is open", () => {
+    const preview = html(home({ selection: { kind: "page", key: "health/now" } }));
+    expect(preview.match(/aria-modal="true"/g)).toHaveLength(1);
+    expect(openingTag(preview, "nebula-dock nebula-read")).toContain('aria-modal="true"');
+    expect(openingTag(preview, "nebula-dock nebula-read")).toContain('tabindex="-1"');
+    const directory = html(home({ selection: { kind: "source", id: "health" } }));
+    expect(directory.match(/aria-modal="true"/g)).toHaveLength(1);
+    expect(openingTag(directory, "nebula-dock")).toContain('tabindex="-1"');
+
+    const armed = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        armed: "visibility:health/now",
+      }),
+    );
+    expect(armed.match(/aria-modal="true"/g)).toHaveLength(1);
+    expect(openingTag(armed, "nebula-dock nebula-read")).not.toContain("aria-modal");
+    expect(openingTag(armed, "vis-card")).toContain('aria-modal="true"');
+    expect(openingTag(armed, "vis-card")).toContain('tabindex="-1"');
+
+    const missing = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        armed: "visibility:missing/page",
+      }),
+    );
+    expect(missing.match(/aria-modal="true"/g)).toHaveLength(1);
+    expect(openingTag(missing, "nebula-dock nebula-read")).toContain('aria-modal="true"');
+    expect(missing).not.toContain("vis-card");
+  });
+
+  it("nests an indented list and renders a safe image", () => {
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown:
+          "- parent\n  - child\n\n![封面](https://example.com/a.png)\n![跳过](javascript:alert(1))\n",
+      }),
+    );
+    expect(markup).toContain("<li>parent<ul><li>child</li></ul></li>");
+    expect(markup).toContain('src="https://example.com/a.png"');
+    expect(markup).toContain('alt="封面"');
+    expect(markup).not.toContain("javascript:");
+  });
+
+  it("focuses the open dialog and marks the sky and sidebar inert without a document", () => {
+    expect(previewDialogPlan({ previewOpen: true, confirmOpen: false })).toEqual({
+      inert: true,
+      focus: "preview",
+      escape: "close",
+    });
+    expect(previewDialogPlan({ previewOpen: true, confirmOpen: true })).toEqual({
+      inert: true,
+      focus: "confirm",
+      escape: "disarm",
+    });
+    expect(previewDialogPlan({ previewOpen: false, confirmOpen: false })).toEqual({
+      inert: false,
+      focus: null,
+      escape: "ignore",
+    });
+    const sky = { inert: false };
+    const side = { inert: false };
+    const preview = { focus: vi.fn() };
+    const confirm = { focus: vi.fn() };
+    applyPreviewDialog({
+      sky,
+      side,
+      preview,
+      confirm,
+      plan: previewDialogPlan({ previewOpen: true, confirmOpen: false }),
+    });
+    expect(sky.inert).toBe(true);
+    expect(side.inert).toBe(true);
+    expect(preview.focus).toHaveBeenCalledOnce();
+    expect(confirm.focus).not.toHaveBeenCalled();
+    confirm.focus.mockClear();
+    applyPreviewDialog({
+      sky,
+      side,
+      preview,
+      confirm,
+      plan: previewDialogPlan({ previewOpen: true, confirmOpen: true }),
+    });
+    expect(confirm.focus).toHaveBeenCalledOnce();
+    releasePreviewInert(sky, side);
+    expect(sky.inert).toBe(false);
+    expect(side.inert).toBe(false);
   });
 
   it("does not change visibility until the second click", () => {
@@ -385,6 +521,11 @@ describe("device grants", () => {
     expect(onArm).toHaveBeenCalledWith("grant_live");
   });
 });
+
+function openingTag(markup: string, className: string): string {
+  const escaped = className.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`<[^>]*class="${escaped}"[^>]*>`).exec(markup)?.[0] ?? "";
+}
 
 function findSky(node: ReactNode): { props: Record<string, unknown> } {
   if (!isValidElement(node)) throw new Error("missing sky");
