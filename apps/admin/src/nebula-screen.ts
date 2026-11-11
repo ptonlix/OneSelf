@@ -1,6 +1,8 @@
 import { createElement, useEffect, useRef, useState, type ReactElement } from "react";
 
 import {
+  applyPreviewDialog,
+  bindKeyDown,
   canUseWebGL,
   cancelFrame,
   frame,
@@ -8,7 +10,9 @@ import {
   now,
   readCanvas,
   readLabels,
+  readPreviewDialogNodes,
   readReducedMotion,
+  releasePreviewInert,
 } from "./dom";
 import type { AdminClient } from "./http";
 import {
@@ -24,7 +28,12 @@ import {
   type Gesture,
 } from "./nebula-model";
 import { mountNebula } from "./nebula-scene";
-import { NebulaHome, type NebulaSelection } from "./nebula-view";
+import {
+  NebulaHome,
+  previewDialogPlan,
+  visibilityConfirmOpen,
+  type NebulaSelection,
+} from "./nebula-view";
 import type { AdminGraph } from "./types";
 
 export function NebulaScreen(props: {
@@ -171,6 +180,28 @@ export function NebulaScreen(props: {
     [],
   );
 
+  const previewOpen = selection !== null;
+  const confirmOpen = visibilityConfirmOpen(armed, graph?.pages ?? null);
+  useEffect(() => {
+    const plan = previewDialogPlan({ previewOpen, confirmOpen });
+    const nodes = readPreviewDialogNodes();
+    applyPreviewDialog({ ...nodes, plan });
+    const stop = bindKeyDown((event) => {
+      if (typeof event.key !== "string" || event.key !== "Escape" || plan.escape === "ignore") {
+        return;
+      }
+      event.preventDefault?.();
+      event.stopPropagation?.();
+      if (plan.escape === "disarm") setArmed(null);
+      else setSelection(null);
+    });
+    return () => {
+      stop();
+      // The sidebar outlives this screen. Leaving inert set would block the rest of admin.
+      releasePreviewInert(nodes.sky, nodes.side);
+    };
+  }, [previewOpen, confirmOpen]);
+
   return createElement(NebulaHome, {
     graph,
     loading,
@@ -283,6 +314,9 @@ function isControl(target: EventTarget | null): boolean {
   const closest = target.closest;
   if (typeof closest !== "function") return false;
   return (
-    closest.call(target, "input, .nebula-dock, .nebula-zoom, .nebula-mark, .nebula-menu") !== null
+    closest.call(
+      target,
+      "input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-mark, .nebula-menu",
+    ) !== null
   );
 }

@@ -4,7 +4,7 @@ import { readInputValue } from "./browser";
 import { connectCommand } from "./continuity";
 import { capturePointer, pointerOutside } from "./dom";
 import { Icon } from "./icons";
-import { proseBlocks, type ProseInline } from "./nebula-prose";
+import { proseBlocks, type ProseAlign, type ProseBlock, type ProseInline } from "./nebula-prose";
 import { h } from "./parts";
 import type { AdminGraph, GraphPage } from "./types";
 
@@ -12,6 +12,31 @@ export type NebulaSelection =
   | { readonly kind: "source"; readonly id: string }
   | { readonly kind: "page"; readonly key: string }
   | null;
+
+type PreviewDialogPlan = {
+  readonly inert: boolean;
+  readonly focus: "preview" | "confirm" | null;
+  readonly escape: "close" | "disarm" | "ignore";
+};
+
+/** One modal at a time. Escape disarms the visibility confirm before it can close the page. */
+export function previewDialogPlan(input: {
+  readonly previewOpen: boolean;
+  readonly confirmOpen: boolean;
+}): PreviewDialogPlan {
+  if (input.confirmOpen) return { inert: true, focus: "confirm", escape: "disarm" };
+  if (input.previewOpen) return { inert: true, focus: "preview", escape: "close" };
+  return { inert: false, focus: null, escape: "ignore" };
+}
+
+export function visibilityConfirmOpen(
+  armed: string | null,
+  pages: readonly { readonly source: string; readonly slug: string }[] | null,
+): boolean {
+  if (pages === null || armed === null || !armed.startsWith("visibility:")) return false;
+  const key = armed.slice("visibility:".length);
+  return pages.some((page) => `${page.source}/${page.slug}` === key);
+}
 
 export function NebulaHome(props: {
   readonly graph: AdminGraph | null;
@@ -193,6 +218,7 @@ function dock(props: {
     const pages = props.graph.pages.filter((page) => page.source === source.id);
     return drawer(
       "目录",
+      false,
       props,
       h("h2", null, source.id),
       h("p", { className: "dock-quiet" }, `${String(source.page_count)} 页`),
@@ -225,6 +251,7 @@ function dock(props: {
   const incoming = props.graph.links.filter((link) => linkKey(link.to) === pageKey(page));
   return drawer(
     "页",
+    true,
     props,
     visibilityMark(page, props),
     h("h2", null, page.title),
@@ -249,25 +276,50 @@ function dock(props: {
 
 function drawer(
   label: string,
-  props: { onSelect: (selection: NebulaSelection) => void },
+  reading: boolean,
+  props: {
+    onSelect: (selection: NebulaSelection) => void;
+    graph: AdminGraph | null;
+    armed: string | null;
+  },
   ...children: ReactNode[]
 ): ReactElement {
+  const modal = !visibilityConfirmOpen(props.armed, props.graph?.pages ?? null);
   return h(
-    "aside",
-    { className: "nebula-dock", "aria-label": label },
-    h(
-      "button",
-      {
-        className: "dock-close",
-        type: "button",
-        "aria-label": "关闭",
-        onClick: () => {
-          props.onSelect(null);
-        },
+    "div",
+    {
+      className: "nebula-modal",
+      onClick: (event: { target: EventTarget | null; currentTarget: EventTarget | null }) => {
+        if (event.target === event.currentTarget) props.onSelect(null);
       },
-      createElement(Icon, { name: "chevron", size: 16 }),
+    },
+    h(
+      "section",
+      {
+        className: reading ? "nebula-dock nebula-read" : "nebula-dock",
+        role: "dialog",
+        tabIndex: -1,
+        "aria-label": label,
+        ...(modal ? { "aria-modal": "true" } : {}),
+      },
+      h(
+        "div",
+        { className: "dock-bar" },
+        h(
+          "button",
+          {
+            className: "dock-close",
+            type: "button",
+            "aria-label": "关闭",
+            onClick: () => {
+              props.onSelect(null);
+            },
+          },
+          "×",
+        ),
+      ),
+      h("div", { className: "dock-scroll" }, ...children),
     ),
-    ...children,
   );
 }
 
@@ -283,32 +335,108 @@ function prose(props: {
   return h(
     "article",
     { className: "nebula-prose" },
-    ...blocks.map((block, index) => {
-      const key = String(index);
-      if (block.kind === "heading") {
-        return h(
-          block.level === 2 ? "h3" : "h4",
-          { key },
-          ...inlineNodes(block.inlines, props.onSelect, key),
-        );
-      }
-      if (block.kind === "list") {
-        return h(
-          "ul",
-          { key },
-          ...block.items.map((item, itemIndex) =>
+    ...blockNodes(blocks, props.onSelect, "prose"),
+  );
+}
+
+function blockNodes(
+  blocks: readonly ProseBlock[],
+  onSelect: (selection: NebulaSelection) => void,
+  prefix: string,
+): ReactNode[] {
+  return blocks.map((block, index) => blockNode(block, onSelect, `${prefix}-${String(index)}`));
+}
+
+function blockNode(
+  block: ProseBlock,
+  onSelect: (selection: NebulaSelection) => void,
+  key: string,
+): ReactNode {
+  if (block.kind === "heading") {
+    return h(headingTag(block.level), { key }, ...inlineNodes(block.inlines, onSelect, key));
+  }
+  if (block.kind === "list") {
+    return h(
+      block.ordered ? "ol" : "ul",
+      { key },
+      ...block.items.map((item, itemIndex) =>
+        h(
+          "li",
+          { key: `${key}-${String(itemIndex)}` },
+          ...inlineNodes(item.inlines, onSelect, `${key}-${String(itemIndex)}`),
+          ...blockNodes(item.nested, onSelect, `${key}-${String(itemIndex)}-nested`),
+        ),
+      ),
+    );
+  }
+  if (block.kind === "code") return h("pre", { key }, h("code", null, block.text));
+  if (block.kind === "quote") {
+    return h("blockquote", { key }, ...blockNodes(block.blocks, onSelect, key));
+  }
+  if (block.kind === "table") return tableNode(block, onSelect, key);
+  if (block.kind === "rule") return h("hr", { key });
+  return h("p", { key }, ...inlineNodes(block.inlines, onSelect, key));
+}
+
+function headingTag(level: 1 | 2 | 3 | 4): "h3" | "h4" | "h5" {
+  if (level === 1) return "h3";
+  if (level === 2) return "h4";
+  return "h5";
+}
+
+function tableNode(
+  block: Extract<ProseBlock, { kind: "table" }>,
+  onSelect: (selection: NebulaSelection) => void,
+  key: string,
+): ReactElement {
+  return h(
+    "div",
+    { key, className: "prose-table-wrap" },
+    h(
+      "table",
+      null,
+      h(
+        "thead",
+        null,
+        h(
+          "tr",
+          null,
+          ...block.headers.map((cell, index) =>
             h(
-              "li",
-              { key: `${key}-${String(itemIndex)}` },
-              ...inlineNodes(item, props.onSelect, `${key}-${String(itemIndex)}`),
+              "th",
+              { key: `${key}-h-${String(index)}`, style: alignStyle(block.aligns[index]) },
+              ...inlineNodes(cell, onSelect, `${key}-h-${String(index)}`),
             ),
           ),
-        );
-      }
-      if (block.kind === "code") return h("pre", { key }, h("code", null, block.text));
-      return h("p", { key }, ...inlineNodes(block.inlines, props.onSelect, key));
-    }),
+        ),
+      ),
+      h(
+        "tbody",
+        null,
+        ...block.rows.map((row, rowIndex) =>
+          h(
+            "tr",
+            { key: `${key}-r-${String(rowIndex)}` },
+            ...row.map((cell, cellIndex) =>
+              h(
+                "td",
+                {
+                  key: `${key}-r-${String(rowIndex)}-${String(cellIndex)}`,
+                  style: alignStyle(block.aligns[cellIndex]),
+                },
+                ...inlineNodes(cell, onSelect, `${key}-r-${String(rowIndex)}-${String(cellIndex)}`),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
   );
+}
+
+function alignStyle(align: ProseAlign | undefined): { textAlign: ProseAlign } | null {
+  if (align === undefined || align === "left") return null;
+  return { textAlign: align };
 }
 
 function inlineNodes(
@@ -319,7 +447,16 @@ function inlineNodes(
   return parts.map((part, index) => {
     const key = `${prefix}-${String(index)}`;
     if (part.kind === "strong") return h("strong", { key }, part.text);
+    if (part.kind === "em") return h("em", { key }, part.text);
+    if (part.kind === "del") return h("del", { key }, part.text);
     if (part.kind === "code") return h("code", { key }, part.text);
+    if (part.kind === "url") {
+      return h(
+        "a",
+        { key, href: part.href, target: "_blank", rel: "noopener noreferrer" },
+        part.label,
+      );
+    }
     if (part.kind === "link") {
       return h(
         "button",
@@ -334,6 +471,7 @@ function inlineNodes(
         part.label,
       );
     }
+    if (part.kind === "image") return h("img", { key, src: part.src, alt: part.alt });
     return part.text;
   });
 }
@@ -422,7 +560,13 @@ function visibilityDialog(props: {
     { className: "vis-modal", role: "presentation" },
     h(
       "div",
-      { className: "vis-card", role: "dialog", "aria-modal": "true", "aria-label": title },
+      {
+        className: "vis-card",
+        role: "dialog",
+        tabIndex: -1,
+        "aria-modal": "true",
+        "aria-label": title,
+      },
       h("h2", null, title),
       h("p", null, note),
       h(
