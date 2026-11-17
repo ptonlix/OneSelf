@@ -79,6 +79,12 @@ export function browserTransport(fetchImpl: typeof fetch = globalThis.fetch): Ht
   };
 }
 
+export interface PageFile {
+  readonly id: string;
+  readonly media_type: string;
+  readonly byte_size: number;
+}
+
 export interface AdminClient {
   login(login: string, password: string): Promise<LoginResult>;
   changePassword(password: string): Promise<PasswordResult>;
@@ -103,6 +109,7 @@ export interface AdminClient {
   listDeletedSources(cursor?: string): Promise<DeletedSource[]>;
   readGraph(): Promise<AdminGraph>;
   readPage(source: string, slug: string): Promise<{ markdown: string }>;
+  listPageFiles(source: string, slug: string): Promise<PageFile[]>;
   deleteSource(id: string): Promise<void>;
   deletePage(source: string, slug: string): Promise<void>;
   setPageVisibility(
@@ -237,6 +244,15 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
         await send(transport, {
           method: "GET",
           path: `/pcp/v1/pages/${encodeURIComponent(source)}/${encodeURIComponent(slug)}`,
+        }),
+      );
+    },
+    async listPageFiles(source, slug) {
+      const query = new URLSearchParams({ source, slug });
+      return parsePageFiles(
+        await send(transport, {
+          method: "GET",
+          path: `/pcp/v1/files?${query.toString()}`,
         }),
       );
     },
@@ -688,6 +704,21 @@ function parseVisibilityWrite(body: unknown): {
 function parsePageMarkdown(body: unknown): { markdown: string } {
   if (!isRecord(body) || typeof body.markdown !== "string") throw new ParseError("页无法识别");
   return { markdown: body.markdown };
+}
+
+function parsePageFiles(body: unknown): PageFile[] {
+  if (!isRecord(body) || !Array.isArray(body.files)) throw new ParseError("原件无法识别");
+  return body.files.map((item) => {
+    if (
+      !isRecord(item) ||
+      typeof item.id !== "string" ||
+      typeof item.media_type !== "string" ||
+      typeof item.byte_size !== "number"
+    ) {
+      throw new ParseError("原件无法识别");
+    }
+    return { id: item.id, media_type: item.media_type, byte_size: item.byte_size };
+  });
 }
 
 function parseGraph(body: unknown): AdminGraph {

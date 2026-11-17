@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { applyPreviewDialog, releasePreviewInert } from "./dom";
-import { NebulaHome, previewDialogPlan } from "./nebula-view";
+import { readFileSync } from "node:fs";
+
+import { NebulaHome, originalMediaPath, previewDialogPlan } from "./nebula-view";
 import { DeviceApprovalView } from "./views";
 import type { AdminGraph } from "./types";
 
@@ -50,6 +52,11 @@ function home(extra: Partial<Parameters<typeof NebulaHome>[0]> = {}) {
     onVisibility: () => undefined,
     pageMarkdown: null,
     pageLoading: false,
+    originals: { status: "ready", files: [] },
+    selectedFileId: null,
+    onSelectFile: () => undefined,
+    originalOpen: false,
+    onOriginalOpen: () => undefined,
     connectOrigin: "http://127.0.0.1:3000",
     showConnect: false,
     webgl: true,
@@ -195,6 +202,182 @@ describe("nebula home", () => {
     onSelect.mockClear();
     clickOverlay(selected, false);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("builds a same-host media path only for a stored file id", () => {
+    const id = "file_0123456789abcdef0123456789abcdef";
+    expect(originalMediaPath(id)).toBe(`/media/${id}`);
+    expect(originalMediaPath("file_abc")).toBeNull();
+    expect(originalMediaPath("../file_0123456789abcdef0123456789abcdef")).toBeNull();
+  });
+
+  it("keeps the original closed until the owner opens it", () => {
+    const id = "file_0123456789abcdef0123456789abcdef";
+    const onOriginalOpen = vi.fn();
+    const closed = home({
+      selection: { kind: "page", key: "health/now" },
+      pageMarkdown: "---\ntitle: 体检\nfiles:\n  - file_secret\n---\n胆囊结石，约 5×4 mm。\n",
+      originals: {
+        status: "ready",
+        files: [{ id, media_type: "application/pdf", byte_size: 324939 }],
+      },
+      onOriginalOpen,
+    });
+    const closedMarkup = html(closed);
+    expect(closedMarkup).toContain("胆囊结石，约 5×4 mm。");
+    expect(closedMarkup).toContain('aria-label="预览原件"');
+    expect(closedMarkup).not.toContain("files:");
+    expect(closedMarkup).not.toContain("<textarea");
+    expect(closedMarkup).not.toContain('title="原件预览"');
+    expect(closedMarkup).not.toMatch(/class="pname"[^>]*>file_/);
+    pressLabel(closed, "预览原件");
+    expect(onOriginalOpen).toHaveBeenCalledWith(true);
+    const open = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "---\ntitle: 体检\nfiles:\n  - file_secret\n---\n胆囊结石，约 5×4 mm。\n",
+        originals: {
+          status: "ready",
+          files: [{ id, media_type: "application/pdf", byte_size: 324939 }],
+        },
+        originalOpen: true,
+        onOriginalOpen,
+      }),
+    );
+    expect(open).toContain("nebula-windows");
+    expect(open).toContain("nebula-original");
+    expect(open).toContain("胆囊结石，约 5×4 mm。");
+    expect(open).toContain('title="原件预览"');
+    expect(open).toContain(`src="/media/${id}"`);
+    expect(open).toContain(`href="/media/${id}"`);
+    expect(open).toContain("在新标签打开");
+    expect(open).toContain("application/pdf · 317 KB");
+    expect(open).not.toContain("https://files.example");
+    pressLabel(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "胆囊结石，约 5×4 mm。\n",
+        originals: {
+          status: "ready",
+          files: [{ id, media_type: "application/pdf", byte_size: 324939 }],
+        },
+        originalOpen: true,
+        onOriginalOpen,
+      }),
+      "收起",
+    );
+    expect(onOriginalOpen).toHaveBeenCalledWith(false);
+  });
+
+  it("replaces the embedded original when another file is chosen", () => {
+    const png = "file_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const pdf = "file_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const originals = {
+      status: "ready" as const,
+      files: [
+        { id: png, media_type: "image/png", byte_size: 12 },
+        { id: pdf, media_type: "application/pdf", byte_size: 34 },
+      ],
+    };
+    const onSelectFile = vi.fn();
+    const first = home({
+      selection: { kind: "page", key: "health/now" },
+      pageMarkdown: "对照件。\n",
+      originals,
+      originalOpen: true,
+      onSelectFile,
+    });
+    expect(html(first)).toContain(`<img src="/media/${png}"`);
+    expect(html(first)).not.toContain(`src="/media/${pdf}"`);
+    press(first, "application/pdf");
+    expect(onSelectFile).toHaveBeenCalledWith(pdf);
+    const next = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "对照件。\n",
+        originals,
+        originalOpen: true,
+        selectedFileId: pdf,
+      }),
+    );
+    expect(next).toContain(`src="/media/${pdf}"`);
+    expect(next).not.toContain(`src="/media/${png}"`);
+    expect(next).toContain("对照件。");
+  });
+
+  it("lists type and size without embedding a non-image, non-PDF original", () => {
+    const id = "file_0123456789abcdef0123456789abcdef";
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "录音备注。\n",
+        originals: {
+          status: "ready",
+          files: [{ id, media_type: "audio/mpeg", byte_size: 2048 }],
+        },
+        originalOpen: true,
+      }),
+    );
+    expect(markup).toContain("录音备注。");
+    expect(markup).toContain("audio/mpeg · 2 KB");
+    expect(markup).not.toContain("<img");
+    expect(markup).not.toContain("<iframe");
+    expect(markup).not.toContain('title="原件预览"');
+  });
+
+  it("keeps a single column when the page has no originals", () => {
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "没有原件。\n",
+        originals: { status: "ready", files: [] },
+      }),
+    );
+    expect(markup).toContain("没有原件。");
+    expect(markup).not.toContain("dock-split");
+    expect(markup).not.toContain("原件预览");
+    expect(markup).not.toContain("image/jpeg");
+  });
+
+  it("says the originals were not read when the list fails", () => {
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "正文还在。\n",
+        originals: { status: "error", files: [] },
+      }),
+    );
+    expect(markup).toContain("正文还在。");
+    expect(markup).toContain("原件没读到");
+    expect(markup).not.toContain("原件预览");
+  });
+
+  it("says originals are loading when the graph already has them", () => {
+    const markup = html(
+      home({
+        selection: { kind: "page", key: "health/now" },
+        pageMarkdown: "正文还在。\n",
+        originals: { status: "loading", files: [] },
+      }),
+    );
+    expect(markup).toContain("正在读取原件");
+    expect(markup).not.toContain("原件没读到");
+    expect(markup).not.toContain("image/jpeg");
+  });
+
+  it("stacks the original under the body below 900px", () => {
+    const css = readFileSync(new URL("./styles.css", import.meta.url), "utf8");
+    expect(css).toContain(".nebula-windows");
+    expect(css).toContain(".nebula-dock.nebula-read.nebula-frame");
+    expect(css).toContain(".icon-btn");
+    expect(css).not.toContain(".dock-split");
+    expect(css).toContain("@media (max-width: 900px)");
+    expect(css).toMatch(
+      /@media \(max-width: 900px\) \{[\s\S]*\.nebula-windows \{[\s\S]*grid-template-columns: 1fr/,
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 900px\) \{[\s\S]*\.nebula-original \{[\s\S]*grid-column: 1[\s\S]*grid-row: 2/,
+    );
   });
 
   it("previews quotes and tables instead of the markdown source", () => {

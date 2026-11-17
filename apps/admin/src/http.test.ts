@@ -233,6 +233,40 @@ function browserCalls(body: unknown): {
   return { fetchImpl, calls };
 }
 
+describe("page originals", () => {
+  it("lists a page's files without keeping the absolute url", async () => {
+    const { transport, seen } = scripted([
+      {
+        status: 200,
+        body: {
+          files: [
+            {
+              id: "file_0123456789abcdef0123456789abcdef",
+              url: "https://files.example/media/file_0123456789abcdef0123456789abcdef",
+              media_type: "application/pdf",
+              byte_size: 324939,
+              sha256: "abc",
+            },
+          ],
+        },
+      },
+    ]);
+    const files = await createAdminClient(transport).listPageFiles("health", "checkup 2025");
+    expect(files).toEqual([
+      {
+        id: "file_0123456789abcdef0123456789abcdef",
+        media_type: "application/pdf",
+        byte_size: 324939,
+      },
+    ]);
+    expect(files[0]).not.toHaveProperty("url");
+    expect(seen[0]).toEqual({
+      method: "GET",
+      path: "/pcp/v1/files?source=health&slug=checkup+2025",
+    });
+  });
+});
+
 describe("admin overview client", () => {
   it("reads the overview through the existing operations", async () => {
     const { transport, seen } = scripted([
