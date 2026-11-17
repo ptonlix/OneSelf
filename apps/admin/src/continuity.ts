@@ -53,35 +53,44 @@ export function skillLineDiff(before: string, after: string): readonly SkillDiff
     Array<number>(next.length + 1).fill(0),
   );
   for (let i = previous.length - 1; i >= 0; i -= 1) {
+    const row = score[i];
+    if (row === undefined) continue;
     for (let j = next.length - 1; j >= 0; j -= 1) {
       const down = score[i + 1]?.[j] ?? 0;
-      const right = score[i]?.[j + 1] ?? 0;
+      const right = row[j + 1] ?? 0;
       const diagonal = score[i + 1]?.[j + 1] ?? 0;
-      score[i][j] = previous[i] === next[j] ? diagonal + 1 : Math.max(down, right);
+      row[j] = previous[i] === next[j] ? diagonal + 1 : Math.max(down, right);
     }
   }
   const raw: SkillDiffLine[] = [];
   let i = 0;
   let j = 0;
   while (i < previous.length && j < next.length) {
-    if (previous[i] === next[j]) {
-      raw.push({ kind: "same", text: previous[i] });
+    const left = previous[i];
+    const right = next[j];
+    if (left === undefined || right === undefined) break;
+    if (left === right) {
+      raw.push({ kind: "same", text: left });
       i += 1;
       j += 1;
     } else if ((score[i + 1]?.[j] ?? 0) >= (score[i]?.[j + 1] ?? 0)) {
-      raw.push({ kind: "del", text: previous[i] });
+      raw.push({ kind: "del", text: left });
       i += 1;
     } else {
-      raw.push({ kind: "add", text: next[j] });
+      raw.push({ kind: "add", text: right });
       j += 1;
     }
   }
   while (i < previous.length) {
-    raw.push({ kind: "del", text: previous[i] });
+    const left = previous[i];
+    if (left === undefined) break;
+    raw.push({ kind: "del", text: left });
     i += 1;
   }
   while (j < next.length) {
-    raw.push({ kind: "add", text: next[j] });
+    const right = next[j];
+    if (right === undefined) break;
+    raw.push({ kind: "add", text: right });
     j += 1;
   }
   return collapseSame(raw);
