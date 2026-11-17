@@ -202,7 +202,16 @@ describe("admin shell", () => {
         children: "body",
       }),
     );
-    for (const label of ["星图", "资料", "Skill", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
+    for (const label of [
+      "星图",
+      "资料",
+      "Skill",
+      "批准设备码",
+      "API Key",
+      "站点上线",
+      "修改密码",
+      "登出",
+    ]) {
       expect(markup).toContain(`>${label}<`);
     }
     expect(markup).toContain("收起菜单");
