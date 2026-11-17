@@ -14,7 +14,7 @@ import {
   readReducedMotion,
   releasePreviewInert,
 } from "./dom";
-import type { AdminClient } from "./http";
+import type { AdminClient, PageFile } from "./http";
 import {
   AUTO_TURN,
   gestureDown,
@@ -33,6 +33,7 @@ import {
   previewDialogPlan,
   visibilityConfirmOpen,
   type NebulaSelection,
+  type PageOriginals,
 } from "./nebula-view";
 import type { AdminGraph } from "./types";
 
@@ -48,6 +49,11 @@ export function NebulaScreen(props: {
   const [pending, setPending] = useState(false);
   const [pageMarkdown, setPageMarkdown] = useState<string | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
+  const [pageFiles, setPageFiles] = useState<PageFile[] | null>(null);
+  const [pageFilesLoading, setPageFilesLoading] = useState(false);
+  const [pageFilesError, setPageFilesError] = useState(false);
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
+  const [originalOpen, setOriginalOpen] = useState(false);
   const [pageEpoch, setPageEpoch] = useState(0);
   const [connectOrigin, setConnectOrigin] = useState<string | null>(null);
   const [showConnect, setShowConnect] = useState(false);
@@ -103,6 +109,11 @@ export function NebulaScreen(props: {
     if (selection === null || selection.kind !== "page") {
       setPageMarkdown(null);
       setPageLoading(false);
+      setPageFiles(null);
+      setPageFilesLoading(false);
+      setPageFilesError(false);
+      setSelectedFileId(null);
+      setOriginalOpen(false);
       return;
     }
     const slash = selection.key.indexOf("/");
@@ -111,18 +122,32 @@ export function NebulaScreen(props: {
     const slug = selection.key.slice(slash + 1);
     let cancelled = false;
     setPageLoading(true);
+    setPageFilesLoading(true);
+    setPageFiles(null);
+    setPageFilesError(false);
+    setSelectedFileId(null);
+    setOriginalOpen(false);
     const loadPage = async (): Promise<void> => {
-      try {
-        const page = await props.client.readPage(source, slug);
-        if (!cancelled) setPageMarkdown(page.markdown);
-      } catch (reason: unknown) {
-        if (!cancelled) {
-          setPageMarkdown(null);
-          setError(props.onFailure(reason));
-        }
-      } finally {
-        if (!cancelled) setPageLoading(false);
+      const [pageResult, filesResult] = await Promise.allSettled([
+        props.client.readPage(source, slug),
+        props.client.listPageFiles(source, slug),
+      ]);
+      if (cancelled) return;
+      if (pageResult.status === "fulfilled") {
+        setPageMarkdown(pageResult.value.markdown);
+      } else {
+        setPageMarkdown(null);
+        setError(props.onFailure(pageResult.reason));
       }
+      if (filesResult.status === "fulfilled") {
+        setPageFiles(filesResult.value);
+        setPageFilesError(false);
+      } else {
+        setPageFiles(null);
+        setPageFilesError(true);
+      }
+      setPageLoading(false);
+      setPageFilesLoading(false);
     };
     void loadPage();
     return () => {
@@ -266,6 +291,11 @@ export function NebulaScreen(props: {
     onArm: setArmed,
     pageMarkdown,
     pageLoading,
+    originals: pageOriginals(pageFilesLoading, pageFilesError, pageFiles),
+    selectedFileId,
+    onSelectFile: setSelectedFileId,
+    originalOpen,
+    onOriginalOpen: setOriginalOpen,
     onVisibility: (source, slug, visibility) => {
       setPending(true);
       void (async () => {
@@ -307,6 +337,16 @@ export function NebulaScreen(props: {
     webgl,
     reducedMotion: reduced,
   });
+}
+
+function pageOriginals(
+  loading: boolean,
+  failed: boolean,
+  files: readonly PageFile[] | null,
+): PageOriginals {
+  if (failed) return { status: "error", files: [] };
+  if (loading || files === null) return { status: "loading", files: [] };
+  return { status: "ready", files };
 }
 
 function isControl(target: EventTarget | null): boolean {

@@ -3,7 +3,8 @@ import { createElement, type ReactElement, type ReactNode } from "react";
 import { readInputValue } from "./browser";
 import { connectCommand } from "./continuity";
 import { capturePointer, pointerOutside } from "./dom";
-import { Icon } from "./icons";
+import type { PageFile } from "./http";
+import { Icon, type IconName } from "./icons";
 import { proseBlocks, type ProseAlign, type ProseBlock, type ProseInline } from "./nebula-prose";
 import { h } from "./parts";
 import type { AdminGraph, GraphPage } from "./types";
@@ -12,6 +13,20 @@ export type NebulaSelection =
   | { readonly kind: "source"; readonly id: string }
   | { readonly kind: "page"; readonly key: string }
   | null;
+
+export type PageOriginals = {
+  readonly status: "loading" | "ready" | "error";
+  readonly files: readonly PageFile[];
+};
+
+const FILE_ID = /^file_[0-9a-f]{32}$/;
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+
+/** Same-host media path. Rejects anything that is not a stored file id. */
+export function originalMediaPath(id: string): string | null {
+  if (!FILE_ID.test(id)) return null;
+  return `/media/${id}`;
+}
 
 type PreviewDialogPlan = {
   readonly inert: boolean;
@@ -61,6 +76,11 @@ export function NebulaHome(props: {
   readonly onVisibility: (source: string, slug: string, visibility: "public" | "private") => void;
   readonly pageMarkdown: string | null;
   readonly pageLoading: boolean;
+  readonly originals: PageOriginals;
+  readonly selectedFileId: string | null;
+  readonly onSelectFile: (id: string) => void;
+  readonly originalOpen: boolean;
+  readonly onOriginalOpen: (open: boolean) => void;
   readonly connectOrigin: string | null;
   readonly showConnect: boolean;
   readonly webgl: boolean;
@@ -209,6 +229,11 @@ function dock(props: {
   onSelect: (selection: NebulaSelection) => void;
   pageMarkdown: string | null;
   pageLoading: boolean;
+  originals: PageOriginals;
+  selectedFileId: string | null;
+  onSelectFile: (id: string) => void;
+  originalOpen: boolean;
+  onOriginalOpen: (open: boolean) => void;
 }): ReactNode {
   const selection = props.selection;
   if (props.graph === null || selection === null) return null;
@@ -220,6 +245,7 @@ function dock(props: {
       "目录",
       false,
       props,
+      null,
       h("h2", null, source.id),
       h("p", { className: "dock-quiet" }, `${String(source.page_count)} 页`),
       h(
@@ -249,17 +275,37 @@ function dock(props: {
   if (page === undefined) return null;
   const outgoing = props.graph.links.filter((link) => linkKey(link.from) === pageKey(page));
   const incoming = props.graph.links.filter((link) => linkKey(link.to) === pageKey(page));
-  return drawer(
-    "页",
-    true,
-    props,
-    visibilityMark(page, props),
+  return pageDialog(page, props, outgoing, incoming);
+}
+
+function pageDialog(
+  page: GraphPage,
+  props: {
+    onSelect: (selection: NebulaSelection) => void;
+    graph: AdminGraph | null;
+    armed: string | null;
+    onArm: (id: string | null) => void;
+    pending: boolean;
+    onDelete: (id: string) => void;
+    onVisibility: (source: string, slug: string, visibility: "public" | "private") => void;
+    pageMarkdown: string | null;
+    pageLoading: boolean;
+    originals: PageOriginals;
+    selectedFileId: string | null;
+    onSelectFile: (id: string) => void;
+    originalOpen: boolean;
+    onOriginalOpen: (open: boolean) => void;
+  },
+  outgoing: AdminGraph["links"],
+  incoming: AdminGraph["links"],
+): ReactElement {
+  const available = originalsAvailable(page, props.originals);
+  const open = props.originalOpen && available;
+  const body = [
     h("h2", null, page.title),
     h("p", { className: "mono dock-path" }, pageKey(page)),
+    originalsStatus(page, props.originals),
     prose(props),
-    page.media_types.length === 0
-      ? null
-      : h("p", { className: "dock-quiet" }, page.media_types.join("、")),
     linkList(
       "指出",
       outgoing.map((link) => link.to),
@@ -271,19 +317,17 @@ function dock(props: {
       props.onSelect,
     ),
     confirmButton(`page:${pageKey(page)}`, "删除这一页", props),
-  );
-}
-
-function drawer(
-  label: string,
-  reading: boolean,
-  props: {
-    onSelect: (selection: NebulaSelection) => void;
-    graph: AdminGraph | null;
-    armed: string | null;
-  },
-  ...children: ReactNode[]
-): ReactElement {
+  ];
+  if (!open) {
+    return drawer(
+      "页",
+      true,
+      props,
+      available ? previewEntry(props) : null,
+      visibilityMark(page, props),
+      ...body,
+    );
+  }
   const modal = !visibilityConfirmOpen(props.armed, props.graph?.pages ?? null);
   return h(
     "div",
@@ -296,31 +340,226 @@ function drawer(
     h(
       "section",
       {
-        className: reading ? "nebula-dock nebula-read" : "nebula-dock",
+        className: "nebula-dock nebula-read nebula-frame",
+        role: "dialog",
+        tabIndex: -1,
+        "aria-label": "页",
+        ...(modal ? { "aria-modal": "true" } : {}),
+      },
+      h(
+        "div",
+        { className: "dock-bar frame-bar" },
+        visibilityMark(page, props),
+        closeButton(props),
+      ),
+      h(
+        "div",
+        { className: "nebula-windows" },
+        h(
+          "section",
+          { className: "nebula-page", "aria-label": "正文" },
+          h("div", { className: "dock-scroll" }, ...body),
+        ),
+        originalWindow(props),
+      ),
+    ),
+  );
+}
+
+function drawer(
+  label: string,
+  reading: boolean,
+  props: {
+    onSelect: (selection: NebulaSelection) => void;
+    graph: AdminGraph | null;
+    armed: string | null;
+  },
+  bar: ReactNode,
+  ...children: ReactNode[]
+): ReactElement {
+  const modal = !visibilityConfirmOpen(props.armed, props.graph?.pages ?? null);
+  const className = reading ? "nebula-dock nebula-read" : "nebula-dock";
+  return h(
+    "div",
+    {
+      className: "nebula-modal",
+      onClick: (event: { target: EventTarget | null; currentTarget: EventTarget | null }) => {
+        if (event.target === event.currentTarget) props.onSelect(null);
+      },
+    },
+    h(
+      "section",
+      {
+        className,
         role: "dialog",
         tabIndex: -1,
         "aria-label": label,
         ...(modal ? { "aria-modal": "true" } : {}),
       },
-      h(
-        "div",
-        { className: "dock-bar" },
-        h(
-          "button",
-          {
-            className: "dock-close",
-            type: "button",
-            "aria-label": "关闭",
-            onClick: () => {
-              props.onSelect(null);
-            },
-          },
-          "×",
-        ),
-      ),
+      h("div", { className: "dock-bar" }, bar, closeButton(props)),
       h("div", { className: "dock-scroll" }, ...children),
     ),
   );
+}
+
+function closeButton(props: { onSelect: (selection: NebulaSelection) => void }): ReactElement {
+  return h(
+    "button",
+    {
+      className: "dock-close",
+      type: "button",
+      "aria-label": "关闭",
+      onClick: () => {
+        props.onSelect(null);
+      },
+    },
+    "×",
+  );
+}
+
+function originalsAvailable(page: GraphPage, originals: PageOriginals): boolean {
+  if (originals.status === "loading" || originals.status === "error") return page.file_count > 0;
+  return originals.files.length > 0;
+}
+
+function originalsStatus(page: GraphPage, originals: PageOriginals): ReactNode {
+  if (!originalsAvailable(page, originals)) return null;
+  if (originals.status === "loading") return h("p", { className: "dock-quiet" }, "正在读取原件");
+  if (originals.status === "error") return h("p", { className: "dock-quiet" }, "原件没读到");
+  return null;
+}
+
+function iconButton(label: string, name: IconName, onClick: () => void): ReactElement {
+  return h(
+    "button",
+    {
+      className: "icon-btn",
+      type: "button",
+      "aria-label": label,
+      onClick,
+    },
+    Icon({ name, size: 16 }),
+  );
+}
+
+function previewEntry(props: { onOriginalOpen: (open: boolean) => void }): ReactElement {
+  return iconButton("预览原件", "file", () => {
+    props.onOriginalOpen(true);
+  });
+}
+
+function originalWindow(props: {
+  originals: PageOriginals;
+  selectedFileId: string | null;
+  onSelectFile: (id: string) => void;
+  onOriginalOpen: (open: boolean) => void;
+}): ReactElement {
+  const files = props.originals.files;
+  const chosen = files.find((file) => file.id === props.selectedFileId) ?? files[0];
+  const path = chosen === undefined ? null : originalMediaPath(chosen.id);
+  return h(
+    "section",
+    { className: "nebula-original", role: "region", "aria-label": "原件" },
+    h(
+      "div",
+      { className: "original-tools" },
+      h("span", { className: "original-mark" }, Icon({ name: "file", size: 15 })),
+      chosen === undefined ? null : h("span", { className: "dock-quiet" }, fileLabel(chosen)),
+      h(
+        "span",
+        { className: "original-actions" },
+        path === null
+          ? null
+          : h(
+              "a",
+              {
+                className: "icon-btn",
+                href: path,
+                target: "_blank",
+                rel: "noopener",
+                "aria-label": "在新标签打开",
+              },
+              Icon({ name: "external", size: 16 }),
+            ),
+        iconButton("收起", "collapse", () => {
+          props.onOriginalOpen(false);
+        }),
+      ),
+    ),
+    h("div", { className: "dock-scroll" }, originalsPane(props)),
+  );
+}
+
+function originalsPane(props: {
+  originals: PageOriginals;
+  selectedFileId: string | null;
+  onSelectFile: (id: string) => void;
+}): ReactNode {
+  if (props.originals.status === "loading") {
+    return h("p", { className: "dock-quiet" }, "正在读取原件");
+  }
+  if (props.originals.status === "error") {
+    return h("p", { className: "dock-quiet" }, "原件没读到");
+  }
+  const files = props.originals.files;
+  const chosen = files.find((file) => file.id === props.selectedFileId) ?? files[0];
+  return h(
+    "div",
+    { className: "dock-files" },
+    files.length < 2
+      ? null
+      : h(
+          "ul",
+          { className: "dock-file-list" },
+          ...files.map((file) =>
+            h(
+              "li",
+              { key: file.id },
+              h(
+                "button",
+                {
+                  type: "button",
+                  className: file.id === chosen?.id ? "dock-file on" : "dock-file",
+                  "aria-pressed": file.id === chosen?.id,
+                  onClick: () => {
+                    props.onSelectFile(file.id);
+                  },
+                },
+                fileLabel(file),
+              ),
+            ),
+          ),
+        ),
+    chosen === undefined ? null : embeddedOriginal(chosen),
+  );
+}
+
+function fileLabel(file: PageFile): string {
+  return `${file.media_type} · ${formatSize(file.byte_size)}`;
+}
+
+function formatSize(size: number): string {
+  const kb = size / 1024;
+  if (kb < 1024) return `${roundSize(kb)} KB`;
+  return `${roundSize(kb / 1024)} MB`;
+}
+
+function roundSize(value: number): string {
+  if (value >= 10) return String(Math.round(value));
+  const digits = value >= 1 ? 1 : 2;
+  return value.toFixed(digits).replace(/\.0+$/, "");
+}
+
+function embeddedOriginal(file: PageFile): ReactNode {
+  const path = originalMediaPath(file.id);
+  if (path === null) return null;
+  const frame = IMAGE_TYPES.has(file.media_type)
+    ? h("img", { src: path, alt: file.media_type })
+    : file.media_type === "application/pdf"
+      ? h("iframe", { title: "原件预览", src: path })
+      : null;
+  if (frame === null) return null;
+  return h("div", { className: "dock-preview" }, frame);
 }
 
 function prose(props: {
