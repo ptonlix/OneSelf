@@ -292,6 +292,33 @@ describe("admin overview client", () => {
     ]);
   });
 
+  it("reads the product skill as text", async () => {
+    const { transport, seen } = scripted([{ status: 200, body: "---\nname: oneself\n---\n" }]);
+    await expect(createAdminClient(transport).readSkillText()).resolves.toContain("name: oneself");
+    expect(seen).toEqual([
+      { method: "GET", path: "/skills/oneself/SKILL.md", anonymous: true, text: true },
+    ]);
+  });
+
+  it("reads the oneself digest from the agent-skills index", async () => {
+    const digest = `sha256:${"a".repeat(64)}`;
+    const { transport, seen } = scripted([
+      {
+        status: 200,
+        body: {
+          skills: [
+            { name: "other", digest: "nope" },
+            { name: "oneself", digest },
+          ],
+        },
+      },
+    ]);
+    await expect(createAdminClient(transport).readSkillDigest()).resolves.toBe(digest);
+    expect(seen).toEqual([
+      { method: "GET", path: "/.well-known/agent-skills/index.json", anonymous: true },
+    ]);
+  });
+
   it("reads the connect origin from skills.oneself and ignores a spoofed host", async () => {
     const { transport, seen } = scripted([
       {

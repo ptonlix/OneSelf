@@ -43,6 +43,7 @@ it("serves admin HTML for browser navigation and JSON only for an explicit Accep
     "/admin/",
     "/admin/login",
     "/admin/password",
+    "/admin/skill",
     "/admin/device",
     "/admin/api-keys/new",
     "/admin/api-keys/req_1",

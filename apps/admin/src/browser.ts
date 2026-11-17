@@ -1,3 +1,5 @@
+import { skillDigestKey, skillTextKey } from "./continuity";
+
 export function readInputValue(target: EventTarget | null): string {
   const value = readProp(target, "value");
   return typeof value === "string" ? value : "";
@@ -5,6 +7,44 @@ export function readInputValue(target: EventTarget | null): string {
 
 export function readInputChecked(target: EventTarget | null): boolean {
   return readProp(target, "checked") === true;
+}
+
+export function readStoredSkillDigest(origin: string): string | null {
+  const storage = readStorage();
+  const getItem = storage?.getItem;
+  if (typeof getItem !== "function") return null;
+  const read = getItem as (this: unknown, key: string) => unknown;
+  const value = read.call(storage, skillDigestKey(origin));
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+export function writeStoredSkillDigest(origin: string, digest: string): void {
+  const storage = readStorage();
+  const setItem = storage?.setItem;
+  if (typeof setItem !== "function") return;
+  setItem.call(storage, skillDigestKey(origin), digest);
+}
+
+export function readStoredSkillText(origin: string): string | null {
+  const storage = readStorage();
+  const getItem = storage?.getItem;
+  if (typeof getItem !== "function") return null;
+  const read = getItem as (this: unknown, key: string) => unknown;
+  const value = read.call(storage, skillTextKey(origin));
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+export function writeStoredSkillText(origin: string, text: string): void {
+  const storage = readStorage();
+  const setItem = storage?.setItem;
+  if (typeof setItem !== "function") return;
+  setItem.call(storage, skillTextKey(origin), text);
+}
+
+function readStorage(): { getItem?: unknown; setItem?: unknown } | null {
+  const storage = (globalThis as { localStorage?: { getItem?: unknown; setItem?: unknown } })
+    .localStorage;
+  return storage ?? null;
 }
 
 export function readBrowserLocation(): {

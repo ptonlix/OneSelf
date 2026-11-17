@@ -20,6 +20,151 @@ export function connectCommand(origin: string): string {
   return `npx skills add ${origin} -a <agent> -s oneself -y`;
 }
 
+export const SKILL_UPDATE_NOTICE = "发现 oneself skill 有更新，请升级 skill";
+
+export function skillUpgradeCommand(): string {
+  return "npx skills update oneself";
+}
+
+export function skillDigestKey(origin: string): string {
+  return `oneself.skill-digest.${origin}`;
+}
+
+export function skillTextKey(origin: string): string {
+  return `oneself.skill-text.${origin}`;
+}
+
+export type SkillDiffLine = {
+  readonly kind: "same" | "add" | "del";
+  readonly text: string;
+};
+
+/** Line diff of two skill copies. Long unchanged runs collapse to one marker. */
+export function skillLineDiff(before: string, after: string): readonly SkillDiffLine[] {
+  const previous = before.split("\n");
+  const next = after.split("\n");
+  if (previous.length * next.length > 80_000) {
+    return [
+      { kind: "del", text: `上一份 ${String(previous.length)} 行` },
+      { kind: "add", text: `当前 ${String(next.length)} 行` },
+    ];
+  }
+  const score: number[][] = Array.from({ length: previous.length + 1 }, () =>
+    Array<number>(next.length + 1).fill(0),
+  );
+  for (let i = previous.length - 1; i >= 0; i -= 1) {
+    for (let j = next.length - 1; j >= 0; j -= 1) {
+      const down = score[i + 1]?.[j] ?? 0;
+      const right = score[i]?.[j + 1] ?? 0;
+      const diagonal = score[i + 1]?.[j + 1] ?? 0;
+      score[i][j] = previous[i] === next[j] ? diagonal + 1 : Math.max(down, right);
+    }
+  }
+  const raw: SkillDiffLine[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < previous.length && j < next.length) {
+    if (previous[i] === next[j]) {
+      raw.push({ kind: "same", text: previous[i] });
+      i += 1;
+      j += 1;
+    } else if ((score[i + 1]?.[j] ?? 0) >= (score[i]?.[j + 1] ?? 0)) {
+      raw.push({ kind: "del", text: previous[i] });
+      i += 1;
+    } else {
+      raw.push({ kind: "add", text: next[j] });
+      j += 1;
+    }
+  }
+  while (i < previous.length) {
+    raw.push({ kind: "del", text: previous[i] });
+    i += 1;
+  }
+  while (j < next.length) {
+    raw.push({ kind: "add", text: next[j] });
+    j += 1;
+  }
+  return collapseSame(raw);
+}
+
+function collapseSame(lines: readonly SkillDiffLine[]): readonly SkillDiffLine[] {
+  const out: SkillDiffLine[] = [];
+  let same = 0;
+  const flush = (keep: boolean): void => {
+    if (same > 1) out.push({ kind: "same", text: "…" });
+    else if (same === 1 && keep) out.push({ kind: "same", text: "" });
+    same = 0;
+  };
+  for (const line of lines) {
+    if (line.kind === "same") {
+      same += 1;
+      continue;
+    }
+    if (same === 1) out.push({ kind: "same", text: "" });
+    else if (same > 1) out.push({ kind: "same", text: "…" });
+    same = 0;
+    out.push(line);
+  }
+  flush(false);
+  return out.filter((line) => line.text !== "" || line.kind !== "same");
+}
+
+/** Remember the current text when the owner confirms, or when nothing has changed yet. */
+export function skillSnapshotPlan(input: {
+  readonly prompt: boolean;
+  readonly current: string | null;
+  readonly previous: string | null;
+  readonly acknowledged: boolean;
+}): string | null {
+  if (input.current === null) return null;
+  if (input.acknowledged) return input.current;
+  if (!input.prompt && input.previous === null) return input.current;
+  return null;
+}
+
+/** Prompt only an owner who already has an agent, and only until this digest is acknowledged. */
+export function shouldPromptSkillUpdate(input: {
+  readonly hasAgent: boolean;
+  readonly digest: string | null;
+  readonly stored: string | null;
+}): boolean {
+  return input.hasAgent && input.digest !== null && input.stored !== input.digest;
+}
+
+/**
+ * Store silently when there is no agent, and store when the owner acknowledges.
+ * Do not store while the notice is still waiting for that acknowledgement.
+ */
+export function skillNoticePlan(input: {
+  readonly hasAgent: boolean;
+  readonly digest: string | null;
+  readonly stored: string | null;
+  readonly acknowledged: boolean;
+  readonly origin: string | null;
+}): { readonly storeDigest: string | null; readonly prompt: boolean } {
+  const prompt = input.acknowledged ? false : shouldPromptSkillUpdate(input);
+  const store =
+    input.digest !== null && input.origin !== null && (input.acknowledged || !input.hasAgent);
+  return { storeDigest: store ? input.digest : null, prompt };
+}
+
+/**
+ * Writes that follow `skillNoticePlan`.
+ * A silent store keeps fetched skill text so a later diff has a baseline.
+ * A null fetch must not replace text that is already stored.
+ */
+export function skillStorePlan(input: {
+  readonly storeDigest: string | null;
+  readonly hasAgent: boolean;
+  readonly fetchedText: string | null;
+}): { readonly digest: string | null; readonly text: string | null } {
+  if (input.storeDigest === null) return { digest: null, text: null };
+  if (input.hasAgent || input.fetchedText === null) {
+    return { digest: input.storeDigest, text: null };
+  }
+  return { digest: input.storeDigest, text: input.fetchedText };
+}
+
 /** Next query/deleted-source cursor. A full page is not the total. */
 function nextCursor(offset: number, pageLength: number, limit = PAGE_SIZE): string | null {
   if (pageLength < limit) return null;

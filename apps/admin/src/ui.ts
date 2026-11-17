@@ -22,15 +22,19 @@ import {
   toggleDraft,
 } from "./forms";
 import { hrefFor, parseAdminRoute, type AdminRoute } from "./routes";
-import { isPasswordGate, isUnauthorized, sessionFromProbeFailure, type Session } from "./session";
-import type { ApiKeyRequest, OauthGrantView, SiteActivation, SourceDraft } from "./types";
+import { SkillScreen } from "./skill-view";
 import {
   pushBrowserPath,
   readBrowserLocation,
+  readStoredSkillDigest,
   subscribeToLocation,
   writeClipboard,
+  writeStoredSkillDigest,
+  writeStoredSkillText,
 } from "./browser";
-import { PAGE_SIZE, type RecordsTab } from "./continuity";
+import { PAGE_SIZE, skillNoticePlan, skillStorePlan, type RecordsTab } from "./continuity";
+import { isPasswordGate, isUnauthorized, sessionFromProbeFailure, type Session } from "./session";
+import type { ApiKeyRequest, OauthGrantView, SiteActivation, SourceDraft } from "./types";
 import { NebulaScreen } from "./nebula-screen";
 import {
   countPublic,
@@ -59,6 +63,7 @@ export function AdminApp(): ReactElement {
   const client = useMemo(() => createAdminClient(browserTransport()), []);
   const { route, go } = useRoute();
   const [session, setSession] = useState<Session>({ status: "loading" });
+  const [skillAlert, setSkillAlert] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +102,54 @@ export function AdminApp(): ReactElement {
     },
     [onPasswordGate, onUnauthorized],
   );
+
+  useEffect(() => {
+    if (session.status !== "ready") return;
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      try {
+        const [origin, keys, grants, digest] = await Promise.all([
+          client.readConnectOrigin(),
+          client.listApiKeys(),
+          client.listOauthGrants(),
+          client.readSkillDigest(),
+        ]);
+        if (cancelled) return;
+        const hasAgent =
+          keys.some((key) => key.revoked_at === null) ||
+          grants.some((grant) => grant.revoked_at === null);
+        const plan = skillNoticePlan({
+          hasAgent,
+          digest,
+          stored: readStoredSkillDigest(origin),
+          acknowledged: false,
+          origin,
+        });
+        setSkillAlert(plan.prompt);
+        let fetchedText: string | null = null;
+        if (plan.storeDigest !== null && !hasAgent) {
+          try {
+            fetchedText = await client.readSkillText();
+          } catch {
+            fetchedText = null;
+          }
+        }
+        const writes = skillStorePlan({ storeDigest: plan.storeDigest, hasAgent, fetchedText });
+        try {
+          if (writes.digest !== null) writeStoredSkillDigest(origin, writes.digest);
+          if (writes.text !== null) writeStoredSkillText(origin, writes.text);
+        } catch {
+          // A full or denied store must not block the star map.
+        }
+      } catch {
+        if (!cancelled) setSkillAlert(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [client, session.status]);
 
   const logout = useCallback(() => {
     void (async () => {
@@ -167,7 +220,16 @@ export function AdminApp(): ReactElement {
     );
   }
 
-  return shell(true, route, go, logout, screenForRoute(route, client, go, onFailure, logout));
+  return shell(
+    true,
+    route,
+    go,
+    logout,
+    screenForRoute(route, client, go, onFailure, logout, () => {
+      setSkillAlert(false);
+    }),
+    skillAlert,
+  );
 }
 
 function shell(
@@ -176,6 +238,7 @@ function shell(
   go: (route: AdminRoute) => void,
   logout: () => void,
   child: ReactElement,
+  skillAlert = false,
 ): ReactElement {
   return createElement(Shell, {
     showNav,
@@ -183,6 +246,7 @@ function shell(
     host: readBrowserLocation().host,
     onNavigate: go,
     onLogout: logout,
+    skillAlert,
     children: child,
   });
 }
@@ -193,10 +257,13 @@ function screenForRoute(
   go: (route: AdminRoute) => void,
   onFailure: (reason: unknown) => string,
   logout: () => void,
+  onSkillAck: () => void,
 ): ReactElement {
   switch (route.name) {
     case "home":
       return createElement(NebulaScreen, { client, onFailure });
+    case "skill":
+      return createElement(SkillScreen, { client, onFailure, onAcknowledged: onSkillAck });
     case "login":
     case "unknown":
       return createElement(HomeScreen, { client, onFailure, onNavigate: go });

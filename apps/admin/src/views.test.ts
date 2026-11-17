@@ -191,7 +191,7 @@ function deviceView(done: boolean): string {
 }
 
 describe("admin shell", () => {
-  it("has seven entries, marks the current one and links the public home", () => {
+  it("has the skill entry, marks the current one and links the public home", () => {
     const markup = html(
       createElement(Shell, {
         showNav: true,
@@ -202,17 +202,30 @@ describe("admin shell", () => {
         children: "body",
       }),
     );
-    for (const label of ["星图", "资料", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
+    for (const label of ["星图", "资料", "Skill", "批准设备码", "API Key", "站点上线", "修改密码", "登出"]) {
       expect(markup).toContain(`>${label}<`);
     }
     expect(markup).toContain("收起菜单");
     expect(markup).not.toContain("me.example.com");
     expect(markup).not.toContain(">收起<");
     expect(markup.indexOf(">星图<")).toBeLessThan(markup.indexOf(">资料<"));
-    expect(markup.match(/class="nav-i/g)).toHaveLength(6);
+    expect(markup.match(/class="nav-i/g)).toHaveLength(7);
+    expect(markup).not.toContain("Skill 有更新");
     expect(markup.match(/aria-current="page"/g)).toHaveLength(1);
     expect(markup).toMatch(/<a[^>]*class="nav-i on"[^>]*aria-current="page"[^>]*>.*?API Key/);
     expect(markup).toContain('href="/"');
+    const alerted = html(
+      createElement(Shell, {
+        showNav: true,
+        route: { name: "home" },
+        host: "me.example.com",
+        onNavigate: noop,
+        onLogout: noop,
+        skillAlert: true,
+        children: "body",
+      }),
+    );
+    expect(alerted).toContain("Skill 有更新");
     expect(markup).toContain('id="side-mark-g"');
   });
 

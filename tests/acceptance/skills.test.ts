@@ -136,13 +136,40 @@ describe("product skills", () => {
     expect(entry).toContain("{oneself_origin}/skills/oneself/references/public-page.md");
   });
 
-  it("takes origin in one order and asks only when all three are missing", () => {
+  it("takes origin in one order and asks only when all four are missing", () => {
     const rule =
-      "调用前按这个顺序取 origin：先 `ONESELF_ORIGIN`，再 `~/.config/oneself/config.json`（设置了 `XDG_CONFIG_HOME` 时为 `$XDG_CONFIG_HOME/oneself/config.json`，Windows 为 `%APPDATA%\\oneself\\config.json`），再 `metadata.oneself_origin`。三者都没有才问一次，并把答案写入该配置文件。";
+      "调用前按这个顺序取 origin：先是用户这次要求连接、上传或操作的那一台 origin，然后 `ONESELF_ORIGIN`，然后文件里的 `current`，再 `metadata.oneself_origin`。四者都没有才问一次，并把答案写成 `current`，同时写入对应 profile。";
     expect(entry).toContain(rule);
     expect(entry.match(/调用前按这个顺序取 origin/g)).toEqual(["调用前按这个顺序取 origin"]);
     expect(entry).toContain("`metadata.oneself_origin` 标出这一台实例");
     expect(entry).toContain("已有其中任一来源时不要再问");
+    expect(entry).toContain("这个文件保存 `current` 和 `profiles`");
+    expect(entry).toContain("`profiles` 的键是 origin");
+    expect(entry).toContain("不改 `current`");
+    expect(entry).toContain("不得用另一台的 refresh token 或 API Key");
+    expect(entry).toContain("禁止改回只有顶层 `origin` 的旧形状");
+    expect(entry).toContain("一次指定两台 origin 时停下来问");
+    expect(entry).toContain("写入前必须先读到整个文件");
+    expect(entry).toContain("不要回落");
+    expect(entry).toContain("（`metadata.oneself_origin` 标出这一份副本）");
+    expect(entry).not.toContain("随站点下发的副本里就是");
+    expect(entry).not.toContain("就是 `metadata.oneself_origin`");
+    for (const sentence of [
+      "每次写入前必须先读到整个文件",
+      "只更新 origin 完全相同的 profile",
+      "这包括换上 API Key，不限于设备码换到 refresh token",
+      "其他 origin 必须还在",
+      "不得丢掉已有凭据",
+      "`ONESELF_API_KEY` 只覆盖这次选中的 origin，不写入文件",
+      "`ONESELF_API_KEY` 不写入文件",
+    ]) {
+      expect(entry, sentence).toContain(sentence);
+      expect(context, sentence).not.toContain(sentence);
+      expect(publicPage, sentence).not.toContain(sentence);
+    }
+    expect(entry).not.toContain("设备码换到 refresh token 后，只写入");
+    expect(entry).not.toContain("三者都没有才问一次");
+    expect(entry).not.toContain("保存 `origin`，以及 `api_key`");
     expect(entry).not.toContain("有 `metadata.oneself_origin` 时，调用这一台实例");
     expect(entry).not.toContain("有 metadata.oneself_origin 时就调用它");
     expect(entry).not.toContain("没有 `oneself_origin` 的副本");
@@ -150,10 +177,11 @@ describe("product skills", () => {
     expect(entry).not.toContain("否则问用户一次");
     expect(entry).not.toContain("否则问一次");
     const originRule = entry.slice(entry.indexOf(rule));
-    expect(originRule.indexOf("ONESELF_ORIGIN")).toBeLessThan(
-      originRule.indexOf("~/.config/oneself/config.json"),
+    expect(originRule.indexOf("用户这次要求连接")).toBeLessThan(
+      originRule.indexOf("ONESELF_ORIGIN"),
     );
-    expect(originRule.indexOf("~/.config/oneself/config.json")).toBeLessThan(
+    expect(originRule.indexOf("ONESELF_ORIGIN")).toBeLessThan(originRule.indexOf("`current`"));
+    expect(originRule.indexOf("`current`")).toBeLessThan(
       originRule.indexOf("metadata.oneself_origin"),
     );
   });

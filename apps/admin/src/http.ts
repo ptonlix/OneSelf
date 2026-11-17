@@ -48,6 +48,8 @@ export interface HttpRequest {
   json?: unknown;
   /** Anonymous requests send no cookie, exactly like a visitor of the public site. */
   anonymous?: true;
+  /** Return the body as text. Used for the product skill, which is not JSON. */
+  text?: true;
 }
 
 export interface HttpResponse {
@@ -59,7 +61,9 @@ export type HttpTransport = (request: HttpRequest) => Promise<HttpResponse>;
 
 export function browserTransport(fetchImpl: typeof fetch = globalThis.fetch): HttpTransport {
   return async (request) => {
-    const headers = new Headers({ accept: "application/json" });
+    const headers = new Headers({
+      accept: request.text === true ? "text/plain" : "application/json",
+    });
     const init: RequestInit = {
       method: request.method,
       credentials: request.anonymous === true ? "omit" : "include",
@@ -70,6 +74,7 @@ export function browserTransport(fetchImpl: typeof fetch = globalThis.fetch): Ht
       init.body = JSON.stringify(request.json);
     }
     const response = await fetchImpl(request.path, init);
+    if (request.text === true) return { status: response.status, body: await response.text() };
     return { status: response.status, body: await readResponseBody(response) };
   };
 }
@@ -108,6 +113,8 @@ export interface AdminClient {
   restoreSource(id: string): Promise<void>;
   queryPages(cursor?: string): Promise<QueryPage[]>;
   readConnectOrigin(): Promise<string>;
+  readSkillDigest(): Promise<string>;
+  readSkillText(): Promise<string>;
 }
 
 export function createAdminClient(transport: HttpTransport): AdminClient {
@@ -273,6 +280,31 @@ export function createAdminClient(transport: HttpTransport): AdminClient {
     async readConnectOrigin() {
       return originFromDiscovery(
         await send(transport, { method: "GET", path: "/.well-known/pcp", anonymous: true }),
+      );
+    },
+    async readSkillText() {
+      const response = await transport({
+        method: "GET",
+        path: "/skills/oneself/SKILL.md",
+        anonymous: true,
+        text: true,
+      });
+      if (
+        response.status !== 200 ||
+        typeof response.body !== "string" ||
+        !response.body.startsWith("---")
+      ) {
+        throw new ParseError("Skill 无法识别");
+      }
+      return response.body;
+    },
+    async readSkillDigest() {
+      return skillDigestFromIndex(
+        await send(transport, {
+          method: "GET",
+          path: "/.well-known/agent-skills/index.json",
+          anonymous: true,
+        }),
       );
     },
     async revokeOauthGrant(id) {
@@ -607,6 +639,18 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
 }
 
 const QUERY_FIELDS = ["slug", "source", "title", "type", "updated_at"] as const;
+
+export function skillDigestFromIndex(body: unknown): string {
+  if (!isRecord(body) || !Array.isArray(body.skills)) throw new ParseError("安装索引无法识别");
+  let digest = "";
+  for (const item of body.skills) {
+    if (!isRecord(item) || item.name !== "oneself" || typeof item.digest !== "string") continue;
+    digest = item.digest;
+    break;
+  }
+  if (!/^sha256:[0-9a-f]{64}$/.test(digest)) throw new ParseError("安装索引无法识别");
+  return digest;
+}
 
 export function originFromDiscovery(body: unknown): string {
   if (!isRecord(body) || !isRecord(body.skills) || typeof body.skills.oneself !== "string") {

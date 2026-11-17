@@ -23,6 +23,8 @@ describe("admin routes", () => {
     expect(parseAdminRoute("/admin", "")).toEqual({ name: "home" });
     expect(parseAdminRoute("/admin/records", "")).toEqual({ name: "records" });
     expect(hrefFor({ name: "records" })).toBe("/admin/records");
+    expect(parseAdminRoute("/admin/skill", "")).toEqual({ name: "skill" });
+    expect(hrefFor({ name: "skill" })).toBe("/admin/skill");
     expect(parseAdminRoute("/admin/login", "")).toEqual({ name: "login" });
     expect(parseAdminRoute("/admin/password", "")).toEqual({ name: "password" });
   });

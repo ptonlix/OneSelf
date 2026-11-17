@@ -1,7 +1,7 @@
 import { createElement, useState, type ReactElement, type ReactNode } from "react";
 import { readInputChecked, readInputValue } from "./browser";
 import { createApiKeyBody } from "./forms";
-import { Icon, LoginOrbit, OrbitMark } from "./icons";
+import { Icon, LoginOrbit, OrbitMark, type IconName } from "./icons";
 import {
   chip,
   formatRemaining,
@@ -36,14 +36,14 @@ import type {
   SourceDraft,
 } from "./types";
 
-type Section = "home" | "records" | "device" | "api-key" | "site" | "password";
+type Section = "home" | "records" | "skill" | "device" | "api-key" | "site" | "password";
 
 const NAV: readonly {
   group: string;
   items: readonly {
     section: Section;
     label: string;
-    icon: "star" | "records" | "device" | "key" | "globe" | "lock";
+    icon: IconName;
     route: AdminRoute;
   }[];
 }[] = [
@@ -53,6 +53,10 @@ const NAV: readonly {
       { section: "home", label: "星图", icon: "star", route: { name: "home" } },
       { section: "records", label: "资料", icon: "records", route: { name: "records" } },
     ],
+  },
+  {
+    group: "产品",
+    items: [{ section: "skill", label: "Skill", icon: "skill", route: { name: "skill" } }],
   },
   {
     group: "授权",
@@ -80,6 +84,8 @@ function sectionFor(route: AdminRoute): Section {
   switch (route.name) {
     case "records":
       return "records";
+    case "skill":
+      return "skill";
     case "device":
       return "device";
     case "api-key-new":
@@ -99,6 +105,8 @@ function crumbFor(route: AdminRoute): string {
   switch (route.name) {
     case "records":
       return "资料";
+    case "skill":
+      return "Skill";
     case "device":
       return "批准设备码";
     case "api-key-new":
@@ -127,6 +135,7 @@ export function Shell(props: {
   host: string;
   onNavigate: (route: AdminRoute) => void;
   onLogout: () => void;
+  skillAlert?: boolean;
   children: ReactNode;
   navCollapsed?: boolean;
   onToggleNav?: () => void;
@@ -180,6 +189,9 @@ export function Shell(props: {
                 [
                   createElement(Icon, { key: "i", name: item.icon }),
                   h("span", { key: "t" }, item.label),
+                  item.section === "skill" && props.skillAlert === true
+                    ? h("i", { key: "dot", className: "nav-dot", "aria-label": "Skill 有更新" })
+                    : null,
                 ],
                 item.route,
                 props.onNavigate,
