@@ -640,7 +640,7 @@ function parseOauthGrants(body: unknown): OauthGrantView[] {
 
 const QUERY_FIELDS = ["slug", "source", "title", "type", "updated_at"] as const;
 
-export function skillDigestFromIndex(body: unknown): string {
+function skillDigestFromIndex(body: unknown): string {
   if (!isRecord(body) || !Array.isArray(body.skills)) throw new ParseError("安装索引无法识别");
   let digest = "";
   for (const item of body.skills) {

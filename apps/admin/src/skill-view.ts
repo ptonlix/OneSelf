@@ -235,10 +235,7 @@ function diffBody(
   );
 }
 
-export async function copySkillCommand(
-  origin: string,
-  kind: "install" | "update",
-): Promise<boolean> {
+async function copySkillCommand(origin: string, kind: "install" | "update"): Promise<boolean> {
   const command = kind === "install" ? connectCommand(origin) : skillUpgradeCommand();
   return writeClipboard(command);
 }
