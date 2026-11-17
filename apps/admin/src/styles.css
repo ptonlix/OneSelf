@@ -210,6 +210,79 @@ h3 {
 .nav-i.on svg {
   color: var(--teal-2);
 }
+.nav-dot {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: #fb7d96;
+}
+.skill-commands {
+  display: grid;
+  gap: 10px;
+}
+.skill-cmd {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+}
+.skill-cmd code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.skill-copy {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--hair-2);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg-3);
+  cursor: pointer;
+}
+.skill-copy:hover {
+  color: var(--fg);
+  border-color: var(--hair-3);
+}
+.skill-ack {
+  justify-self: start;
+  height: 32px;
+  margin-top: 2px;
+  padding: 0 14px;
+  border: 1px solid rgb(94 234 212 / 0.45);
+  border-radius: 8px;
+  background: rgb(45 212 191 / 0.12);
+  color: var(--fg);
+  font: 500 13px/1 var(--sans);
+  cursor: pointer;
+}
+.skill-ack:hover {
+  background: rgb(45 212 191 / 0.2);
+  border-color: rgb(94 234 212 / 0.7);
+}
+.skill-current,
+.skill-diff {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.skill-current,
+.skill-diff {
+  max-height: 28rem;
+  overflow: auto;
+  margin: 0;
+  padding: 12px 14px;
+}
+.skill-diff .diff-add {
+  color: #5eead4;
+}
+.skill-diff .diff-del {
+  color: #fb7d96;
+}
+.skill-diff .diff-same {
+  color: var(--fg-2);
+}
 .side-foot {
   position: relative;
   margin-top: auto;

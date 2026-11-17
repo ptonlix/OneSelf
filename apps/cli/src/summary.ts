@@ -1,6 +1,10 @@
 import path from "node:path";
 import pc from "picocolors";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 import type { InstallBinaryResult } from "./self-bin.ts";
 
 /** Lines under a section header; outro continuation lines have no gutter, so indent by hand. */
@@ -96,17 +100,46 @@ export function formatInstallSummary(summary: InstallSummary): string {
  * Message for the final `p.outro` after `oneself update`.
  * `checkedLatest` is true only when this run resolved latest.
  */
+export function oneselfSkillDigest(body: string): string | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsed) || !Array.isArray(parsed.skills)) return null;
+  for (const item of parsed.skills) {
+    if (!isRecord(item) || item.name !== "oneself" || typeof item.digest !== "string") continue;
+    return /^sha256:[0-9a-f]{64}$/.test(item.digest) ? item.digest : null;
+  }
+  return null;
+}
+
+export function skillChanged(before: string | null, after: string | null): boolean {
+  return before !== null && after !== null && before !== after;
+}
+
 export function formatUpdateSummary(
   root: string,
   binary: InstallBinaryResult | undefined,
   platform: NodeJS.Platform = process.platform,
   checkedLatest = false,
+  skillOrigin?: string,
 ): string {
   const detail = checkedLatest ? "不覆盖口令。没有新版本时，只重新拉取当前镜像" : "不覆盖口令";
   return [
     pc.green(pc.bold("✓ OneSelf 已更新")),
     `${HEAD}${pc.dim(detail)}`,
     `${HEAD}${pc.dim("· 旧 Release 的安装命令不会把已装版本降回去")}`,
+    ...(skillOrigin
+      ? section("Skill", [
+          "发现 oneself skill 有更新，请升级 skill",
+          pc.dim("全新安装"),
+          pc.cyan(`npx skills add ${skillOrigin} -a <agent> -s oneself -y`),
+          pc.dim("已安装升级"),
+          pc.cyan("npx skills update oneself"),
+        ])
+      : []),
     ...section("运维", opsLines(binary, root, false, platform)),
   ].join("\n");
 }

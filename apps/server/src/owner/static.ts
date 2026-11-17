@@ -10,6 +10,8 @@ const ADMIN_PAGES = new Set([
   "login",
   "password",
   "records",
+  // GET /admin/skill has no file; refresh and a direct open fall back to the app.
+  "skill",
   "device",
   "api-keys/new",
   "site-activations/new",

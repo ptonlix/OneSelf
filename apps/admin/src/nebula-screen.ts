@@ -316,7 +316,7 @@ function isControl(target: EventTarget | null): boolean {
   return (
     closest.call(
       target,
-      "input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-mark, .nebula-menu",
+      "input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-mark, .nebula-menu, .nebula-skill",
     ) !== null
   );
 }

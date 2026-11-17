@@ -1,6 +1,7 @@
 export type AdminRoute =
   | { readonly name: "home" }
   | { readonly name: "records" }
+  | { readonly name: "skill" }
   | { readonly name: "login" }
   | { readonly name: "password" }
   | { readonly name: "device"; readonly userCode: string }
@@ -23,6 +24,7 @@ export function parseAdminRoute(pathname: string, search: string): AdminRoute {
   if (parts.length === 1 && head === "login") return { name: "login" };
   if (parts.length === 1 && head === "password") return { name: "password" };
   if (parts.length === 1 && head === "records") return { name: "records" };
+  if (parts.length === 1 && head === "skill") return { name: "skill" };
   if (parts.length === 1 && head === "device") {
     return { name: "device", userCode: readUserCode(search) };
   }
@@ -47,6 +49,8 @@ export function hrefFor(route: AdminRoute): string {
       return "/admin/";
     case "records":
       return "/admin/records";
+    case "skill":
+      return "/admin/skill";
     case "login":
       return "/admin/login";
     case "password":

@@ -118,7 +118,14 @@ describe("nebula home", () => {
   it("shows the connect command without removing the sky", () => {
     const markup = html(home({ showConnect: true }));
     expect(markup).toContain("npx skills add http://127.0.0.1:3000");
+    expect(markup).not.toContain("发现 oneself skill 有更新");
     expect(markup).toContain('data-nebula="sky"');
+  });
+
+  it("does not put the skill update notice on the star map", () => {
+    const markup = html(home());
+    expect(markup).not.toContain("发现 oneself skill 有更新");
+    expect(markup).not.toContain("npx skills update oneself");
   });
 
   it("puts a zoom slider at the bottom left that grows toward the right", () => {
