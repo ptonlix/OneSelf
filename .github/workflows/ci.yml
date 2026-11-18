@@ -24,8 +24,11 @@ jobs:
       # check 会先构建管理端和内置公开页。dist 不入库，没有构建时首页会 404。
       - name: Check
         run: pnpm run check
+      # picomatch <=4.0.7 (GHSA-fc5q-39xc-vjpf) has no patched release.
+      # It is only reached through dev tools (vite, vitest, knip, eslint).
+      # Drop the ignore once a patched picomatch is published.
       - name: Audit
-        run: pnpm audit --audit-level=high
+        run: pnpm audit --audit-level=high --ignore GHSA-fc5q-39xc-vjpf
 
   gitleaks:
     runs-on: ubuntu-latest
