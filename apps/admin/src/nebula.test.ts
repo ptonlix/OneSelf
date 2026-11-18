@@ -5,7 +5,12 @@ import { describe, expect, it, vi } from "vitest";
 import { applyPreviewDialog, releasePreviewInert } from "./dom";
 import { readFileSync } from "node:fs";
 
-import { NebulaHome, originalMediaPath, previewDialogPlan } from "./nebula-view";
+import {
+  homeOnEmptyDoubleClick,
+  NebulaHome,
+  originalMediaPath,
+  previewDialogPlan,
+} from "./nebula-view";
 import { DeviceApprovalView } from "./views";
 import type { AdminGraph } from "./types";
 
@@ -44,6 +49,9 @@ function home(extra: Partial<Parameters<typeof NebulaHome>[0]> = {}) {
     onSkyMove: () => undefined,
     onSkyUp: () => undefined,
     onSkyCancel: () => undefined,
+    onSkyLeave: () => undefined,
+    onSkyDouble: () => undefined,
+    hovered: null,
     onWheel: () => undefined,
     armed: null,
     pending: false,
@@ -111,6 +119,18 @@ function pressLabel(node: ReactNode, label: string): void {
 }
 
 describe("nebula home", () => {
+  it("keeps the gesture guide collapsed on the sky", () => {
+    const markup = html(home());
+    expect(markup).toContain("<details");
+    expect(markup).not.toMatch(/<details[^>]*\sopen[\s>]/);
+    expect(markup).toContain("对着指针缩放");
+    expect(markup).toContain("空白处双击");
+    expect(markup).toContain("<summary>手势</summary>");
+    expect(markup).toContain("只把注视点拉回中心");
+    expect(markup).not.toContain("<summary>操作</summary>");
+    expect(html(home({ webgl: false }))).not.toContain("nebula-help");
+  });
+
   it("shows page titles and does not replace the sidebar menu", () => {
     const markup = html(home());
     expect(markup).not.toContain("晚上好");
@@ -178,6 +198,50 @@ describe("nebula home", () => {
       deltaMode: 0,
     });
     expect(onWheel).toHaveBeenCalledWith(expect.objectContaining({ ctrlKey: false, deltaY: 8 }));
+  });
+
+  it("does not home when a double-click target is a label", () => {
+    const onSkyDouble = vi.fn();
+    const label = {
+      closest(selector: string) {
+        return selector.includes(".nebula-labels") ? this : null;
+      },
+    };
+    const sky = findSky(home({ onSkyDouble }));
+    (
+      sky.props.onDoubleClick as (event: {
+        clientX: number;
+        clientY: number;
+        target: EventTarget | null;
+      }) => void
+    )({
+      clientX: 8,
+      clientY: 24,
+      target: label as unknown as EventTarget,
+    });
+    expect(onSkyDouble).toHaveBeenCalledWith(8, 24, label);
+    const homeView = vi.fn();
+    homeOnEmptyDoubleClick({
+      target: onSkyDouble.mock.calls[0]?.[2] as EventTarget,
+      picked: null,
+      home: homeView,
+    });
+    expect(homeView).not.toHaveBeenCalled();
+    const titleText = {
+      parentElement: label,
+    };
+    homeOnEmptyDoubleClick({
+      target: titleText as unknown as EventTarget,
+      picked: null,
+      home: homeView,
+    });
+    expect(homeView).not.toHaveBeenCalled();
+    homeOnEmptyDoubleClick({
+      target: { closest: () => null } as unknown as EventTarget,
+      picked: null,
+      home: homeView,
+    });
+    expect(homeView).toHaveBeenCalledTimes(1);
   });
 
   it("opens a centered preview and shows the page body without frontmatter", () => {
@@ -565,7 +629,7 @@ describe("nebula home", () => {
     }
   });
 
-  it("ignores a non-primary pointer and captures the primary one", () => {
+  it("ignores a middle pointer and captures turn and pan drags", () => {
     const onSkyDown = vi.fn();
     const capture = vi.fn();
     const sky = findSky(home({ onSkyDown }));
@@ -578,7 +642,7 @@ describe("nebula home", () => {
       currentTarget: { setPointerCapture(id: number): void } | null;
     }) => void;
     down({
-      button: 2,
+      button: 1,
       pointerId: 3,
       clientX: 4,
       clientY: 6,
@@ -588,6 +652,16 @@ describe("nebula home", () => {
     expect(onSkyDown).not.toHaveBeenCalled();
     expect(capture).not.toHaveBeenCalled();
     down({
+      button: 2,
+      pointerId: 5,
+      clientX: 4,
+      clientY: 6,
+      target: null,
+      currentTarget: { setPointerCapture: capture },
+    });
+    expect(capture).toHaveBeenCalledWith(5);
+    expect(onSkyDown).toHaveBeenCalledWith(4, 6, null, { button: 2, shiftKey: false });
+    down({
       button: 0,
       pointerId: 7,
       clientX: 1,
@@ -596,7 +670,7 @@ describe("nebula home", () => {
       currentTarget: { setPointerCapture: capture },
     });
     expect(capture).toHaveBeenCalledWith(7);
-    expect(onSkyDown).toHaveBeenCalledWith(1, 2, null);
+    expect(onSkyDown).toHaveBeenCalledWith(1, 2, null, { button: 0, shiftKey: false });
   });
 
   it("reports a pointerup outside the sky and cancels without selecting", () => {

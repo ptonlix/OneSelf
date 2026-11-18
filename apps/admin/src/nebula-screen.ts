@@ -20,15 +20,19 @@ import {
   gestureDown,
   gestureMove,
   releaseSkyGesture,
+  skyDragMode,
   distanceToSlider,
   shouldAutoTurn,
-  sliderToDistance,
   wheelTurn,
+  ZOOM_FAR,
+  ZOOM_NEAR,
   ZOOM_START,
   type Gesture,
+  type NebulaAttention,
 } from "./nebula-model";
 import { mountNebula } from "./nebula-scene";
 import {
+  homeOnEmptyDoubleClick,
   NebulaHome,
   previewDialogPlan,
   visibilityConfirmOpen,
@@ -63,14 +67,30 @@ export function NebulaScreen(props: {
   const dragged = useRef(false);
   const pinching = useRef(false);
   const [zoom, setZoom] = useState(() => distanceToSlider(ZOOM_START));
-  const reportZoom = useRef<(distance: number) => void>(() => undefined);
-  reportZoom.current = (distance) => {
-    setZoom(distanceToSlider(distance));
+  const reportZoom = useRef<(distance: number, far?: number) => void>(() => undefined);
+  reportZoom.current = (distance, far = ZOOM_FAR) => {
+    const span = ZOOM_NEAR - far;
+    setZoom(span === 0 ? 1 : Math.min(1, Math.max(0, (distance - far) / span)));
   };
   const idleAt = useRef(0);
   const scene = useRef<ReturnType<typeof mountNebula> | null>(null);
   const focused = useRef(false);
+  const hoveredRef = useRef<string | null>(null);
+  const selectionRef = useRef(selection);
+  const [hovered, setHovered] = useState<string | null>(null);
   focused.current = selection !== null;
+  selectionRef.current = selection;
+
+  const rememberHover = (next: string | null): void => {
+    if (hoveredRef.current === next) return;
+    hoveredRef.current = next;
+    setHovered(next);
+    scene.current?.focus(attentionOf(next, selectionRef.current));
+  };
+  const pointAt = (x: number, y: number): void => {
+    const picked = scene.current?.pick(x, y) ?? null;
+    rememberHover(picked?.kind === "page" ? picked.key : null);
+  };
 
   const reload = async (): Promise<void> => {
     const next = await props.client.readGraph();
@@ -160,10 +180,11 @@ export function NebulaScreen(props: {
     const canvas = readCanvas();
     const labels = readLabels();
     if (canvas === null || labels === null) return;
-    const mounted = mountNebula(canvas, labels, graph, reduced, (distance) => {
-      reportZoom.current(distance);
+    const mounted = mountNebula(canvas, labels, graph, reduced, (distance, far) => {
+      reportZoom.current(distance, far);
     });
     scene.current = mounted;
+    mounted.focus(attentionOf(hoveredRef.current, selectionRef.current));
     let handle = 0;
     let last = now();
     const tick = (): void => {
@@ -191,12 +212,21 @@ export function NebulaScreen(props: {
     };
   }, [webgl, graph, reduced]);
 
+  useEffect(() => {
+    scene.current?.focus(attentionOf(hovered, selection));
+  }, [hovered, selection]);
+
+  useEffect(() => {
+    if (selection === null) return;
+    scene.current?.inspect(selection);
+  }, [selection]);
+
   useEffect(
     () =>
       holdSkyZoom(
-        (delta) => {
+        (delta, x, y) => {
           idleAt.current = now();
-          scene.current?.zoom(delta);
+          scene.current?.zoom(delta, x, y);
         },
         (active) => {
           pinching.current = active;
@@ -236,23 +266,33 @@ export function NebulaScreen(props: {
       if (dragged.current) return;
       setSelection(next);
     },
-    onSkyDown: (x, y, target) => {
-      if (isControl(target)) return;
+    onSkyDown: (x, y, target, input) => {
+      const mode = skyDragMode(input);
+      if (mode === null || isControl(target)) return;
       dragged.current = false;
-      gesture.current = gestureDown(x, y);
+      gesture.current = gestureDown(x, y, mode, input.button);
       idleAt.current = now();
     },
     onSkyMove: (x, y) => {
       const current = gesture.current;
-      if (current === null) return;
+      if (current === null) {
+        pointAt(x, y);
+        return;
+      }
       const next = gestureMove(current, x, y);
       gesture.current = next.gesture;
       idleAt.current = now();
-      if (!next.dragging) return;
+      if (!next.dragging) {
+        pointAt(x, y);
+        return;
+      }
       dragged.current = true;
-      scene.current?.turn(next.dx, next.dy);
+      if (hoveredRef.current !== null) rememberHover(null);
+      if (next.gesture.mode === "pan") scene.current?.pan(next.dx, next.dy);
+      else scene.current?.turn(next.dx, next.dy);
     },
     onSkyUp: (x, y, target, outside) => {
+      const button = gesture.current?.button ?? 0;
       const released = releaseSkyGesture({
         type: "pointerup",
         outside,
@@ -261,7 +301,7 @@ export function NebulaScreen(props: {
       });
       gesture.current = released.gesture;
       idleAt.current = now();
-      if (!released.select || isControl(target)) return;
+      if (!released.select || button === 2 || isControl(target)) return;
       const picked = scene.current?.pick(x, y) ?? null;
       if (picked !== null) setSelection(picked);
     },
@@ -274,17 +314,30 @@ export function NebulaScreen(props: {
       }).gesture;
       idleAt.current = now();
     },
+    onSkyLeave: () => {
+      rememberHover(null);
+    },
+    onSkyDouble: (x, y, target) => {
+      homeOnEmptyDoubleClick({
+        target,
+        picked: scene.current?.pick(x, y) ?? null,
+        home: () => {
+          scene.current?.home();
+        },
+      });
+    },
+    hovered,
     onWheel: (input) => {
       if (pinching.current) return;
       idleAt.current = now();
       const action = wheelTurn(input);
-      if (action.kind === "zoom") scene.current?.zoom(action.delta);
+      if (action.kind === "zoom") scene.current?.zoom(action.delta, input.clientX, input.clientY);
       else scene.current?.turn(action.dx, action.dy);
     },
     zoom,
     onZoom: (slider) => {
       idleAt.current = now();
-      scene.current?.zoomTo(sliderToDistance(slider));
+      scene.current?.zoomToSlider(slider);
     },
     armed,
     pending,
@@ -339,6 +392,14 @@ export function NebulaScreen(props: {
   });
 }
 
+function attentionOf(hovered: string | null, selection: NebulaSelection): NebulaAttention {
+  return {
+    hovered,
+    selected: selection?.kind === "page" ? selection.key : null,
+    source: selection?.kind === "source" ? selection.id : null,
+  };
+}
+
 function pageOriginals(
   loading: boolean,
   failed: boolean,
@@ -356,7 +417,7 @@ function isControl(target: EventTarget | null): boolean {
   return (
     closest.call(
       target,
-      "input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-mark, .nebula-menu, .nebula-skill",
+      "input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-help, .nebula-mark, .nebula-menu, .nebula-skill",
     ) !== null
   );
 }

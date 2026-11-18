@@ -1,12 +1,26 @@
 import * as THREE from "three";
 
-import { cancelFrame, frame, observeSize, readPixelRatio } from "./dom";
+import { cancelFrame, frame, now, observeSize, readPixelRatio } from "./dom";
 import {
+  anchorShift,
+  directoryHitRadius,
+  directoryLabelOffset,
   filamentPoints,
+  glowScale,
   ghostOffset,
-  ZOOM_FAR,
+  inspectDistance,
+  keptLabels,
+  labelPriority,
+  labelSize,
+  layoutBounds,
+  placeNebula,
+  strandOpacity,
+  viewFar,
+  viewStart,
+  zoomLookAt,
   ZOOM_NEAR,
-  ZOOM_START,
+  type LabelRect,
+  type NebulaAttention,
   type Vec3,
 } from "./nebula-model";
 import type { AdminGraph } from "./types";
@@ -18,12 +32,16 @@ export function mountNebula(
   labels: object,
   graph: AdminGraph,
   reduced: boolean,
-  onDistance: (distance: number) => void,
+  onDistance: (distance: number, far: number) => void,
 ): {
   dispose(): void;
   turn(dx: number, dy: number): void;
-  zoom(delta: number): void;
-  zoomTo(distance: number): void;
+  pan(dx: number, dy: number): void;
+  zoom(delta: number, x: number | null, y: number | null): void;
+  zoomToSlider(slider: number): void;
+  focus(attention: NebulaAttention): void;
+  inspect(picked: { kind: "page"; key: string } | { kind: "source"; id: string }): void;
+  home(): void;
   auto(dt: number, focused: boolean): void;
   pick(
     clientX: number,
@@ -37,12 +55,24 @@ export function mountNebula(
   const world = new THREE.Group();
   scene.add(world);
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 2200);
-  let distance = ZOOM_START;
-  camera.position.set(0, 12, distance);
-  camera.lookAt(0, 0, 0);
+  const layout = placeNebula(graph);
+  const bounds = layoutBounds([...layout.sources.values(), ...layout.pages.values()]);
+  const far = viewFar(bounds);
+  let distance = viewStart(bounds);
+  const target = new THREE.Vector3();
+  const spin = new THREE.Quaternion();
+  const offset = new THREE.Vector3();
+  const homePoint = new THREE.Vector3();
+  const placeCamera = (): void => {
+    offset.set(0, 12, distance).applyQuaternion(spin);
+    camera.position.copy(target).add(offset);
+    // lookAt resolves roll from camera.up. World up flips the view at the pole and twists a rolled sky.
+    camera.up.set(0, 1, 0).applyQuaternion(spin);
+    camera.lookAt(target.x, target.y, target.z);
+  };
+  placeCamera();
   const soft = spriteTexture();
   addStarfield(world, soft);
-  const layout = place(graph);
   const pickables: THREE.Object3D[] = [];
   const marked = new Map<string, THREE.Object3D>();
   const gases: THREE.Object3D[] = [];
@@ -51,23 +81,23 @@ export function mountNebula(
     if (at === undefined) continue;
     const color =
       COLORS[graph.sources.findIndex((item) => item.id === source.id) % COLORS.length] ?? COLORS[0];
-    const radius = cloudRadius(source.page_count);
+    const radius = directoryHitRadius(source.page_count);
     const gas = new THREE.Group();
     gas.position.set(at.x, at.y, at.z);
     world.add(gas);
     gases.push(gas);
-    addGlow(gas, soft, color, radius * 2.35, 0.22);
-    addGlow(gas, soft, color, radius * 1.35, 0.32);
+    addGlow(gas, soft, color, glowScale(source.page_count), 0.2);
+    addGlow(gas, soft, color, radius * 1.7, 0.28);
     const random = seeded(source.id);
     for (let i = 0; i < 11; i += 1) {
       const theta = random() * Math.PI * 2;
       const phi = Math.acos(2 * random() - 1);
-      const distance = radius * (0.25 + random() * 0.7);
+      const distance = radius * (0.2 + random() * 0.65);
       const wisp = addGlow(
         gas,
         soft,
         color,
-        radius * (0.55 + random() * 0.45),
+        radius * (0.35 + random() * 0.35),
         0.12 + random() * 0.1,
       );
       wisp.position.set(
@@ -77,14 +107,14 @@ export function mountNebula(
       );
     }
     const cloudHit = new THREE.Mesh(
-      new THREE.SphereGeometry(radius * 0.96, 16, 12),
+      new THREE.SphereGeometry(radius, 16, 12),
       new THREE.MeshBasicMaterial({ visible: false }),
     );
     cloudHit.userData["source"] = source.id;
     gas.add(cloudHit);
     pickables.push(cloudHit);
     const name = new THREE.Group();
-    name.position.set(0, radius * 1.05, 0);
+    name.position.set(0, directoryLabelOffset(source.page_count), 0);
     gas.add(name);
     marked.set(`source:${source.id}`, name);
   }
@@ -128,6 +158,11 @@ export function mountNebula(
     anchors.set(label, ghost.position);
     marked.set(`ghost:${label}`, ghost);
   }
+  const strands: {
+    material: THREE.PointsMaterial;
+    from: string;
+    to: string;
+  }[] = [];
   for (const link of graph.links) {
     const from = anchors.get(`${link.from.source}/${link.from.slug}`);
     const to = anchors.get(`${link.to.source}/${link.to.slug}`);
@@ -149,17 +184,37 @@ export function mountNebula(
       color: link.broken ? 0xfb7d96 : 0xb7c4ff,
       size: 5,
       transparent: true,
-      opacity: 0.72,
+      opacity: strandOpacity({
+        selected: null,
+        from: `${link.from.source}/${link.from.slug}`,
+        to: `${link.to.source}/${link.to.slug}`,
+      }),
       blending: THREE.AdditiveBlending,
       depthWrite: false,
     });
     const dots = new THREE.Points(geometry, material);
     dots.frustumCulled = false;
     world.add(dots);
+    strands.push({
+      material,
+      from: `${link.from.source}/${link.from.slug}`,
+      to: `${link.to.source}/${link.to.slug}`,
+    });
   }
+  let attention: NebulaAttention = { hovered: null, selected: null, source: null };
+  const quietSize = new Map<string, { width: number; height: number }>();
+  const paintStrands = (): void => {
+    for (const strand of strands) {
+      strand.material.opacity = strandOpacity({
+        selected: attention.selected,
+        from: strand.from,
+        to: strand.to,
+      });
+    }
+  };
   const paint = (): void => {
     renderer.render(scene, camera);
-    projectLabels(canvas, camera, labels, marked);
+    projectLabels(canvas, camera, labels, marked, attention, quietSize);
   };
   const resize = (): void => {
     const rect = box(canvas);
@@ -173,36 +228,132 @@ export function mountNebula(
   resize();
   const observer = observeSize(canvas, resize);
   let handle = 0;
+  let flight: {
+    from: THREE.Vector3;
+    to: THREE.Vector3;
+    fromDistance: number;
+    toDistance: number;
+    started: number;
+  } | null = null;
+  const stepFly = (): void => {
+    if (flight === null) return;
+    const u = Math.min(1, (now() - flight.started) / 460);
+    const eased = 1 - (1 - u) * (1 - u);
+    target.lerpVectors(flight.from, flight.to, eased);
+    distance = flight.fromDistance + (flight.toDistance - flight.fromDistance) * eased;
+    placeCamera();
+    onDistance(distance, far);
+    if (u >= 1) flight = null;
+  };
   const draw = (): void => {
     if (reduced) return;
     handle = frame(draw);
     for (const gas of gases) gas.rotation.y += 0.004;
+    stepFly();
     paint();
   };
   if (box(canvas).width < 2) paint();
-  onDistance(distance);
+  onDistance(distance, far);
   if (!reduced) handle = frame(draw);
-  const axis = { up: new THREE.Vector3(), right: new THREE.Vector3() };
+  const axis = {
+    up: new THREE.Vector3(),
+    right: new THREE.Vector3(),
+    forward: new THREE.Vector3(),
+  };
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
-  const applyDistance = (next: number): void => {
-    distance = Math.min(ZOOM_FAR, Math.max(ZOOM_NEAR, next));
-    camera.position.set(0, 12, distance);
-    camera.lookAt(0, 0, 0);
-    onDistance(distance);
+  const pivot = new THREE.Vector3();
+  const landed = new THREE.Vector3();
+  const scratch = new THREE.Vector3();
+  const aim = (clientX: number, clientY: number): boolean => {
+    const rect = box(canvas);
+    if (rect.width < 2) return false;
+    pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+    pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    return true;
+  };
+  const focusPoint = (into: THREE.Vector3): void => {
+    raycaster.setFromCamera(pointer, camera);
+    const origin = raycaster.ray.origin;
+    const dir = raycaster.ray.direction;
+    camera.getWorldDirection(axis.forward);
+    const denom = dir.dot(axis.forward);
+    const depth =
+      Math.abs(denom) < 1e-5
+        ? distance
+        : scratch.copy(target).sub(camera.position).dot(axis.forward) / denom;
+    into.copy(origin).addScaledVector(dir, depth);
+  };
+  const orbit = (spinAxis: THREE.Vector3, worldAngle: number): void => {
+    // Rotating the world by worldAngle matched this view. The camera offset takes the inverse.
+    const turn = new THREE.Quaternion().setFromAxisAngle(spinAxis, -worldAngle);
+    turn.multiply(spin);
+    spin.copy(turn);
+    placeCamera();
+  };
+  const cancelFly = (): void => {
+    flight = null;
+  };
+  const flyTo = (point: Vec3, nextDistance: number): void => {
+    const clamped = Math.min(far, Math.max(ZOOM_NEAR, nextDistance));
+    if (reduced) {
+      cancelFly();
+      target.set(point.x, point.y, point.z);
+      distance = clamped;
+      placeCamera();
+      onDistance(distance, far);
+      paint();
+      return;
+    }
+    flight = {
+      from: target.clone(),
+      to: new THREE.Vector3(point.x, point.y, point.z),
+      fromDistance: distance,
+      toDistance: clamped,
+      started: now(),
+    };
+  };
+  const applyDistance = (next: number, clientX: number | null, clientY: number | null): void => {
+    cancelFly();
+    const aimed = clientX !== null && clientY !== null && aim(clientX, clientY);
+    if (aimed) focusPoint(pivot);
+    distance = Math.min(far, Math.max(ZOOM_NEAR, next));
+    let shift = { x: 0, y: 0, z: 0 };
+    if (aimed) {
+      placeCamera();
+      focusPoint(landed);
+      shift = anchorShift(
+        { x: pivot.x, y: pivot.y, z: pivot.z },
+        { x: landed.x, y: landed.y, z: landed.z },
+      );
+    }
+    const nextTarget = zoomLookAt(
+      { x: target.x, y: target.y, z: target.z },
+      { x: homePoint.x, y: homePoint.y, z: homePoint.z },
+      distance,
+      far,
+      aimed,
+      shift,
+    );
+    target.set(nextTarget.x, nextTarget.y, nextTarget.z);
+    placeCamera();
+    onDistance(distance, far);
     paint();
   };
   return {
     pick(clientX, clientY) {
-      const rect = box(canvas);
-      pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-      pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      if (!aim(clientX, clientY)) return null;
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects(pickables, false)[0];
-      const key = hit?.object.userData["key"];
-      if (typeof key === "string") return { kind: "page", key };
-      const source = hit?.object.userData["source"];
-      return typeof source === "string" ? { kind: "source", id: source } : null;
+      const hits = raycaster.intersectObjects(pickables, false);
+      for (const hit of hits) {
+        const key = hit.object.userData["key"];
+        if (typeof key === "string") return { kind: "page", key };
+      }
+      for (const hit of hits) {
+        const source = hit.object.userData["source"];
+        if (typeof source === "string") return { kind: "source", id: source };
+      }
+      return null;
     },
     dispose() {
       cancelFrame(handle);
@@ -210,63 +361,57 @@ export function mountNebula(
       renderer.dispose();
     },
     turn(dx, dy) {
+      cancelFly();
       axis.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
       axis.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
-      world.rotateOnWorldAxis(axis.up, -dx * 0.005);
-      world.rotateOnWorldAxis(axis.right, -dy * 0.005);
+      orbit(axis.up, -dx * 0.005);
+      orbit(axis.right, -dy * 0.005);
       paint();
     },
-    zoom(delta) {
-      applyDistance(distance + delta);
+    pan(dx, dy) {
+      cancelFly();
+      const scale = Math.max(distance, 1) * 0.0016;
+      axis.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+      axis.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      target.addScaledVector(axis.right, -dx * scale);
+      target.addScaledVector(axis.up, dy * scale);
+      placeCamera();
+      paint();
     },
-    zoomTo(next) {
-      applyDistance(next);
+    zoom(delta, x, y) {
+      applyDistance(distance + delta, x, y);
+    },
+    zoomToSlider(slider) {
+      const t = Math.min(1, Math.max(0, slider));
+      applyDistance(far + t * (ZOOM_NEAR - far), null, null);
+    },
+    focus(next) {
+      attention = next;
+      paintStrands();
+      paint();
+    },
+    inspect(picked) {
+      if (picked.kind === "source") {
+        const at = layout.sources.get(picked.id);
+        const count = graph.sources.find((item) => item.id === picked.id)?.page_count ?? 1;
+        if (at !== undefined) flyTo(at, inspectDistance("source", directoryHitRadius(count)));
+        return;
+      }
+      const at = layout.pages.get(picked.key);
+      if (at !== undefined) flyTo(at, inspectDistance("page", 36));
+    },
+    home() {
+      flyTo(homePoint, viewStart(bounds));
     },
     auto(dt, focused) {
-      world.rotateOnWorldAxis(focused ? axis.right.set(0, 0, 1) : axis.up.set(0, 1, 0), 0);
-      world.rotateOnWorldAxis(
-        focused ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0),
-        dt,
-      );
+      if (flight !== null) return;
+      // An open page rolls around the view axis. World +Z walks that page off the look-at point.
+      if (focused) camera.getWorldDirection(axis.forward);
+      else axis.up.set(0, 1, 0);
+      orbit(focused ? axis.forward : axis.up, dt);
       paint();
     },
   };
-}
-
-function place(graph: AdminGraph): { sources: Map<string, Vec3>; pages: Map<string, Vec3> } {
-  const sources = new Map<string, Vec3>();
-  graph.sources.forEach((source, index) => {
-    const angle = (index / Math.max(graph.sources.length, 1)) * Math.PI * 2;
-    const spread = 120;
-    sources.set(source.id, {
-      x: Math.cos(angle) * spread,
-      y: Math.sin(angle) * spread * 0.62,
-      z: Math.sin(angle * 2) * 16,
-    });
-  });
-  const pages = new Map<string, Vec3>();
-  for (const source of graph.sources) {
-    const origin = sources.get(source.id) ?? { x: 0, y: 0, z: 0 };
-    const own = graph.pages.filter((page) => page.source === source.id);
-    const radius = Math.max(34, 24 + own.length * 5);
-    own.forEach((page, index) => {
-      const local = fibonacci(index, own.length, radius * 0.48);
-      pages.set(`${page.source}/${page.slug}`, {
-        x: origin.x + local.x,
-        y: origin.y + local.y,
-        z: origin.z + local.z,
-      });
-    });
-  }
-  return { sources, pages };
-}
-
-function fibonacci(index: number, count: number, radius: number): Vec3 {
-  if (count <= 1) return { x: 0, y: 0, z: 0 };
-  const y = 1 - (index / (count - 1)) * 2;
-  const ring = Math.sqrt(Math.max(0, 1 - y * y));
-  const theta = Math.PI * (3 - Math.sqrt(5)) * index;
-  return { x: Math.cos(theta) * ring * radius, y: y * radius, z: Math.sin(theta) * ring * radius };
 }
 
 function makeCanvas(): {
@@ -402,10 +547,6 @@ function shellPoint(random: () => number, near: number, far: number): Vec3 {
   };
 }
 
-function cloudRadius(pageCount: number): number {
-  return Math.max(34, 24 + pageCount * 5);
-}
-
 function seeded(id: string): () => number {
   let seed = 2166136261;
   for (const char of id) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
@@ -422,6 +563,8 @@ function projectLabels(
   camera: THREE.PerspectiveCamera,
   labels: object,
   marked: ReadonlyMap<string, THREE.Object3D>,
+  attention: NebulaAttention,
+  quietSize: Map<string, { width: number; height: number }>,
 ): void {
   const query = (labels as { querySelectorAll?: unknown }).querySelectorAll;
   if (typeof query !== "function") return;
@@ -430,6 +573,7 @@ function projectLabels(
     "[data-source], [data-key], [data-ghost]",
   );
   const rect = box(canvas);
+  const pending: (LabelRect & { element: LabelElement })[] = [];
   for (let index = 0; index < list.length; index += 1) {
     const node = list[index];
     if (
@@ -439,14 +583,18 @@ function projectLabels(
       !("style" in node)
     )
       continue;
-    const element = node as {
-      getAttribute(name: string): string | null;
-      style: { transform: string };
-      hidden: boolean;
-    };
+    const element = node as LabelElement;
     const source = element.getAttribute("data-source");
     const key = element.getAttribute("data-key");
     const ghost = element.getAttribute("data-ghost");
+    const id =
+      source !== null
+        ? `source:${source}`
+        : key !== null
+          ? key
+          : ghost !== null
+            ? `ghost:${ghost}`
+            : "";
     const mark =
       source !== null
         ? marked.get(`source:${source}`)
@@ -455,16 +603,49 @@ function projectLabels(
           : ghost !== null
             ? marked.get(`ghost:${ghost}`)
             : undefined;
-    if (mark === undefined || rect.width < 2) {
+    if (id === "" || mark === undefined || rect.width < 2) {
       element.hidden = true;
       continue;
     }
     const projected = mark.getWorldPosition(new THREE.Vector3()).project(camera);
     const behind = projected.z > 1 || Math.abs(projected.x) > 1.05 || Math.abs(projected.y) > 1.05;
-    element.hidden = behind;
-    if (behind) continue;
+    if (behind) {
+      element.hidden = true;
+      continue;
+    }
     const x = (projected.x * 0.5 + 0.5) * rect.width;
     const y = (-projected.y * 0.5 + 0.5) * rect.height;
     element.style.transform = `translate(${String(x)}px, ${String(y + 12)}px) translate(-50%, 0)`;
+    const forced =
+      source !== null || ghost !== null || id === attention.hovered || id === attention.selected;
+    const lit = id === attention.hovered || id === attention.selected;
+    const size = labelSize(element, id, lit, quietSize);
+    const pageSource = key === null ? "" : (key.split("/")[0] ?? "");
+    pending.push({
+      element,
+      id,
+      left: x - size.width / 2,
+      top: y + 12,
+      width: size.width,
+      height: size.height,
+      priority: labelPriority({
+        kind: source !== null ? "source" : ghost !== null ? "ghost" : "page",
+        depth: projected.z,
+        inSelectedSource: pageSource !== "" && pageSource === attention.source,
+      }),
+      forced,
+    });
   }
+  const kept = keptLabels(pending);
+  for (const item of pending) item.element.hidden = !kept.has(item.id);
 }
+
+type LabelElement = {
+  getAttribute(name: string): string | null;
+  style: { transform: string };
+  className?: string;
+  classList?: { contains(name: string): boolean };
+  hidden: boolean;
+  offsetWidth: number;
+  offsetHeight: number;
+};
