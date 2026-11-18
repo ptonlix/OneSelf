@@ -59,15 +59,25 @@ export function NebulaHome(props: {
   readonly error: string | null;
   readonly selection: NebulaSelection;
   readonly onSelect: (selection: NebulaSelection) => void;
-  readonly onSkyDown: (x: number, y: number, target: EventTarget | null) => void;
+  readonly onSkyDown: (
+    x: number,
+    y: number,
+    target: EventTarget | null,
+    input: { button: number; shiftKey: boolean },
+  ) => void;
   readonly onSkyMove: (x: number, y: number) => void;
   readonly onSkyUp: (x: number, y: number, target: EventTarget | null, outside: boolean) => void;
   readonly onSkyCancel: () => void;
+  readonly onSkyLeave: () => void;
+  readonly onSkyDouble: (x: number, y: number, target: EventTarget | null) => void;
+  readonly hovered: string | null;
   readonly onWheel: (input: {
     ctrlKey: boolean;
     deltaX: number;
     deltaY: number;
     deltaMode: number;
+    clientX: number | null;
+    clientY: number | null;
   }) => void;
   readonly armed: string | null;
   readonly pending: boolean;
@@ -100,15 +110,31 @@ export function NebulaHome(props: {
         "data-webgl": props.webgl ? "yes" : "no",
         onPointerDown: (event: {
           button: number;
+          shiftKey?: boolean;
           pointerId: number;
           clientX: number;
           clientY: number;
           target: EventTarget | null;
           currentTarget: EventTarget | null;
+          preventDefault?: () => void;
         }) => {
-          if (event.button !== 0) return;
+          if (event.button !== 0 && event.button !== 2) return;
+          event.preventDefault?.();
           capturePointer(event.currentTarget, event.pointerId);
-          props.onSkyDown(event.clientX, event.clientY, event.target);
+          props.onSkyDown(event.clientX, event.clientY, event.target, {
+            button: event.button,
+            shiftKey: event.shiftKey === true,
+          });
+        },
+        onDoubleClick: (event: {
+          clientX: number;
+          clientY: number;
+          target: EventTarget | null;
+        }) => {
+          props.onSkyDouble(event.clientX, event.clientY, event.target);
+        },
+        onContextMenu: (event: { preventDefault(): void }) => {
+          event.preventDefault();
         },
         onPointerMove: (event: { clientX: number; clientY: number }) => {
           props.onSkyMove(event.clientX, event.clientY);
@@ -129,15 +155,27 @@ export function NebulaHome(props: {
         onPointerCancel: () => {
           props.onSkyCancel();
         },
+        onPointerLeave: () => {
+          props.onSkyLeave();
+        },
         onWheel: (event: {
           preventDefault(): void;
           ctrlKey: boolean;
           deltaX: number;
           deltaY: number;
           deltaMode: number;
+          clientX?: number;
+          clientY?: number;
         }) => {
           event.preventDefault();
-          props.onWheel(event);
+          props.onWheel({
+            ctrlKey: event.ctrlKey,
+            deltaX: event.deltaX,
+            deltaY: event.deltaY,
+            deltaMode: event.deltaMode,
+            clientX: typeof event.clientX === "number" ? event.clientX : null,
+            clientY: typeof event.clientY === "number" ? event.clientY : null,
+          });
         },
       },
       h("canvas", { className: "nebula-canvas", "aria-hidden": "true" }),
@@ -167,7 +205,9 @@ export function NebulaHome(props: {
             {
               key: pageKey(page),
               type: "button",
-              className: "pname",
+              className: pageLit(pageKey(page), props.hovered, props.selection)
+                ? "pname lit"
+                : "pname",
               "data-key": pageKey(page),
               onClick: () => {
                 props.onSelect({ kind: "page", key: pageKey(page) });
@@ -194,6 +234,7 @@ export function NebulaHome(props: {
       : null,
     props.loading ? h("p", { className: "nebula-note" }, "正在读取…") : null,
     props.error !== null ? h("p", { className: "nebula-note", role: "alert" }, props.error) : null,
+    props.webgl ? skyHelp() : null,
     props.webgl
       ? h(
           "label",
@@ -888,6 +929,71 @@ function brokenLabels(graph: AdminGraph | null): string[] {
     if (!live.has(label)) labels.add(label);
   }
   return [...labels];
+}
+
+const SKY_HELP: readonly (readonly [string, string])[] = [
+  ["拖动", "转动星图"],
+  ["双指滑动", "同样转动"],
+  ["Shift 或右键拖动", "平移"],
+  ["Control 滚动，或捏合", "对着指针缩放"],
+  ["滑条拉到最远", "只把注视点拉回中心"],
+  ["点开目录或页", "飞过去，并打开侧栏"],
+  ["指到星上", "显示收起的标题"],
+  ["空白处双击", "回到全图"],
+];
+
+const DOUBLE_CLICK_IGNORE =
+  ".nebula-labels, input, .nebula-modal, .nebula-dock, .nebula-zoom, .nebula-help, .nebula-mark, .nebula-menu, .nebula-skill";
+
+/** A title sits under its star, so a label miss must not be treated as empty sky. */
+export function homeOnEmptyDoubleClick(input: {
+  target: EventTarget | null;
+  picked: unknown;
+  home: () => void;
+}): void {
+  if (input.picked !== null && input.picked !== undefined) return;
+  if (!pointsAtEmptySky(input.target)) return;
+  input.home();
+}
+
+function pointsAtEmptySky(target: EventTarget | null): boolean {
+  const node = skyElement(target);
+  if (node === null) return true;
+  return node.closest(DOUBLE_CLICK_IGNORE) === null;
+}
+
+function skyElement(target: EventTarget | null): { closest(selector: string): unknown } | null {
+  const direct = closestHost(target);
+  if (direct !== null) return direct;
+  if (target === null || typeof target !== "object" || !("parentElement" in target)) return null;
+  return closestHost((target as { parentElement?: EventTarget | null }).parentElement ?? null);
+}
+
+function closestHost(target: EventTarget | null): { closest(selector: string): unknown } | null {
+  if (target === null || typeof target !== "object" || !("closest" in target)) return null;
+  const closest = target.closest;
+  if (typeof closest !== "function") return null;
+  return target as { closest(selector: string): unknown };
+}
+
+function skyHelp(): ReactElement {
+  return h(
+    "details",
+    { className: "nebula-help" },
+    h("summary", null, "手势"),
+    h(
+      "dl",
+      null,
+      ...SKY_HELP.flatMap(([gesture, effect]) => [
+        h("dt", { key: `${gesture}-name` }, gesture),
+        h("dd", { key: `${gesture}-effect` }, effect),
+      ]),
+    ),
+  );
+}
+
+function pageLit(key: string, hovered: string | null, selection: NebulaSelection): boolean {
+  return key === hovered || (selection?.kind === "page" && selection.key === key);
 }
 
 function pageKey(page: Pick<GraphPage, "source" | "slug">): string {

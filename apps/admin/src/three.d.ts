@@ -15,9 +15,18 @@ declare module "three" {
     clone(): Vector3;
     project(camera: Object3D): this;
     applyQuaternion(quaternion: Quaternion): this;
+    add(other: Vector3): this;
+    sub(other: Vector3): this;
+    addScaledVector(other: Vector3, scale: number): this;
+    lerp(other: Vector3, alpha: number): this;
+    lerpVectors(from: Vector3, to: Vector3, alpha: number): this;
+    dot(other: Vector3): number;
   }
   export class Quaternion {
     constructor();
+    setFromAxisAngle(axis: Vector3, angle: number): this;
+    multiply(other: Quaternion): this;
+    copy(other: Quaternion): this;
   }
   export class Object3D {
     add(child: Object3D): this;
@@ -25,6 +34,7 @@ declare module "three" {
     userData: Record<string, unknown>;
     scale: { setScalar(value: number): void };
     quaternion: Quaternion;
+    up: Vector3;
     rotation: { y: number };
     rotateOnWorldAxis(axis: Vector3, angle: number): this;
     getWorldPosition(target: Vector3): Vector3;
@@ -37,6 +47,7 @@ declare module "three" {
     aspect: number;
     updateProjectionMatrix(): void;
     lookAt(x: number, y: number, z: number): void;
+    getWorldDirection(target: Vector3): Vector3;
   }
   export class WebGLRenderer {
     constructor(params?: object);
@@ -54,6 +65,7 @@ declare module "three" {
   }
   export class PointsMaterial {
     constructor(params?: object);
+    opacity: number;
   }
   export class Points extends Object3D {
     constructor(geometry?: object, material?: object);
@@ -79,6 +91,7 @@ declare module "three" {
     colorSpace: string;
   }
   export class Raycaster {
+    ray: { origin: Vector3; direction: Vector3 };
     setFromCamera(pointer: Vector2, camera: Object3D): void;
     intersectObjects(objects: readonly Object3D[], recursive: boolean): { object: Object3D }[];
   }

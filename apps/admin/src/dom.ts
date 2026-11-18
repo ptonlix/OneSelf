@@ -35,7 +35,7 @@ function readSky(): object | null {
 
 /** Pinch zoom is a ctrl+wheel. A passive listener cannot cancel it, so the browser zooms the page instead of the sky. */
 export function holdSkyZoom(
-  onPinch: (delta: number) => void,
+  onPinch: (delta: number, x: number | null, y: number | null) => void,
   onGesture: (active: boolean) => void,
 ): () => void {
   const sky = readSky();
@@ -49,10 +49,19 @@ export function holdSkyZoom(
     scale = 1;
     onGesture(true);
   };
-  const change = (event: { preventDefault(): void; scale?: unknown }): void => {
+  const change = (event: {
+    preventDefault(): void;
+    scale?: unknown;
+    clientX?: unknown;
+    clientY?: unknown;
+  }): void => {
     event.preventDefault();
     if (typeof event.scale !== "number") return;
-    onPinch((scale - event.scale) * 240);
+    onPinch(
+      (scale - event.scale) * 240,
+      typeof event.clientX === "number" ? event.clientX : null,
+      typeof event.clientY === "number" ? event.clientY : null,
+    );
     scale = event.scale;
   };
   const end = (event: { preventDefault(): void }): void => {
@@ -70,7 +79,12 @@ export function holdSkyZoom(
   };
 }
 
-type ZoomListener = (event: { preventDefault(): void; scale?: unknown }) => void;
+type ZoomListener = (event: {
+  preventDefault(): void;
+  scale?: unknown;
+  clientX?: unknown;
+  clientY?: unknown;
+}) => void;
 
 function listen(target: object, type: string, listener: ZoomListener, options: object): () => void {
   const add = (target as { addEventListener?: unknown }).addEventListener;
