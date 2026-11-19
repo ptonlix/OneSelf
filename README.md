@@ -35,7 +35,13 @@
 
 </div>
 
-https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
+<p align="center">
+  <a href="https://chenfudong.win/">
+    <video src="docs/assets/site-intro.mp4" poster="docs/assets/site-intro-poster.jpg" width="100%" autoplay muted loop playsinline></video>
+  </a>
+  <br />
+  <sub>用 OneSelf 做出来的个人站点：<a href="https://chenfudong.win/">chenfudong.win</a></sub>
+</p>
 
 ---
 
@@ -318,7 +324,6 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 - [技术架构](docs/ARCHITECTURE.md)
 - [Skill：oneself](skills/oneself/SKILL.md)
 - 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/oneself/SKILL.md`
-- 安装 Skill：`npx skills add https://站点 -a <agent> -s oneself -y`
 
 ## 🤝 贡献
 
@@ -328,3 +333,13 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 2. 改动与 [docs/PRD.md](docs/PRD.md) 范围一致；操作名、权限或错误码有变时，先改文档和 [`packages/operations`](packages/operations/src/registry.ts)。
 3. 提交前运行 `pnpm check`。
 4. 发起 PR，说明行为变化和验证方式。
+
+## ⭐ Star History
+
+<a href="https://www.star-history.com/#ptonlix/OneSelf&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&legend=top-left" />
+  </picture>
+</a>
