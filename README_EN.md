@@ -35,7 +35,13 @@
 
 </div>
 
-https://github.com/user-attachments/assets/98c48652-0ec5-476c-a6b6-bd5dde7151a5
+<p align="center">
+  <a href="https://chenfudong.win/">
+    <video src="docs/assets/site-intro.mp4" poster="docs/assets/site-intro-poster.jpg" width="100%" autoplay muted loop playsinline></video>
+  </a>
+  <br />
+  <sub>A personal site built with OneSelf: <a href="https://chenfudong.win/">chenfudong.win</a></sub>
+</p>
 
 ---
 
@@ -336,7 +342,6 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
 - [Skill: oneself](skills/oneself/SKILL.md)
 - On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
-- Install: `npx skills add https://your-site -a <agent> -s oneself -y`
 
 ## 🤝 Contributing
 
@@ -346,3 +351,13 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) fi
 2. Keep changes within the scope of [docs/PRD.md](docs/PRD.md); if operation names, permissions, or error codes change, update the docs and [`packages/operations`](packages/operations/src/registry.ts) before the code.
 3. Run `pnpm check` before committing.
 4. Open a pull request describing the behavior change and how you verified it.
+
+## ⭐ Star History
+
+<a href="https://www.star-history.com/#ptonlix/OneSelf&type=date&legend=top-left">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&theme=dark&legend=top-left" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&legend=top-left" />
+    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ptonlix/OneSelf&type=date&legend=top-left" />
+  </picture>
+</a>
