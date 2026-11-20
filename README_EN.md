@@ -37,7 +37,7 @@
 
 <p align="center">
   <a href="https://chenfudong.win/">
-    <video src="docs/assets/site-intro.mp4" poster="docs/assets/site-intro-poster.jpg" width="100%" autoplay muted loop playsinline></video>
+    <img src="docs/assets/site-intro.gif" alt="Opening animation of chenfudong.win" width="100%" />
   </a>
   <br />
   <sub>A personal site built with OneSelf: <a href="https://chenfudong.win/">chenfudong.win</a></sub>

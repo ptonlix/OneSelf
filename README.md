@@ -37,7 +37,7 @@
 
 <p align="center">
   <a href="https://chenfudong.win/">
-    <video src="docs/assets/site-intro.mp4" poster="docs/assets/site-intro-poster.jpg" width="100%" autoplay muted loop playsinline></video>
+    <img src="docs/assets/site-intro.gif" alt="chenfudong.win 打开时的开场动画" width="100%" />
   </a>
   <br />
   <sub>用 OneSelf 做出来的个人站点：<a href="https://chenfudong.win/">chenfudong.win</a></sub>
