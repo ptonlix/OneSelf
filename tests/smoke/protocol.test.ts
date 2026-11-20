@@ -68,6 +68,13 @@ it("omits key tools from MCP and ignores a spoofed forwarding header", async () 
   expect(discoverySkills).not.toHaveProperty("public_page");
   expect(JSON.stringify(discovery.operations)).toContain("get_skill");
   expect(JSON.stringify(discovery.operations)).toContain("get_site");
+  expect(discovery.version).toBe("1");
+  expect(discovery.self).toEqual({
+    soul: { source: "self", slug: "soul" },
+    recent: { source: "self", slug: "recent" },
+  });
+  expect(JSON.stringify(discovery.self)).not.toContain("evil.example");
+  expect(JSON.stringify(discovery.operations)).not.toContain("self_");
 
   for (let index = 0; index < 9; index += 1) {
     const response = await server.request("/admin/login", {
@@ -105,6 +112,10 @@ it("describes credentials, public endpoints, and upload limits in discovery", as
   const discovery = await readJson(await server.request("/.well-known/pcp"));
   expect(discovery.protocol).toBe("pcp");
   expect(discovery.version).toBe("1");
+  expect(discovery.self).toEqual({
+    soul: { source: "self", slug: "soul" },
+    recent: { source: "self", slug: "recent" },
+  });
   expect(discovery.auth).toEqual({
     headers: [
       { credential: "api_key", header: "Authorization", value: "ApiKey <key>" },
@@ -414,8 +425,14 @@ it("serves one oneself skill and rejects the old names", async () => {
 
   const context = await server.request("/skills/oneself/references/context.md");
   const publicPage = await server.request("/skills/oneself/references/public-page.md");
+  const selfReference = await server.request("/skills/oneself/references/self.md");
+  const philosophy = await server.request("/skills/oneself/references/philosophy.md");
+  const cognition = await server.request("/skills/oneself/references/cognition.md");
   expect(context.status).toBe(200);
   expect(publicPage.status).toBe(200);
+  expect(selfReference.status).toBe(200);
+  expect(philosophy.status).toBe(200);
+  expect(cognition.status).toBe(200);
   const contextText = await context.text();
   const publicPageText = await publicPage.text();
   const skillRoot = resolve(
@@ -424,10 +441,15 @@ it("serves one oneself skill and rejects the old names", async () => {
   );
   expect(contextText).toBe(readFileSync(resolve(skillRoot, "context.md"), "utf8"));
   expect(publicPageText).toBe(readFileSync(resolve(skillRoot, "public-page.md"), "utf8"));
+  expect(await selfReference.text()).toBe(readFileSync(resolve(skillRoot, "self.md"), "utf8"));
   expect(contextText).not.toContain("oneself_origin");
   expect(publicPageText).not.toContain("oneself_origin");
   expect(contextText).not.toContain(ORIGIN);
   expect(publicPageText).not.toContain(ORIGIN);
+  const selfText = await server.request("/skills/oneself/references/self.md");
+  expect(await selfText.text()).not.toContain(ORIGIN);
+  expect(await philosophy.text()).not.toContain(ORIGIN);
+  expect(await cognition.text()).not.toContain(ORIGIN);
 
   for (const path of [
     "/skills/context-management.md",
@@ -488,8 +510,11 @@ it("serves an anonymous agent-skills archive index that ignores Host", async () 
   const files = unpackTarGz(raw);
   expect([...files.keys()].sort()).toEqual([
     "SKILL.md",
+    "references/cognition.md",
     "references/context.md",
+    "references/philosophy.md",
     "references/public-page.md",
+    "references/self.md",
   ]);
   const archivedEntry = files.get("SKILL.md");
   const archivedContext = files.get("references/context.md");

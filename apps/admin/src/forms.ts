@@ -3,7 +3,12 @@ import type { CreateApiKeyBody, DeviceApprovalBody, GrantFlag, SourceDraft } fro
 const RELEASE_ID = /^(?:public-page|rel_[0-9a-fA-F]{32})$/;
 
 export function draftsFromDirectories(ids: readonly string[]): SourceDraft[] {
-  return ids.map((id) => ({ id, read: false, write: false, visibility: false }));
+  return ids.map((id) => ({
+    id,
+    read: id === "self",
+    write: false,
+    visibility: false,
+  }));
 }
 
 export function toggleDraft(

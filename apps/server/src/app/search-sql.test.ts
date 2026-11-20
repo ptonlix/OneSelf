@@ -39,6 +39,9 @@ describe("search", () => {
         if (String(prop).startsWith("list") || String(prop).startsWith("find")) {
           return () => Promise.resolve([]);
         }
+        if (String(prop).startsWith("insert")) {
+          return () => Promise.resolve({ id: 1 });
+        }
         return () => Promise.resolve(undefined);
       },
     });
@@ -192,6 +195,9 @@ function postgresHandle(searchPages: PostgresStore["searchPages"]): PostgresHand
       }
       if (String(prop).startsWith("list") || String(prop).startsWith("find")) {
         return () => Promise.resolve([]);
+      }
+      if (String(prop).startsWith("insert")) {
+        return () => Promise.resolve({ id: 1 });
       }
       return () => Promise.resolve(undefined);
     },

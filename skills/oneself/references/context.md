@@ -28,15 +28,16 @@
 
 ## 收到资料后
 
+- [ ] 先确认所属人这次是要把资料放进个人上下文，还是只做分析、翻译、总结或修改。不是保存任务时，不要写入。每次处理新的个人上下文，都先读 `references/philosophy.md` 和 `references/cognition.md`，不限于这次要改画像。建页成功不等于已经理解了这个人。能读 `self` 时，再读 `references/self.md`、`self/soul` 和 `self/recent`。上传本身不是改这两页的理由。读不到 `self` 时不要另起总览。
 - [ ] 调用 `whoami` 和 `sources_list`。确认能写哪个目录，以及该目录有没有改可见性权限。
 - [ ] 用 `search`、`list_pages` 或 `recall` 找已有页。`search` 只返回标题和最多 140 字片段，不返回全文。要改内容先 `get_page`，用返回的当前哈希。
-- [ ] 一段可以单独引用的资料做成一页。稳定字段放进 frontmatter，叙述放进正文，带日期的事件放进 `## Timeline`，会过期或不确定的陈述放进 `## Facts`。
+- [ ] 一段可以单独引用的资料做成一页。稳定字段放进 frontmatter，叙述放进正文，带日期的事件放进 `## Timeline`，会过期或不确定的陈述放进 `## Facts`。`self/soul` 和 `self/recent` 不用这两条系统围栏，写法见 `references/self.md`。
 - [ ] 图片和 PDF 不进正文，用 `file_upload` 上传。字段名、允许的类型和单文件大小上限看发现文档 `uploads.file_upload`；超出的不要硬传，先告诉所属人。
 - [ ] 新页用 `put_page`，正文是完整 Markdown。已有页的小改用 `edit_page`。多页一起写用 `put_pages`，任一页不合法则全部不写。
 - [ ] 原件返回 `id` 和 `/media/{id}` 后，把 id 放进 frontmatter 的 `files`，再写入该页。上传成功还不等于挂上，更不等于公开。
 - [ ] 用返回的哈希再 `get_page` 核对。失败时不要改成不带哈希的覆盖，除非你就是要用当前正文替换刚写过的内容。
 
-`remember`、`forget`、`add_timeline_entry`、`add_tag`、`remove_tag`、`add_link`、`remove_link` 会回写 Markdown 或 frontmatter，再走和 `put_page` 相同的写入。它们不单独改表。能用这些操作完成的小改，就不要整页覆盖。
+`remember`、`forget`、`add_timeline_entry`、`add_tag`、`remove_tag`、`add_link`、`remove_link` 会回写 Markdown 或 frontmatter，再走和 `put_page` 相同的写入。它们不单独改表。能用这些操作完成的小改，就不要整页覆盖。`self/soul` 和 `self/recent` 除外：这两页上 `remember`、`forget`、`add_timeline_entry` 会返回 `invalid`，见 `references/self.md`。
 
 ## 参数的语义
 
@@ -61,8 +62,8 @@
 
 ```markdown
 ---
-type: profile
-title: 工程师
+type: note
+title: 笔记
 name: 张三
 visibility: private
 tags: []
@@ -74,7 +75,7 @@ files: []
 
 ## 两种 fence
 
-只认两种 fence：`## Facts` 和 `## Timeline`。不要发明新的围栏。围栏解析失败时，整次写入回滚，不留下半页投影。
+只认两种 fence：标题恰好是 `## Facts` 和 `## Timeline`。不要发明新的围栏。`## Facts — 近期有效判断` 这种带后缀的标题不是系统围栏，系统不会解析。画像页的判断块由 Agent 用 `edit_page` 维护，见 `references/self.md`。围栏解析失败时，整次写入回滚，不留下半页投影。
 
 一项资料自己的字段放在 frontmatter。只有需要有效期或置信度的陈述，才写入 `## Facts`。
 

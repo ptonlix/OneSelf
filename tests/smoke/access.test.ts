@@ -135,7 +135,10 @@ it("returns the owner whoami result", async () => {
     admin: true,
     site_write: true,
     unrestricted_data: true,
-    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+    sources: [
+      { id: "self", read: true, write: true, visibility: true },
+      { id: "notes", read: true, write: true, visibility: true },
+    ],
   });
   await server.close();
 });
@@ -364,7 +367,7 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
     admin: false,
     unrestricted_data: true,
     site_write: false,
-    sources: [],
+    sources: [{ id: "self", read: true, write: true, visibility: true }],
   });
 
   const added = await server.request("/pcp/v1/sources", {
@@ -375,10 +378,13 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
   expect(added.status, await added.clone().text()).toBe(200);
   expect(await readJson(await server.request("/pcp/v1/whoami", { headers }))).toMatchObject({
     unrestricted_data: true,
-    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+    sources: [
+      { id: "self", read: true, write: true, visibility: true },
+      { id: "notes", read: true, write: true, visibility: true },
+    ],
   });
   const listed = await readJson(await server.request("/pcp/v1/sources", { headers }));
-  expect(listed.sources).toEqual([{ id: "notes" }]);
+  expect(listed.sources).toEqual([{ id: "notes" }, { id: "self" }]);
 
   const deleted = await server.request("/pcp/v1/sources/notes", {
     method: "DELETE",
@@ -431,7 +437,10 @@ it("lets an unrestricted device grant add a directory and shows that on whoami",
   ).toMatchObject({
     credential: "api_key",
     unrestricted_data: true,
-    sources: [{ id: "notes", read: true, write: true, visibility: true }],
+    sources: [
+      { id: "self", read: true, write: true, visibility: true },
+      { id: "notes", read: true, write: true, visibility: true },
+    ],
   });
   await server.close();
 });

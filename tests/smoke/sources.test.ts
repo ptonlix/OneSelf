@@ -31,14 +31,14 @@ it("lists only directories the caller can read", async () => {
     ),
   ).toEqual({ sources: [{ id: "notes" }] });
   expect(await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }))).toEqual({
-    sources: [{ id: "notes" }, { id: "work" }],
+    sources: [{ id: "notes" }, { id: "self" }, { id: "work" }],
   });
   expect(
     (await server.request("/pcp/v1/sources/work", { method: "DELETE", headers: { cookie } }))
       .status,
   ).toBe(200);
   expect(await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }))).toEqual({
-    sources: [{ id: "notes" }],
+    sources: [{ id: "notes" }, { id: "self" }],
   });
   await server.close();
 });
@@ -145,7 +145,7 @@ kept body
   );
   expect(restored).toEqual({ id: "notes" });
   expect(await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }))).toEqual({
-    sources: [{ id: "notes" }],
+    sources: [{ id: "notes" }, { id: "self" }],
   });
   const readable = await readJson(
     await server.request("/pcp/v1/pages/notes/kept", { headers: { cookie } }),
@@ -176,7 +176,7 @@ it("conflicts when adding a source id that is still soft-deleted", async () => {
   });
   await expectError(again, 409, "conflict");
   expect(await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }))).toEqual({
-    sources: [],
+    sources: [{ id: "self" }],
   });
   await expectError(
     await server.request("/pcp/v1/sources/notes", { headers: { cookie } }),
@@ -212,7 +212,7 @@ it("lists deleted directories for the owner session and pages past 20", async ()
     ).toBe(200);
   }
   const live = await readJson(await server.request("/pcp/v1/sources", { headers: { cookie } }));
-  expect(live).toEqual({ sources: [] });
+  expect(live).toEqual({ sources: [{ id: "self" }] });
   const first = await readJson(await server.request("/admin/deleted-sources", { headers }));
   const second = await readJson(
     await server.request("/admin/deleted-sources?cursor=20", { headers }),
@@ -294,9 +294,14 @@ it("reads the admin graph only for the owner and omits hidden pages", async () =
       headers: { accept: "application/json", cookie },
     }),
   );
-  expect(graph.pages).toEqual([
-    expect.objectContaining({ source: "health", slug: "note", title: "Note" }),
-  ]);
+  expect(graph.pages).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ source: "health", slug: "note", title: "Note" }),
+      expect.objectContaining({ source: "self", slug: "soul" }),
+      expect.objectContaining({ source: "self", slug: "recent" }),
+    ]),
+  );
+  expect(graph.pages).toHaveLength(3);
   expect(graph.links).toEqual([
     {
       from: { source: "health", slug: "note" },

@@ -37,6 +37,8 @@ import {
   runHourlyMaintenance,
   setPageVisibility as rewritePageVisibility,
   SITE_ACTIVATION_TTL_MS,
+  ensureStandingJudgment,
+  rejectStandingStructureWrite,
   sourcesAdd,
   sourcesDelete,
   sourcesList,
@@ -179,6 +181,9 @@ export class Runtime {
   #skillEntry: Uint8Array;
   #skillContext: Uint8Array;
   #skillPublicPage: Uint8Array;
+  #skillPhilosophy: Uint8Array;
+  #skillCognition: Uint8Array;
+  #skillSelf: Uint8Array;
   #skillArchive: Uint8Array;
   #skillDescription: string;
   #skillDigest: string;
@@ -215,11 +220,17 @@ export class Runtime {
       entry: readFileSync(path.join(skillRoot, "SKILL.md"), "utf8"),
       context: readFileSync(path.join(skillRoot, "references", "context.md")),
       publicPage: readFileSync(path.join(skillRoot, "references", "public-page.md")),
+      philosophy: readFileSync(path.join(skillRoot, "references", "philosophy.md")),
+      cognition: readFileSync(path.join(skillRoot, "references", "cognition.md")),
+      self: readFileSync(path.join(skillRoot, "references", "self.md")),
       origin: this.origin,
     });
     this.#skillEntry = served.entry;
     this.#skillContext = served.context;
     this.#skillPublicPage = served.publicPage;
+    this.#skillPhilosophy = served.philosophy;
+    this.#skillCognition = served.cognition;
+    this.#skillSelf = served.self;
     this.#skillArchive = served.archive;
     this.#skillDescription = served.description;
     this.#skillDigest = served.digest;
@@ -262,6 +273,19 @@ export class Runtime {
       this.#owner.mustChangePassword = true;
       this.#log("owner password hash replaced");
     }
+    await this.ensureStandingJudgment();
+  }
+
+  ensureStandingJudgment(): Promise<void> {
+    return this.exclusive(async () => {
+      const ensured = ensureStandingJudgment(this.state, this.clock.iso());
+      if (!ensured.ok) {
+        throw new Error(ensured.message);
+      }
+      if (ensured.value !== this.state) {
+        await this.#publish(ensured.value);
+      }
+    });
   }
 
   close(): Promise<void> {
@@ -1070,6 +1094,10 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
+      const denied = rejectStandingStructureWrite(source, slug);
+      if (!denied.ok) {
+        return denied;
+      }
       const page = getPage(this.state, actor.credential, source, slug);
       if (!page.ok) {
         return page;
@@ -1106,6 +1134,10 @@ export class Runtime {
       if (blocked !== null) {
         return blocked;
       }
+      const denied = rejectStandingStructureWrite(input.source, input.slug);
+      if (!denied.ok) {
+        return denied;
+      }
       const page = getPage(this.state, actor.credential, input.source, input.slug);
       if (!page.ok) {
         return page;
@@ -1139,6 +1171,10 @@ export class Runtime {
       const blocked = this.passwordBlocked(actor);
       if (blocked !== null) {
         return blocked;
+      }
+      const denied = rejectStandingStructureWrite(source, slug);
+      if (!denied.ok) {
+        return denied;
       }
       const page = getPage(this.state, actor.credential, source, slug);
       if (!page.ok) {
@@ -1275,6 +1311,15 @@ export class Runtime {
     }
     if (name === "public-page.md") {
       return this.#skillPublicPage;
+    }
+    if (name === "philosophy.md") {
+      return this.#skillPhilosophy;
+    }
+    if (name === "cognition.md") {
+      return this.#skillCognition;
+    }
+    if (name === "self.md") {
+      return this.#skillSelf;
     }
     return null;
   }

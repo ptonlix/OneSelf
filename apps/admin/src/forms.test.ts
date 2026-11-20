@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   createApiKeyBody,
   deviceApprovalBody,
+  draftsFromDirectories,
   isReleaseId,
   selectedGrants,
   toggleDraft,
@@ -82,6 +83,22 @@ describe("approval payloads", () => {
       sources: [{ id: "work", read: true, write: false, visibility: true }],
     });
     expect(body).not.toHaveProperty("key");
+  });
+
+  it("pre-checks only read for self and omits it after unchecking", () => {
+    const initial = draftsFromDirectories(["self", "work"]);
+    expect(initial).toEqual([
+      { id: "self", read: true, write: false, visibility: false },
+      { id: "work", read: false, write: false, visibility: false },
+    ]);
+    const body = deviceApprovalBody({
+      userCode: "WDJB-MJHT",
+      label: "laptop",
+      unrestrictedData: false,
+      siteWrite: false,
+      drafts: toggleDraft(initial, "self", "read", false),
+    });
+    expect(body.sources).toEqual([]);
   });
 
   it("accepts public-page and a 32-hex release id", () => {

@@ -681,6 +681,9 @@ function grantBacking(
       if (String(prop).startsWith("list") || String(prop).startsWith("find")) {
         return () => Promise.resolve([]);
       }
+      if (String(prop).startsWith("insert")) {
+        return () => Promise.resolve({ id: 1 });
+      }
       return () => Promise.resolve(undefined);
     },
   });

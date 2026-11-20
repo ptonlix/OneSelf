@@ -134,6 +134,72 @@ describe("product skills", () => {
     );
     expect(entry).toContain("{oneself_origin}/skills/oneself/references/context.md");
     expect(entry).toContain("{oneself_origin}/skills/oneself/references/public-page.md");
+    expect(entry).toContain("{oneself_origin}/skills/oneself/references/self.md");
+    expect(entry).toContain("`references/philosophy.md`");
+    expect(entry).toContain("`references/cognition.md`");
+    expect(entry).toContain("用更少、更准确的判断");
+    expect(entry).toContain("手里有文件，不等于可以写入个人上下文");
+    expect(entry).toContain("每次处理新的个人上下文");
+    expect(entry).toContain("不限于修改画像");
+    expect(entry).not.toContain("只有这次任务是保存、记住或更新画像时，才读");
+    expect(entry).toContain("`self/soul`");
+    expect(entry).toContain("`self/recent`");
+  });
+
+  it("states the mission and the thinking checkpoints", () => {
+    const philosophy = readSkill("references/philosophy.md");
+    const cognition = readSkill("references/cognition.md");
+    expect(philosophy).toContain("不是记录员");
+    expect(philosophy).toContain("不要写入个人上下文");
+    expect(philosophy).toContain("一个准确的空白");
+    expect(philosophy).toContain("用更少、更准确的判断");
+    expect(cognition).toContain("检查点");
+    expect(cognition).toContain("本人说出的话");
+    expect(cognition).toContain("一次出现不是规律");
+    expect(cognition).not.toContain("Hono");
+  });
+
+  it("gives the agent the soul and recent templates", () => {
+    const self = readSkill("references/self.md");
+    for (const heading of [
+      "01. Values — 价值观与信念",
+      "06. Strengths & Frictions — 优势与摩擦",
+      "Observations — 候选观察",
+      "01. Focus — 近期关注",
+      "07. Goals & Challenges — 目标与困扰",
+    ]) {
+      expect(self, heading).toContain(heading);
+    }
+    expect(self).toContain("observation_id");
+    expect(self).toContain("last_seen");
+    expect(self).toContain("一次偶然");
+    expect(self).toContain("也不自动进入候选");
+    expect(self).toContain("不能因此写成已被行为验证的事实");
+    expect(self).toContain("来源只使用用户自述");
+    expect(self).toContain("都必须有 `valid_until`");
+    expect(self).toContain("日期 | 变化 | 补充");
+    expect(self).toContain("不算新观察");
+    expect(self).toContain("source: 行为观察");
+    expect(self).toContain("goals_challenges");
+    expect(self).toContain("不是系统的 `## Facts` 或 `## Timeline` 围栏");
+    expect(entry).toContain("`0600`");
+    expect(self).toContain("不能当作已经确认的特征");
+    expect(self).toContain("不要创建 `self/observations`");
+    expect(self).toContain("valid_until");
+    expect(self).toContain("不按自然月归档");
+    expect(self).toContain("上传一份资料，本身不是写入这两页的理由");
+    expect(self).toContain("服务启动时");
+    expect(self).toContain("不要再创建这两页");
+    expect(entry).toContain("这两页由系统在启动时按模板生成");
+    expect(self).toContain("不是收集箱");
+    expect(self).toContain("来源：行为观察");
+    expect(self).toContain("不是系统围栏");
+    expect(self).toContain("不要在栏目下再抄一遍");
+    expect(self).toContain("`remember`");
+    expect(self).toContain("不得写入密钥或私有页");
+    expect(self).toContain("credentials: omit");
+    expect(self).not.toContain("Hono");
+    expect(self).not.toContain("context-management");
   });
 
   it("takes origin in one order and asks only when all four are missing", () => {

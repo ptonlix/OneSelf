@@ -2,6 +2,7 @@ import { canAddSource, canDeleteOrRestoreSource, sourceFlags, type Credential } 
 import { isPastRetention, SOFT_DELETE_RETENTION_MS, timestampMs } from "./clock.ts";
 import { isSourceName } from "./identity.ts";
 import { fail, ok, type DomainResult } from "./result.ts";
+import { SELF_SOURCE } from "./standing-judgment.ts";
 import { cloneState, type DomainState } from "./state.ts";
 
 export type SourceStatus = {
@@ -42,6 +43,13 @@ export function sourcesDelete(
   }
   if (timestampMs(input.now) === null) {
     return fail("invalid", "invalid timestamp");
+  }
+  if (input.id === SELF_SOURCE) {
+    const reserved = state.sources.find((source) => source.id === SELF_SOURCE);
+    if (!reserved || reserved.deletedAt !== null) {
+      return fail("not_found", "source not found");
+    }
+    return fail("invalid", "reserved source cannot be deleted");
   }
   const existing = state.sources.find(
     (source) => source.id === input.id && source.deletedAt === null,
