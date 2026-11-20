@@ -159,9 +159,9 @@ describe("standing judgment", () => {
     if (!written.ok) {
       return;
     }
-    expect(deletePage(written.value.state, { credential: owner, now: NOW }, "health", "note").ok).toBe(
-      true,
-    );
+    expect(
+      deletePage(written.value.state, { credential: owner, now: NOW }, "health", "note").ok,
+    ).toBe(true);
     expect(sourcesDelete(written.value.state, owner, { id: "health", now: NOW }).ok).toBe(true);
   });
 });
