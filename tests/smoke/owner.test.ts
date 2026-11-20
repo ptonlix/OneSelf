@@ -21,6 +21,8 @@ it("blocks writes until the owner changes the bootstrap password", async () => {
   const body = await readJson(response);
   expect(body.error).toBe("password_change_required");
   expect(Object.keys(body).sort()).toEqual(["error", "message"]);
-  expect(await server.runtime.objectStore.list("")).toEqual([]);
+  const stored = (await server.runtime.objectStore.list("")).map((head) => head.key);
+  expect(stored.some((key) => key.includes("notes/hello"))).toBe(false);
+  expect(stored.some((key) => key.startsWith("pages/self/"))).toBe(true);
   await server.close();
 });

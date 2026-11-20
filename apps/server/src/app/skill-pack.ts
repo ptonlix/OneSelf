@@ -7,6 +7,9 @@ export type ServedSkill = {
   readonly entry: Uint8Array;
   readonly context: Uint8Array;
   readonly publicPage: Uint8Array;
+  readonly philosophy: Uint8Array;
+  readonly cognition: Uint8Array;
+  readonly self: Uint8Array;
   readonly archive: Uint8Array;
   readonly digest: string;
   readonly description: string;
@@ -16,6 +19,9 @@ export function loadServedSkill(input: {
   readonly entry: string;
   readonly context: Uint8Array;
   readonly publicPage: Uint8Array;
+  readonly philosophy: Uint8Array;
+  readonly cognition: Uint8Array;
+  readonly self: Uint8Array;
   readonly origin: string;
 }): ServedSkill {
   const description = skillDescription(input.entry);
@@ -25,6 +31,9 @@ export function loadServedSkill(input: {
       { name: "SKILL.md", data: entry },
       { name: "references/context.md", data: input.context },
       { name: "references/public-page.md", data: input.publicPage },
+      { name: "references/philosophy.md", data: input.philosophy },
+      { name: "references/cognition.md", data: input.cognition },
+      { name: "references/self.md", data: input.self },
     ]),
     { level: 9 },
   );
@@ -34,6 +43,9 @@ export function loadServedSkill(input: {
     entry,
     context: input.context,
     publicPage: input.publicPage,
+    philosophy: input.philosophy,
+    cognition: input.cognition,
+    self: input.self,
     archive,
     digest: `sha256:${createHash("sha256").update(archive).digest("hex")}`,
     description,

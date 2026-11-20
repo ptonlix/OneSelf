@@ -6,6 +6,14 @@ import type { PageProjection, Visibility } from "./markdown.ts";
 import { projectMarkdown } from "./markdown.ts";
 import { fail, ok, type DomainResult } from "./result.ts";
 import {
+  SELF_RECENT_SLUG,
+  SELF_SOUL_SLUG,
+  SELF_SOURCE,
+  assertStandingContract,
+  isReservedSelfPage,
+  standingSeed,
+} from "./standing-judgment.ts";
+import {
   VERSION_LIMIT,
   cloneState,
   type DomainState,
@@ -100,6 +108,47 @@ export function putPage(
   return ok(commitWrite(state, context.now, prepared.value));
 }
 
+export function ensureStandingJudgment(state: DomainState, now: string): DomainResult<DomainState> {
+  const directory = state.sources.find((source) => source.id === SELF_SOURCE);
+  if (directory?.deletedAt !== null && directory !== undefined) {
+    return ok(state);
+  }
+  let draft = state;
+  if (directory === undefined) {
+    draft = cloneState(state);
+    draft.sources.push({ id: SELF_SOURCE, deletedAt: null });
+  }
+  const context: CommandContext = { credential: { kind: "owner" }, now };
+  for (const slug of [SELF_SOUL_SLUG, SELF_RECENT_SLUG]) {
+    const page = findPage(draft, SELF_SOURCE, slug);
+    if (page && page.deletedAt === null && !page.hiddenBySource) {
+      continue;
+    }
+    if (page && page.deletedAt !== null) {
+      const restored = restorePage(draft, context, SELF_SOURCE, slug);
+      if (!restored.ok) {
+        return restored;
+      }
+      draft = restored.value.state;
+      continue;
+    }
+    const markdown = standingSeed(slug, now);
+    if (!markdown.ok) {
+      return markdown;
+    }
+    const written = putPage(draft, context, {
+      source: SELF_SOURCE,
+      slug,
+      markdown: markdown.value,
+    });
+    if (!written.ok) {
+      return written;
+    }
+    draft = written.value.state;
+  }
+  return ok(draft);
+}
+
 export function putPages(
   state: DomainState,
   context: CommandContext,
@@ -142,6 +191,10 @@ export function editPage(
   const projected = projectMarkdown(edited.value);
   if (!projected.ok) {
     return projected;
+  }
+  const contract = assertStandingContract(input.source, input.slug, projected.value);
+  if (!contract.ok) {
+    return contract;
   }
   const visibility = assertVisibilityChange(
     context.credential,
@@ -248,6 +301,9 @@ export function deletePage(
   if (!located.ok) {
     return located;
   }
+  if (isReservedSelfPage(source, slug)) {
+    return fail("invalid", "reserved page cannot be deleted");
+  }
   if (timestampMs(context.now) === null) {
     return fail("invalid", "invalid timestamp");
   }
@@ -335,6 +391,10 @@ export function revertPage(
   if (!projected.ok) {
     return projected;
   }
+  const contract = assertStandingContract(input.source, input.slug, projected.value);
+  if (!contract.ok) {
+    return contract;
+  }
   const visibility = assertVisibilityChange(
     context.credential,
     input.source,
@@ -420,6 +480,10 @@ function preparePut(
   const projected = projectMarkdown(input.markdown);
   if (!projected.ok) {
     return projected;
+  }
+  const contract = assertStandingContract(input.source, input.slug, projected.value);
+  if (!contract.ok) {
+    return contract;
   }
   const visibility = assertVisibilityChange(
     context.credential,

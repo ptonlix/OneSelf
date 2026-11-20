@@ -51,6 +51,11 @@ export function mountPcp(app: Hono, runtime: Runtime): void {
   app.get("/skills/oneself/references/public-page.md", () =>
     skillReference(runtime, "public-page.md"),
   );
+  app.get("/skills/oneself/references/philosophy.md", () =>
+    skillReference(runtime, "philosophy.md"),
+  );
+  app.get("/skills/oneself/references/cognition.md", () => skillReference(runtime, "cognition.md"));
+  app.get("/skills/oneself/references/self.md", () => skillReference(runtime, "self.md"));
   app.get("/pcp/v1/skills", (c) => authed(c, runtime, (actor) => runtime.listSkills(actor)));
   app.get("/pcp/v1/skills/:name", async (c) => {
     const actor = await runtime.authenticate(c.req.raw);

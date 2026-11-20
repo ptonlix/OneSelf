@@ -1,17 +1,25 @@
 ---
 name: oneself
-description: 管理 OneSelf 的个人上下文，把文字写成页并挂上原件；同时定制唯一的个人公开宣传页。先读本站发现文档 /.well-known/pcp 和它指向的 OpenAPI 取接口细节。写、改、删或挂接文件前读 references/context.md。定制、上传、预览或申请上线前读 references/public-page.md。
+description: 用更少、更准确的判断逐渐理解一个人，而不是只保存更多资料。管理个人上下文，把文字写成页并挂上原件；同时定制唯一的个人公开宣传页。接口细节以本站 PCP 发现文档和 OpenAPI 为准。每次处理新的个人上下文时都读 references/philosophy.md 与 references/cognition.md，不限于修改画像。要判断这个人是谁、最近的生活怎样，或写入可能改变长期画像、近期状态的资料之前，必须再读 references/self.md；能读 self 时再读 self/soul 与 self/recent，whoami 读不到 self 时跳过，不要另起总览。写、改、删或挂接文件之前，必须先读 references/context.md。定制、上传、预览或申请上线公开页之前，必须先读 references/public-page.md。
 compatibility: OneSelf PCP。
 metadata:
   author: oneself
-  version: "4"
+  version: "6"
 ---
 
 # oneself
 
+OneSelf 不是为了保存更多关于这个人的信息，而是用更少、更准确的判断，逐渐理解这个人。建页、挂原件和改公开页都是手段。只完成操作，却没有判断这份资料是否改变了对这个人的理解，任务没有完成。
+
+你是观察者，不是记录员。可以形成假设，不能把推测写成事实。不确定就留在候选，不要为了填栏目而写。不是每份资料都要做人格分析。原则在 `references/philosophy.md`，每次收到资料要过的检查点在 `references/cognition.md`。
+
+先完成所属人这次要做的事。没有要求保存进个人上下文时，不要把合同、体检、文案或译文写进去。意图不清时，不要擅自归档敏感资料。处理新的个人上下文时，每次都先读哲学和认知，再决定只存证据还是动画像。
+
 ## 何时用
 
-- 把简历、经历、笔记、对话、照片或证件整理进个人上下文，或查找、修改、删除、恢复已有的页和原件。
+- 所属人要求整理、保存或记住时，再判断只存证据，还是更新画像。
+- 所属人只要求分析、翻译、总结或修改时，先完成这件事。手里有文件，不等于可以写入个人上下文。
+- 查找、修改、删除、恢复已有的页和原件。
 - 改公开宣传页的版式，增加真实地址，预览，或申请上线。
 
 ## 先读发现文档
@@ -31,12 +39,15 @@ metadata:
 
 ## 动手前
 
-写、改、删或挂接文件之前，必须先读 `references/context.md`。定制、上传、预览或申请上线公开页之前，必须先读 `references/public-page.md`。
+每次处理新的个人上下文时，都必须先读 `references/philosophy.md` 和 `references/cognition.md`。不限于修改画像。要判断这个人是谁、最近的生活怎样，或写入可能改变长期画像、近期状态的资料之前，必须再读 `references/self.md`。这份参考里有 `self/soul` 和 `self/recent` 的模板。能读目录 `self` 时，读完参考再读这两页。这两页由系统在启动时按模板生成，不要再创建。`whoami` 读不到 `self` 时跳过，不要另起总览。写、改、删或挂接文件之前，必须先读 `references/context.md`。定制、上传、预览或申请上线公开页之前，必须先读 `references/public-page.md`。
 
 安装目录旁边有这些文件时，读本地文件。旁边没有时，用 `metadata.oneself_origin` 取：
 
+- `{oneself_origin}/skills/oneself/references/philosophy.md`
+- `{oneself_origin}/skills/oneself/references/cognition.md`
 - `{oneself_origin}/skills/oneself/references/context.md`
 - `{oneself_origin}/skills/oneself/references/public-page.md`
+- `{oneself_origin}/skills/oneself/references/self.md`
 
 ## 连接并由所属人批准
 
@@ -54,7 +65,7 @@ API Key 是另一种选择，只在所属人要给脚本或 CI 一把长期密�
 - 否则：`~/.config/oneself/config.json`
 - Windows：`%APPDATA%\oneself\config.json`
 
-文件不存在就创建，权限设为仅当前用户可读。不要提交到仓库。这个文件保存 `current` 和 `profiles`。`profiles` 的键是 origin。每个 profile 只有 `auth`，以及 `api_key` 或 `refresh_token` 其中之一。`auth` 只能是 `api_key` 或 `oauth`。用设备码时不写 `api_key`，改为 `refresh_token`。不要在同一个 profile 里同时留下 `api_key` 和 `refresh_token`。
+文件不存在就创建。POSIX 上权限必须是 `0600`，仅当前用户可读、可写。Windows 上用文件 ACL，只允许当前用户和必要的系统管理主体访问。不要提交到仓库。这个文件保存 `current` 和 `profiles`。`profiles` 的键是 origin。每个 profile 只有 `auth`，以及 `api_key` 或 `refresh_token` 其中之一。`auth` 只能是 `api_key` 或 `oauth`。用设备码时不写 `api_key`，改为 `refresh_token`。不要在同一个 profile 里同时留下 `api_key` 和 `refresh_token`。
 
 文件里只有顶层 `origin`、没有 `profiles` 时，把它当作唯一 profile，`current` 就是这个 origin。下次写入时改成 `current` 和 `profiles`，不得丢掉已有凭据。看到 `profiles` 时，禁止改回只有顶层 `origin` 的旧形状。
 
@@ -68,7 +79,7 @@ API Key 是另一种选择，只在所属人要给脚本或 CI 一把长期密�
 
 只用选中 origin 的 profile。不得用另一台的 refresh token 或 API Key。`ONESELF_API_KEY` 只覆盖这次选中的 origin，不写入文件。该 profile 没有凭据，或 `whoami` 返回未授权时，只为这台申请设备码或刷新，不要改用另一台。`current` 指向不存在的 profile 时同样停在这一台，不要回落。
 
-每次写入前必须先读到整个文件，只更新 origin 完全相同的 profile。这包括换上 API Key，不限于设备码换到 refresh token。写回整个文件时其他 origin 必须还在；读不到它们就停，不要再写。不得丢掉已有凭据。写回后权限仍仅当前用户可读。凭据只放该配置文件或 `ONESELF_API_KEY`。`ONESELF_API_KEY` 不写入文件。下次先用这份配置里该 origin 的凭据，不要重新问所属人要已经发过的密钥。
+每次写入前必须先读到整个文件，只更新 origin 完全相同的 profile。这包括换上 API Key，不限于设备码换到 refresh token。写回整个文件时其他 origin 必须还在；读不到它们就停，不要再写。不得丢掉已有凭据。写回后重新检查权限，仍须是 POSIX `0600` 或同等的 Windows ACL。凭据只放该配置文件或 `ONESELF_API_KEY`。`ONESELF_API_KEY` 不写入文件。下次先用这份配置里该 origin 的凭据，不要重新问所属人要已经发过的密钥。
 
 不得把 API Key 或所属人密码写入 Skill 文件、页面或公开站点。
 

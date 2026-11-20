@@ -27,6 +27,7 @@ export {
   SLUG_PATTERN,
   SOURCE_PATTERN,
 } from "./identity.ts";
+export { rejectStandingStructureWrite } from "./standing-judgment.ts";
 
 export { projectMarkdown } from "./markdown.ts";
 export type { PageProjection, Visibility } from "./markdown.ts";
@@ -46,6 +47,7 @@ export { rebuildProjections, referencedObjectKeys, runHourlyMaintenance } from "
 export {
   deletePage,
   editPage,
+  ensureStandingJudgment,
   getPage,
   getVersions,
   listPages,

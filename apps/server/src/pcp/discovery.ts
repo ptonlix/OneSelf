@@ -71,6 +71,10 @@ export function discoveryDocument(origin: string): Record<string, unknown> {
       })),
     },
     uploads,
+    self: {
+      soul: { source: "self", slug: "soul" },
+      recent: { source: "self", slug: "recent" },
+    },
   };
 }
 
