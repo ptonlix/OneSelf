@@ -6,7 +6,7 @@
 
 <p><strong>One self. One context. Every AI.</strong></p>
 
-<p>Open-source personal context management: build one context about you, let every AI understand you, and keep privacy and efficiency in balance.</p>
+<p>Open-source, self-hosted personal context and cognition.<br />Let AI do more than remember you. Let it come to understand you.</p>
 
 <p>
   <a href="https://github.com/ptonlix/OneSelf/stargazers"><img src="https://img.shields.io/github/stars/ptonlix/OneSelf" alt="GitHub stars" /></a>
@@ -26,6 +26,9 @@
 </p>
 
 <p>
+  <a href="#-what-is-oneself">What</a> ·
+  <a href="#-why-oneself">Why</a> ·
+  <a href="#-soul-and-recent">Soul and Recent</a> ·
   <a href="#-quick-start">Quick start</a> ·
   <a href="#-architecture">Architecture</a> ·
   <a href="#-agent-entry-points">Agent entry points</a> ·
@@ -47,35 +50,153 @@
 
 ## 💡 What is OneSelf
 
-You shouldn't have to start with an introduction every time.
+Do you introduce yourself again every time you switch AIs?
 
-You switched AIs. You are still you. Your experience, knowledge, work, and preferences should not move with a platform.
+Your experience, how you think, work habits, interests, and goals are scattered across platforms, chats, and files. An AI may remember some of that, and still fail to understand a person over time.
 
-OneSelf puts that material back in your hands.
+**OneSelf is not only a memory problem. It is how an AI keeps understanding a person.**
 
-Open source and self-hosted. One set of personal material, shared by many AIs. Every read, edit, and publication needs your approval.
+It puts your material, experience, knowledge, and files back in your hands, and lets an agent gradually draw out:
 
-**Your material, your call. AIs come to know you, instead of you adapting to each AI.**
+- What do you actually care about?
+- How do you think, judge, and solve problems?
+- How do you tend to work and live?
+- What are you pursuing over the long run?
+- What are you paying attention to, and living through, right now?
+- What is changing?
+
+That understanding is kept as two portraits:
+
+- **Soul: the long-term you.**
+- **Recent: the current you.**
+
+Source material is evidence. Personal cognition is what accumulates. Collaboration with AI is the point. With your approval, different AIs read the same context instead of meeting you from zero.
+
+**Your material, your call. Your portrait is built from evidence. Your context belongs to no AI platform.**
+
+## 🤔 Why OneSelf
+
+Most AIs already have Memory. Why OneSelf?
+
+1. **Memory is fragmented.** Switch AIs and you introduce yourself again. Platform memory does not travel, and it does not merge.
+2. **Remembering is not understanding.** Notes, facts, and a portrait of a person are different things. A large archive can still miss how someone thinks and decides.
+3. **Personal data should not belong to a platform.** You need to own, control, and authorize your context, instead of leaving that to each chat.
+
+> An AI should not have to meet you from zero every time. OneSelf lets every AI gradually understand the real you.
+
+## 🧠 Soul and Recent
+
+OneSelf does not only store what you said. It builds an understanding from material and evidence that accumulate over time. That understanding has two dimensions. `self` is a built-in source. `self/soul` and `self/recent` are created from templates. An agent does not start a separate overview.
+
+### Soul: the long-term you
+
+`self/soul` records stable traits that observation and repeated evidence can support. It is not a résumé and not a set of labels. One accidental act does not enter the formal portrait.
+
+| Dimension             | What it captures                                          |
+| --------------------- | --------------------------------------------------------- |
+| Values                | Beliefs: what you actually care about                     |
+| Thinking              | How you think and judge                                   |
+| Operating             | How you act, decide, and solve problems                   |
+| Habits                | Patterns that keep showing up                             |
+| Motivations           | What you pursue over the long run                         |
+| Strengths & Frictions | What you are good at, and what repeatedly gets in the way |
+
+Supported judgments enter the formal portrait. Patterns worth watching, but not yet confirmed, stay in the candidate observations. They are not confirmed traits.
+
+### Recent: the current you
+
+`self/recent` records the life that still matters to understand. It is not a diary, and it is not an upload log.
+
+| Dimension          | What it captures                                             |
+| ------------------ | ------------------------------------------------------------ |
+| Focus              | What you have been attending to, studying, or thinking about |
+| Work               | Current work, practice, and projects                         |
+| Mood               | Recent emotion, pressure, and drive                          |
+| Health             | Body and health states that already appear in the material   |
+| Life               | Daily life, routine, and changes of setting                  |
+| Relationships      | Relationships that matter right now                          |
+| Goals & Challenges | Current goals, difficulties, and choices                     |
+
+Every judgment cited as the present has a time basis and a `valid_until`. A past mood, a finished project, or an old health state is not the present just because it was written down.
+
+### How they differ
+
+|                | Soul                                                | Recent                            |
+| -------------- | --------------------------------------------------- | --------------------------------- |
+| Question       | Who is this person over time?                       | What are they living through now? |
+| Time           | Long-term, relatively stable                        | Recent, still changing            |
+| Content        | Values, thinking, habits, motives                   | Work, mood, health, daily life    |
+| How it changes | New evidence supports, revises, or drops a judgment | It moves with current life        |
+| Rule           | Do not conclude lightly                             | Do not treat expired notes as now |
+
+**Soul is the inner pattern. Recent is the present situation. Together they are what an AI needs in order to understand you.**
+
+The boundary is part of the product: one act is not a lasting trait; an agent's inference is not something you said; empty sections stay empty; expired notes are not the present; uploading a file is not permission to archive a life. Format and initialization: [skills/oneself/references/self.md](skills/oneself/references/self.md).
 
 ## ✨ Features
 
-**OneSelf is agent-first personal context management: agents read, organize, and maintain; you set the boundaries: who gets what, how much, and for how long.**
+**Ongoing understanding, not just an archive**
 
-**🗂️ Manage**
+- **Soul**: values, thinking, ways of working, habits, and motives, drawn from material that accumulates.
+- **Recent**: current focus, work, mood, health, daily life, relationships, and goals.
+- **Active linking**: an agent does not only file one document. It compares existing evidence for repeated patterns, real changes, and possible contradictions.
+- **Bounded cognition**: separate what you said, what the material shows, and what the agent infers. Uncertainty stays a candidate, or stays as source material.
+- **Revision**: new evidence can support, correct, or overturn an old judgment. The portrait should get closer to the person, not merely fuller.
 
-- **One context for everything about you**: experience, notes, and document summaries become pages, and photos and PDFs are uploaded as originals and attached to them; new kinds of data need no schema change, and facts, timelines, tags, and links between pages are indexed for keyword, filtered, and fact search.
-- **Every change is traceable and reversible**: incremental edits must carry the current version, so nobody silently overwrites changes they haven't seen; each page keeps its last 50 versions, and deleted pages and sources can be restored for 30 days.
+**One context for material and portrait**
 
-**🔐 Privacy**
+- **Material stays put**: experience, projects, notes, and knowledge become pages. Photos and PDFs are uploaded as originals and attached.
+- **Evidence you can follow**: judgments in Soul and Recent link back to source pages.
+- **Time and history**: facts, timelines, tags, links, and validity dates are searchable. Incremental edits carry the current version. Each page keeps its last 50 versions. Deleted pages and sources can be restored for 30 days.
+- **No second copy**: source pages keep the original. The portrait only keeps judgments that help later understanding.
 
-- **Private by default, public only by your choice**: permissions per source at three levels (read, write, change visibility); without access, a private page looks exactly like a missing one. Your public homepage shows only what you mark public, and agents can redesign it, but a new version goes live only after you approve.
-- **You approve every grant, and can revoke any of them**: whether an agent connects with an API key or the OAuth device flow, you confirm it on your approval page, and keys are shown once; revoke any single key or grant and the next request fails. Agents can't issue themselves keys or approve on your behalf.
-- **Your context stays on your machine**: one Node.js process with PostgreSQL and RustFS, deployed with Docker Compose; agents only use the API and never touch the database, object storage, or secrets.
+**Agent-first: maintain with judgment, do not passively record**
 
-**⚡ Efficiency**
+- **Finish the task you asked for first.** A one-off translation, summary, or edit does not become long-term memory.
+- **Update the portrait only when the material warrants it.** If the intent is unclear, sensitive material is not archived on its own.
+- **Start from empty.** A new user does not fill out a résumé first. Existing material can grow a portrait over time.
+- **One entry.** PCP, HTTP / OpenAPI, and MCP share one operation table. Different agents use the same context you approved.
 
-- **Agent-first, any AI can onboard itself**: an agent reads `/.well-known/pcp` and the `oneself` skill to learn how to use it; one operation table serves both HTTP (OpenAPI) and MCP, so any AI that speaks either can connect, with identical results.
-- **AI keeps it current, no more repeating yourself**: agents can read originals you upload and turn them into pages, remember or forget a fact, add a timeline entry, tags, and links, so the next AI always reads the latest you.
+**Yours to keep**
+
+- **Open source and self-hosted**: Node.js, PostgreSQL, and RustFS, deployed with Docker Compose. Agents only use the API.
+- **Private by default**: read, write, and visibility are granted per source. Without access, a private page looks like a missing one.
+- **You approve every grant, and can revoke any of them**: API keys and OAuth device codes both need your approval. Agents cannot issue themselves keys or approve on your behalf.
+- **Public only by your choice**: an agent may help build the public homepage. A new version goes live only after you approve.
+
+## 🗂️ How context is organized
+
+Personal context has three layers. Source material is evidence. Soul and Recent are the portrait. Collaboration is the point.
+
+### 1. Source material: keep the evidence
+
+Experience, projects, notes, knowledge, health records, photos, and PDFs stay in their own sources. You name those sources, for example:
+
+```text
+work/
+knowledge/
+health/
+life/
+```
+
+A page holds structured writing. Originals are uploaded with `file_upload` and attached to a page. An original is anonymously readable only when its page is public. These sources are not a fixed filing scheme, and they do not replace the portrait.
+
+### 2. Personal cognition: keep the judgments that matter
+
+Two pages sit above the material. They do not copy it. They record judgments that evidence can support, and link back to the source.
+
+```text
+self/soul      # long-term portrait, including candidate observations
+self/recent    # recent life, with a validity date on each current judgment
+```
+
+`self` is built in. On startup the server fills in either page if it is missing, and does not overwrite an existing body. An agent must not create them again, and must not write a separate overview in their place.
+
+### 3. AI collaboration: one context, many agents
+
+An approved agent reads Soul, Recent, and the relevant source pages through PCP, then helps from that understanding. Reads, edits, and publication stay inside the permissions you granted.
+
+Page format, Facts / Timeline, and operations: [context.md](skills/oneself/references/context.md). How to write the portrait: [self.md](skills/oneself/references/self.md).
 
 ## 🚀 Quick start
 
@@ -125,11 +246,7 @@ npx skills add https://your-origin -a <agent> -s oneself -y
 - `update` can move `.oneself-release` and `ONESELF_IMAGE`, but replacing the CLI binary still requires re-running the Release install command.
 - Passwords are kept. An older Release's install command never downgrades; set `ONESELF_REF=v1.2.3` to force a version
 
-**Implementation**
-
-- One install implementation: the CLI binary in [`apps/cli`](apps/cli)
-- `oneself.sh` / `oneself.ps1` are thin bootstraps ([`deploy/oneself-bootstrap.sh`](deploy/oneself-bootstrap.sh), [`deploy/oneself-bootstrap.ps1`](deploy/oneself-bootstrap.ps1)) that download and verify the platform binary, then hand over
-- Alpine/musl uses `oneself-linux-*-musl`
+Install and operations are implemented in [`apps/cli`](apps/cli). `oneself.sh` / `oneself.ps1` only download and verify the platform binary, then hand over. The scripts are [`deploy/oneself-bootstrap.sh`](deploy/oneself-bootstrap.sh) and [`deploy/oneself-bootstrap.ps1`](deploy/oneself-bootstrap.ps1).
 
 ### 💻 Option 2: Local development
 
@@ -209,19 +326,24 @@ For the Mermaid system overview, code boundaries, tables, and key flows, see [do
 
 ## 🤖 Agent entry points
 
-| Path                                   | Who                    | Purpose                                                                                                                             |
-| -------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `/.well-known/pcp`                     | Agents                 | Discovery: protocol version, operation list, auth headers, public endpoints, upload limits, OpenAPI, MCP, OAuth, skills             |
-| `/.well-known/agent-skills/index.json` | Installers             | Archive index for the single product skill `oneself`                                                                                |
-| `/skills/oneself/SKILL.md`             | Agents                 | The only product skill. Read the context reference before writing, and the public-page reference before customizing the public page |
-| `/openapi.json`                        | Agents, scripts        | OpenAPI generated from the operation registry and the same input schemas as MCP, with parameters, bodies, and security              |
-| `POST /mcp`                            | MCP clients            | Streamable HTTP; same auth headers as PCP                                                                                           |
-| `/pcp/v1/*`                            | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations                                                         |
-| `/pcp/v1/public/*`                     | Anyone                 | Only `visibility: public`, non-deleted pages                                                                                        |
-| `/media/{id}`                          | Depends on owning page | Original bytes; anonymous when the owning page is public                                                                            |
-| `/oauth/device/auth`, `/oauth/token`   | Agents                 | Request a device code; obtain and refresh access tokens                                                                             |
-| `/admin`                               | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches                                                         |
-| `/_preview/{releaseId}/`               | Anyone                 | Preview an unreleased build without moving the live pointer                                                                         |
+| Path                                        | Who                    | Purpose                                                                                                                 |
+| ------------------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `/.well-known/pcp`                          | Agents                 | Discovery: protocol version, operation list, auth headers, public endpoints, upload limits, OpenAPI, MCP, OAuth, skills |
+| `/.well-known/agent-skills/index.json`      | Installers             | Archive index for the single product skill `oneself`                                                                    |
+| `/skills/oneself/SKILL.md`                  | Agents                 | The only product skill: mission, how to connect, and which reference to read                                            |
+| `/skills/oneself/references/philosophy.md`  | Agents                 | Design philosophy: fewer, more accurate judgments, not a larger archive                                                 |
+| `/skills/oneself/references/cognition.md`   | Agents                 | How to observe, link, and where cognition must stop                                                                     |
+| `/skills/oneself/references/self.md`        | Agents                 | Format and initialization for `self/soul` and `self/recent`                                                             |
+| `/skills/oneself/references/context.md`     | Agents                 | Pages, originals, and file operations                                                                                   |
+| `/skills/oneself/references/public-page.md` | Agents                 | The public homepage: customize, preview, and request a launch                                                           |
+| `/openapi.json`                             | Agents, scripts        | OpenAPI generated from the operation registry and the same input schemas as MCP, with parameters, bodies, and security  |
+| `POST /mcp`                                 | MCP clients            | Streamable HTTP; same auth headers as PCP                                                                               |
+| `/pcp/v1/*`                                 | Authenticated callers  | Pages, originals, search, structure, sources, identity, and site operations                                             |
+| `/pcp/v1/public/*`                          | Anyone                 | Only `visibility: public`, non-deleted pages                                                                            |
+| `/media/{id}`                               | Depends on owning page | Original bytes; anonymous when the owning page is public                                                                |
+| `/oauth/device/auth`, `/oauth/token`        | Agents                 | Request a device code; obtain and refresh access tokens                                                                 |
+| `/admin`                                    | You (account owner)    | Sign in, change password, approve device codes, API keys, and site launches                                             |
+| `/_preview/{releaseId}/`                    | Anyone                 | Preview an unreleased build without moving the live pointer                                                             |
 
 Agents connect with either an API key (`Authorization: ApiKey <key>` or `X-Api-Key`) or an access token from the OAuth 2.1 device flow (`Authorization: Bearer <token>`). You approve both, and the same permissions give the same results. Errors are always `{ "error", "message" }`. Paths are defined in [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts).
 
@@ -239,42 +361,6 @@ Agents connect with either an API key (`Authorization: ApiKey <key>` or `X-Api-K
 | HTTP only            | `create_api_key`, `list_api_keys`, `revoke_api_key`                                                                                                      |
 
 </details>
-
-## 🧩 How context is organized
-
-A context is made of **pages** and **originals**, grouped by source, e.g. `profile`, `career`, `health`:
-
-- **Pages**: identified by `(source, slug)`; fields such as `type`, `title`, and `visibility` go in the frontmatter at the top, and any other keys are free-form. Statements that need a validity date or confidence go under `## Facts`, and dated events under `## Timeline`.
-- **Originals**: photos, scans, and documents (JPEG, PNG, WebP, GIF, PDF, up to 20 MiB each) are uploaded with `file_upload` and referenced from a page's `files`; an original is anonymously readable only when its page is public.
-
-```markdown
----
-type: profile
-title: Engineer
-name: Jane Doe
-visibility: public
-tags: [public-profile]
-files: []
----
-
-# Jane Doe
-
-Builds personal tools and developer products.
-
-## Facts
-
-- id: fact_01
-  entity: Jane Doe
-  statement: Lives in Shanghai
-  confidence: 0.9
-  valid_until: 2027-01-01
-
-## Timeline
-
-- 2024-06-01 | Joined a company | Backend work
-```
-
-Pages recognize only these two structured blocks, and a parse failure rolls back the whole write. Full rules: [skills/oneself/references/context.md](skills/oneself/references/context.md).
 
 ## 📁 Project structure
 
@@ -341,6 +427,7 @@ pnpm dev              # Build the admin UI and built-in public page, then start 
 - [Product requirements (PRD, Chinese)](docs/PRD.md): goals, non-goals, data model, PCP, acceptance criteria
 - [Architecture (Chinese)](docs/ARCHITECTURE.md): stack, code boundaries, data, paths, and key flows
 - [Skill: oneself](skills/oneself/SKILL.md)
+- [Philosophy](skills/oneself/references/philosophy.md) · [Cognition](skills/oneself/references/cognition.md) · [Soul / Recent](skills/oneself/references/self.md) · [Context operations](skills/oneself/references/context.md) · [Public page](skills/oneself/references/public-page.md)
 - On a running instance: `/.well-known/pcp`, `/.well-known/agent-skills/index.json`, `/openapi.json`, `/skills/oneself/SKILL.md`
 
 ## 🤝 Contributing

@@ -6,7 +6,7 @@
 
 <p><strong>One self. One context. Every AI.</strong></p>
 
-<p>开源个人上下文管理：建立一份关于你的上下文，让每个 AI 都了解你，在隐私与效率之间取得平衡。</p>
+<p>开源、自托管的个人上下文与认知系统<br />让 AI 不只是记住你，更能逐渐理解你</p>
 
 <p>
   <a href="https://github.com/ptonlix/OneSelf/stargazers"><img src="https://img.shields.io/github/stars/ptonlix/OneSelf" alt="GitHub stars" /></a>
@@ -26,6 +26,9 @@
 </p>
 
 <p>
+  <a href="#-这是什么">这是什么</a> ·
+  <a href="#-为什么需要-oneself">为什么</a> ·
+  <a href="#-soul-与-recent">Soul 与 Recent</a> ·
   <a href="#-快速开始">快速开始</a> ·
   <a href="#-架构">架构</a> ·
   <a href="#-agent-入口">Agent 入口</a> ·
@@ -47,35 +50,153 @@
 
 ## 💡 这是什么
 
-不必每次都从自我介绍开始。
+每换一个 AI，都要重新介绍自己？
 
-换了一个 AI，你还是你。你的经历、知识、作品和偏好，不应该跟着某个平台走。
+经历、思维方式、工作习惯、兴趣和目标，散落在不同平台、不同对话和不同文件里。AI 可能记住了一些信息，却很难形成对一个人的持续理解。
 
-OneSelf 把这些资料放回你自己手里。
+**OneSelf 想解决的，不只是记忆问题，而是 AI 如何持续理解一个人。**
 
-开源、自托管，一份个人资料，多种 AI 共用。每一次读取、修改和公开，都由你授权。
+它把个人资料、经历、知识和文件放回你自己手里，并由 Agent 从中逐渐提炼：
 
-**你的资料，你做主。AI 来了解你，而不是你反复适应 AI。**
+- 你真正重视什么？
+- 你如何思考、判断和解决问题？
+- 你习惯怎样工作和生活？
+- 你长期追求什么？
+- 你最近关注什么，正在经历什么？
+- 你正在发生怎样的变化？
 
-## ✨ 特性
+这些理解收成两份核心认知：
 
-**Agent-first：Agent 负责读取、整理和维护；你划定边界——给谁、给多少、何时收回。**
+- **Soul：理解长期的你。**
+- **Recent：理解近期的你。**
 
-**🗂️ 管理**
+原始资料是证据，个人认知是积累，AI 协作是最终价值。获得你的授权后，不同 AI 读取的是同一份上下文，不必每次从零认识你。
 
-- **一份上下文，汇集所有资料**：经历、笔记、证件摘要写成页面，照片和 PDF 作为原件上传并挂到页面上；事实、时间线、标签和页面链接可检索。
-- **改动可追溯、可回退**：增量编辑带版本校验；每页保留最近 50 个版本，删除后 30 天内可恢复。
+**你的资料，你做主。你的认知，由证据逐渐建立。你的上下文，不属于任何一个 AI 平台。**
 
-**🔐 隐私**
+## 🤔 为什么需要 OneSelf
 
-- **默认私有，公开由你决定**：按目录分读、写、改可见性；没有权限时，私有页和不存在的页看起来一样。公开主页改版需你批准才上线。
-- **每次授权你批准，随时可收回**：API Key 或 OAuth 设备码都要在批准页确认；密钥与授权可单独作废。Agent 不能给自己发密钥，也不能替你批准。
-- **数据留在你的机器上**：Node.js + PostgreSQL + RustFS，Docker Compose 部署；Agent 只走接口。
+现在很多 AI 都有 Memory。那为什么还要 OneSelf？
 
-**⚡ 效率**
+1. **记忆是割裂的。** 换一个 AI，就要重新介绍自己。平台里的记忆带不走，也合并不到一起。
+2. **记住不等于理解。** 资料、事实和个人认知不是一回事。堆了很多笔记，仍然可能不了解一个人怎样思考、怎样做决定。
+3. **个人数据不该属于某个平台。** 你需要拥有、控制和授权自己的上下文，而不是把理解你的权利交给每一次对话。
 
-- **自助接入**：读 `/.well-known/pcp` 和 Skill `oneself` 即可；HTTP（OpenAPI）与 MCP 同一张操作表。
-- **AI 帮你维护**：Agent 可整理原件成页面、记住或忘掉事实、补时间线与标签；下次任何 AI 读到的都是最新的你。
+> AI 不应该每次都从零认识你。OneSelf 让每一个 AI，都能逐渐理解真实的你。
+
+## 🧠 Soul 与 Recent
+
+OneSelf 不只保存你说过的话。它通过持续积累的资料和证据，逐渐形成对一个人的理解。个人认知分成两个维度。`self` 是内置目录；`self/soul` 和 `self/recent` 由系统按模板生成，Agent 不另起总览。
+
+### Soul：长期的你
+
+`self/soul` 记录经过观察、反复印证后，能够帮助 AI 理解这个人的稳定特征。它不是简历，也不是人物标签。一次偶然的行为不进入正式画像。
+
+| 维度                  | 理解什么                               |
+| --------------------- | -------------------------------------- |
+| Values                | 价值观与信念：真正重视什么             |
+| Thinking              | 思维与认知：如何思考和判断             |
+| Operating             | 做事与决策：如何行动和解决问题         |
+| Habits                | 习惯与行为规律：长期反复出现的做法     |
+| Motivations           | 内在动机：长期追求和驱动力             |
+| Strengths & Frictions | 优势与摩擦：擅长什么，什么会反复挡住你 |
+
+有证据支持的判断进入正式画像。值得以后再验证、但尚未确认的规律留在候选观察区，不能说成已经确认的特征。
+
+### Recent：最近的你
+
+`self/recent` 记录最近一段时间仍有理解价值的生活状态。它不是日记流水账，也不是上传记录。
+
+| 维度               | 理解什么                       |
+| ------------------ | ------------------------------ |
+| Focus              | 最近关注、研究和思考什么       |
+| Work               | 当前工作、事业和项目           |
+| Mood               | 最近的情绪、压力和动力         |
+| Health             | 资料里已经出现的身体与健康状态 |
+| Life               | 生活状态、作息和环境变化       |
+| Relationships      | 近期重要的人际关系             |
+| Goals & Challenges | 当前目标、困难和面临的选择     |
+
+每条要当作现状引用的判断都有时间依据和 `valid_until`。过期的情绪、已经结束的项目和历史健康状态，不会因为曾经被记录就一直被当作现在。
+
+### 两者有什么区别？
+
+|          | Soul                         | Recent                   |
+| -------- | ---------------------------- | ------------------------ |
+| 核心问题 | 这个人长期是怎样的？         | 这个人最近正在经历什么？ |
+| 时间属性 | 长期、相对稳定               | 近期、持续变化           |
+| 内容     | 价值观、思维、习惯、动机     | 工作、情绪、健康、生活   |
+| 更新方式 | 新证据支持、修正或推翻旧认知 | 随近期生活变化更新       |
+| 维护原则 | 不轻易下结论                 | 不把过期信息当成现状     |
+
+**Soul 理解内在规律，Recent 理解现实处境。两者一起，才是 AI 理解你的基础。**
+
+认知有边界：不把单次行为当作长期特征；不把 Agent 推断当成用户自述；不为了填满画像而编造；不把过期信息当成当前状态；不因为你上传了资料，就擅自做长期归档。格式与初始化见 [skills/oneself/references/self.md](skills/oneself/references/self.md)。
+
+## ✨ 核心特性
+
+**持续理解：从资料管理到个人认知**
+
+- **Soul 长期画像**：从持续积累的资料里理解价值观、思维方式、做事规律、习惯和内在动机。
+- **Recent 近期画像**：了解最近的关注、工作、情绪、健康、生活、人际关系和目标。
+- **主动关联**：Agent 不只整理单份资料，还会对照已有证据，发现重复模式、重要变化和潜在矛盾。
+- **有边界的认知**：区分用户自述、行为观察和 Agent 推断。不确定就留在候选，或只保留原始证据。
+- **持续演化**：新证据可以支持、修正或推翻旧判断。理解应逐渐接近真实，而不是越记越满。
+
+**个人上下文：资料与认知统一管理**
+
+- **资料留在原处**：经历、项目、笔记和知识写成页面，照片、PDF 等原件上传并挂接。
+- **证据可追溯**：Soul 和 Recent 里的判断链回原始资料，避免脱离证据的主观描述。
+- **时间与历史**：Facts、Timeline、标签、页面链接和有效期可检索。增量编辑带版本校验；每页保留最近 50 个版本，删除后 30 天内可恢复。
+- **不重复保存**：原始资料留在各自目录。个人认知只提炼有价值的判断，不把原文再抄一遍。
+
+**Agent-first：主动维护，而不是被动记录**
+
+- **先完成你这次要做的事**：翻译、总结、修改等一次性任务，不会自动变成长期记忆。
+- **按价值决定是否更新画像**：意图不清时，不擅自归档敏感资料。
+- **从空白长出来**：新用户不必先填一份简历。已有资料的人，可以逐步从历史证据里建立画像。
+- **同一个入口**：PCP、HTTP / OpenAPI 和 MCP 使用同一张操作表。不同 Agent 用的是你批准过的同一份上下文。
+
+**自主与隐私：数据始终由你掌握**
+
+- **开源、自托管**：Node.js、PostgreSQL 和 RustFS，用 Docker Compose 部署。Agent 只走接口。
+- **默认私有**：按目录分读、写、改可见性。没有权限时，私有页和不存在的页看起来一样。
+- **授权可控**：API Key 和 OAuth 设备码都要你批准，也可以单独收回。Agent 不能给自己发密钥，也不能替你批准。
+- **公开由你决定**：Agent 可以协助做个人公开主页，上线需要你批准。
+
+## 🗂️ 上下文怎么组织
+
+个人上下文分三层。原始资料是证据，Soul 和 Recent 是认知结果，AI 协作是最终价值。
+
+### 1. 原始资料：保留真实证据
+
+经历、项目、笔记、知识、健康资料、照片和 PDF，留在各自的目录里。目录名由你决定，例如：
+
+```text
+work/
+knowledge/
+health/
+life/
+```
+
+页面保存结构化文字。原件用 `file_upload` 上传，挂到对应页面；挂接页公开时，原件才可匿名访问。这些目录不是固定档案分类，也不代替画像。
+
+### 2. 个人认知：提炼有价值的理解
+
+在资料之上有两份核心页面。它们不复制原文，只记录经过判断、有证据支持的认知，并用页面链接追溯来源。
+
+```text
+self/soul      # 长期个人认知，含候选观察
+self/recent    # 近期生活画像，判断带有效期
+```
+
+`self` 是内置目录。服务启动时会补上缺失的这两页，已有正文不覆盖。Agent 不要再创建，也不要另写一份总览来代替。
+
+### 3. AI 协作：共享同一份个人上下文
+
+获得授权的 Agent 通过 PCP 读取 Soul、Recent 和相关原始资料，在理解你的基础上协作。读取、修改和公开都受你的权限约束。
+
+页面格式、Facts / Timeline 和操作规则见 [context.md](skills/oneself/references/context.md)。画像怎么写见 [self.md](skills/oneself/references/self.md)。
 
 ## 🚀 快速开始
 
@@ -125,11 +246,7 @@ npx skills add https://你的站点 -a <agent> -s oneself -y
 - `update` 可改 `.oneself-release` 和 `ONESELF_IMAGE`，但更换 CLI 二进制仍需重跑 Release 安装命令。
 - 口令保留。旧 Release 的安装命令不会降级；确要换旧版设 `ONESELF_REF=v1.2.3`
 
-**实现**
-
-- 安装与运维只有一套实现：CLI 二进制 [apps/cli](apps/cli)
-- `oneself.sh` / `oneself.ps1` 是薄启动脚本（[deploy/oneself-bootstrap.sh](deploy/oneself-bootstrap.sh)、[deploy/oneself-bootstrap.ps1](deploy/oneself-bootstrap.ps1)），只下载、校验本平台二进制后转交
-- Alpine/musl 用 `oneself-linux-*-musl`
+安装与运维的实现在 [apps/cli](apps/cli)。`oneself.sh` / `oneself.ps1` 只下载并校验本平台二进制后转交，脚本见 [deploy/oneself-bootstrap.sh](deploy/oneself-bootstrap.sh) 与 [deploy/oneself-bootstrap.ps1](deploy/oneself-bootstrap.ps1)。
 
 ### 💻 方式二：本地开发
 
@@ -197,19 +314,24 @@ Mermaid 版系统总览、代码边界、数据表和关键流程见 [docs/ARCHI
 
 ## 🤖 Agent 入口
 
-| 路径                                   | 谁用           | 用途                                                                                   |
-| -------------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
-| `/.well-known/pcp`                     | Agent          | 发现文档：协议版本、操作清单、认证头、公开接口、上传限制、OpenAPI、MCP、OAuth 和 Skill |
-| `/.well-known/agent-skills/index.json` | 安装器         | 产品 Skill `oneself` 的 archive 索引                                                   |
-| `/skills/oneself/SKILL.md`             | Agent          | 唯一产品 Skill。写页前读 context reference，改公开页前读 public-page reference         |
-| `/openapi.json`                        | Agent、脚本    | 由操作注册表和 MCP 同一份输入 schema 生成的 OpenAPI                                    |
-| `POST /mcp`                            | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                                                     |
-| `/pcp/v1/*`                            | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                                             |
-| `/pcp/v1/public/*`                     | 任何人         | 只返回 `visibility: public` 且未删除的页                                               |
-| `/media/{id}`                          | 视所属页而定   | 原件字节。所属页公开时匿名可读                                                         |
-| `/oauth/device/auth`、`/oauth/token`   | Agent          | 申请设备码、换取和刷新访问令牌                                                         |
-| `/admin`                               | 所属人         | 登录、改密、批准设备码、API Key 和站点上线                                             |
-| `/_preview/{releaseId}/`               | 任何人         | 未上线 release 的预览                                                                  |
+| 路径                                        | 谁用           | 用途                                                                                   |
+| ------------------------------------------- | -------------- | -------------------------------------------------------------------------------------- |
+| `/.well-known/pcp`                          | Agent          | 发现文档：协议版本、操作清单、认证头、公开接口、上传限制、OpenAPI、MCP、OAuth 和 Skill |
+| `/.well-known/agent-skills/index.json`      | 安装器         | 产品 Skill `oneself` 的 archive 索引                                                   |
+| `/skills/oneself/SKILL.md`                  | Agent          | 唯一产品 Skill：使命、连接方式，以及何时读哪份 reference                               |
+| `/skills/oneself/references/philosophy.md`  | Agent          | 设计哲学：用更少、更准确的判断理解一个人                                               |
+| `/skills/oneself/references/cognition.md`   | Agent          | 主动观察、关联和认知判断的边界                                                         |
+| `/skills/oneself/references/self.md`        | Agent          | `self/soul` 与 `self/recent` 的格式和初始化                                            |
+| `/skills/oneself/references/context.md`     | Agent          | 页面、原件和文件操作                                                                   |
+| `/skills/oneself/references/public-page.md` | Agent          | 个人公开主页：定制、预览和申请上线                                                     |
+| `/openapi.json`                             | Agent、脚本    | 由操作注册表和 MCP 同一份输入 schema 生成的 OpenAPI                                    |
+| `POST /mcp`                                 | MCP 客户端     | Streamable HTTP，认证头与 PCP 相同                                                     |
+| `/pcp/v1/*`                                 | 已认证的调用方 | 页、原件、检索、结构、目录、身份和站点操作                                             |
+| `/pcp/v1/public/*`                          | 任何人         | 只返回 `visibility: public` 且未删除的页                                               |
+| `/media/{id}`                               | 视所属页而定   | 原件字节。所属页公开时匿名可读                                                         |
+| `/oauth/device/auth`、`/oauth/token`        | Agent          | 申请设备码、换取和刷新访问令牌                                                         |
+| `/admin`                                    | 所属人         | 登录、改密、批准设备码、API Key 和站点上线                                             |
+| `/_preview/{releaseId}/`                    | 任何人         | 未上线 release 的预览                                                                  |
 
 接入二选一：API Key（`Authorization: ApiKey <key>` 或 `X-Api-Key`），或 OAuth 2.1 设备码访问令牌（`Authorization: Bearer <token>`）。都要所属人批准。路径以 [`packages/operations/src/registry.ts`](packages/operations/src/registry.ts) 为准。
 
@@ -227,42 +349,6 @@ Mermaid 版系统总览、代码边界、数据表和关键流程见 [docs/ARCHI
 | 仅 HTTP    | `create_api_key`、`list_api_keys`、`revoke_api_key`                                                                                                      |
 
 </details>
-
-## 🧩 上下文怎么组织
-
-一份上下文由**页面**和**原件**组成，按目录（source）分组，例如 `profile`、`career`、`health`：
-
-- **页面**：由 `(source, slug)` 标识；`type`、`title`、`visibility` 等写在 frontmatter 里。需要有效期或置信度的陈述放进 `## Facts`，经历放进 `## Timeline`。
-- **原件**：JPEG、PNG、WebP、GIF、PDF（单个最大 20 MiB）用 `file_upload` 上传，在页面的 `files` 里引用；挂接页公开时原件才可匿名访问。
-
-```markdown
----
-type: profile
-title: 工程师
-name: 张三
-visibility: public
-tags: [public-profile]
-files: []
----
-
-# 张三
-
-做个人工具和开发者产品。
-
-## Facts
-
-- id: fact_01
-  entity: 张三
-  statement: 现居上海
-  confidence: 0.9
-  valid_until: 2027-01-01
-
-## Timeline
-
-- 2024-06-01 | 加入某公司 | 做后端
-```
-
-完整规则见 [skills/oneself/references/context.md](skills/oneself/references/context.md)。
 
 ## 📁 项目结构
 
@@ -323,6 +409,7 @@ pnpm dev              # 构建管理端和内置公开页，再启动应用
 - [产品需求（PRD）](docs/PRD.md)
 - [技术架构](docs/ARCHITECTURE.md)
 - [Skill：oneself](skills/oneself/SKILL.md)
+- [哲学](skills/oneself/references/philosophy.md) · [认知](skills/oneself/references/cognition.md) · [Soul / Recent](skills/oneself/references/self.md) · [上下文操作](skills/oneself/references/context.md) · [公开页](skills/oneself/references/public-page.md)
 - 运行中的实例：`/.well-known/pcp`、`/openapi.json`、`/skills/oneself/SKILL.md`
 
 ## 🤝 贡献
