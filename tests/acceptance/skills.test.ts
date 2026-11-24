@@ -194,7 +194,16 @@ describe("product skills", () => {
     expect(self).toContain("不是收集箱");
     expect(self).toContain("来源：行为观察");
     expect(self).toContain("不是系统围栏");
-    expect(self).toContain("不要在栏目下再抄一遍");
+    expect(self).toContain("恰好一句提炼");
+    expect(self).toContain("不得另加块里没有的说法");
+    expect(self).toContain("不要写「暂无足够证据」");
+    expect(self).toContain("同一次修改必须重写或删掉这句");
+    expect(self).toContain("必须和所在栏目一致");
+    expect(self).toContain("不重复提炼");
+    const recentStart = self.indexOf("type: recent");
+    const recentTemplate = self.slice(recentStart, self.indexOf("```", recentStart));
+    expect(recentTemplate).toContain("## Timeline — 近期重要变化");
+    expect(recentTemplate).not.toContain("## Facts — 近期有效判断");
     expect(self).toContain("`remember`");
     expect(self).toContain("不得写入密钥或私有页");
     expect(self).toContain("credentials: omit");
