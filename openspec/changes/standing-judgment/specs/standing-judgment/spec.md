@@ -32,7 +32,7 @@ The soul seed MUST contain `01. Values — 价值观与信念`, `02. Thinking �
 - **THEN** the body contains `01. Values — 价值观与信念`, `06. Strengths & Frictions — 优势与摩擦`, and `Observations — 候选观察`
 
 ### Requirement: Seed recent uses the bilingual headings
-The recent seed MUST contain `01. Focus — 近期关注`, `02. Work — 工作与事业`, `03. Mood — 情绪与心理状态`, `04. Health — 身体与健康`, `05. Life — 生活状态`, `06. Relationships — 人际关系`, `07. Goals & Challenges — 目标与困扰`, `Facts — 近期有效判断`, and `Timeline — 近期重要变化`.
+The recent seed MUST contain `01. Focus — 近期关注`, `02. Work — 工作与事业`, `03. Mood — 情绪与心理状态`, `04. Health — 身体与健康`, `05. Life — 生活状态`, `06. Relationships — 人际关系`, `07. Goals & Challenges — 目标与困扰`, and `Timeline — 近期重要变化`. It MUST NOT contain `## Facts — 近期有效判断`.
 
 #### Scenario: Recent seed names focus and goals
 - **WHEN** a caller reads a just-seeded `self/recent`

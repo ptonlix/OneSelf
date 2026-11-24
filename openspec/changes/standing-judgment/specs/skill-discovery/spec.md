@@ -55,7 +55,7 @@ The archive MUST contain `SKILL.md` at its root and `references/context.md`, `re
 - **THEN** the text contains `01. Values — 价值观与信念`, `06. Strengths & Frictions — 优势与摩擦`, and `Observations — 候选观察`
 
 ### Requirement: Self reference contains the recent template
-`references/self.md` MUST include a copyable `self/recent` template with `type: recent`, `as_of`, and the headings `01. Focus — 近期关注`, `02. Work — 工作与事业`, `03. Mood — 情绪与心理状态`, `04. Health — 身体与健康`, `05. Life — 生活状态`, `06. Relationships — 人际关系`, `07. Goals & Challenges — 目标与困扰`, `Facts — 近期有效判断`, and `Timeline — 近期重要变化`. It MUST say the page is a current-life portrait, not a log of uploads.
+`references/self.md` MUST include a copyable `self/recent` template with `type: recent`, `as_of`, and the headings `01. Focus — 近期关注`, `02. Work — 工作与事业`, `03. Mood — 情绪与心理状态`, `04. Health — 身体与健康`, `05. Life — 生活状态`, `06. Relationships — 人际关系`, `07. Goals & Challenges — 目标与困扰`, and `Timeline — 近期重要变化`. That template MUST NOT contain `## Facts — 近期有效判断`. It MUST say the page is a current-life portrait, not a log of uploads.
 
 #### Scenario: Recent headings are bilingual
 - **WHEN** an agent reads `references/self.md`

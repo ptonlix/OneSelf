@@ -42,8 +42,12 @@ describe("standing judgment", () => {
     expect(recent.value.markdown).toContain("01. Focus — 近期关注");
     expect(recent.value.markdown).toContain("07. Goals & Challenges — 目标与困扰");
     expect(recent.value.markdown).toContain("过期的判断退出栏目");
+    expect(recent.value.markdown).toContain("有判断的栏目先写一句提炼，判断块写在该栏下。");
+    expect(recent.value.markdown).toContain("没有判断的栏目留空。");
+    expect(recent.value.markdown).toContain("Timeline — 近期重要变化");
     expect(recent.value.markdown).toContain("as_of: 2026-03-01");
     expect(recent.value.markdown).not.toContain("id: work-001");
+    expect(recent.value.markdown).not.toContain("## Facts — 近期有效判断");
     expect(recent.value.markdown).not.toContain("## Facts\n");
     expect(recent.value.visibility).toBe("private");
 

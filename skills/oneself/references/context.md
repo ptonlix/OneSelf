@@ -75,7 +75,7 @@ files: []
 
 ## 两种 fence
 
-只认两种 fence：标题恰好是 `## Facts` 和 `## Timeline`。不要发明新的围栏。`## Facts — 近期有效判断` 这种带后缀的标题不是系统围栏，系统不会解析。画像页的判断块由 Agent 用 `edit_page` 维护，见 `references/self.md`。围栏解析失败时，整次写入回滚，不留下半页投影。
+只认两种 fence：标题恰好是 `## Facts` 和 `## Timeline`。不要发明新的围栏。`## 01. Focus — 近期关注` 这种双语栏目标题不是系统围栏，系统不会解析。画像页的判断块由 Agent 用 `edit_page` 维护，见 `references/self.md`。围栏解析失败时，整次写入回滚，不留下半页投影。
 
 一项资料自己的字段放在 frontmatter。只有需要有效期或置信度的陈述，才写入 `## Facts`。
 
